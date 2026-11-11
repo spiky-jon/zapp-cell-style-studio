@@ -6,7 +6,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const K = window.KNOWLEDGE, BASES = window.CELL_BASES, C = window.Convert;
-  const S = { screens: [], cells: [], sel: null, example: true, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false,
+  const S = { screens: [], cells: [], sel: null, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false,
     fonts: { uploads: {}, picks: [] } };
   const ICONS = K.icons;
   let engine = null, sample = null, downloads = null, mcp = null, figmaSession = null;
@@ -324,7 +324,6 @@
   async function analyse() {
     if (!sample || S.busy || !S.screens.length) return;
     S.busy = true; $('analyse').disabled = true; $('log').textContent = '';
-    if (S.example) { S.cells = []; S.example = false; }
     const todo = S.screens.filter(s => s.state !== 'Done');
     for (const scr of todo) {
       scr.state = 'Reading…'; renderScreens(); log(`${scr.name}: reading the screen…`);
@@ -400,15 +399,12 @@
     for (const t of ['import', 'cells', 'screens', 'compare']) { $('t-' + t).setAttribute('aria-selected', t === v); $('v-' + t).hidden = t !== v; }
     if (v === 'compare') renderDoc();
     if (v === 'screens') renderMock();
-    try { localStorage.setItem('css.view', v); } catch (e) {}
   }
   for (const t of ['import', 'cells', 'screens', 'compare']) $('t-' + t).addEventListener('click', () => show(t));
-  $('goImport').addEventListener('click', () => show('import'));
 
   const cellBg = c => c.spec?.appBg || '#121212';
   function renderAll() {
     $('nCells').textContent = S.cells.length;
-    $('exampleBanner').hidden = !S.example;
     $('listHint').textContent = S.cells.length ? `${S.cells.length}` : '';
     // list grouped by screen
     const groups = new Map();
@@ -429,7 +425,7 @@
   }
   function renderStage() {
     const c = S.cells.find(x => x.id === S.sel) || S.cells[0];
-    if (!c) { $('stage').innerHTML = '<div class="empty"><b>Nothing to show</b><span>Cells appear here once they are built.</span></div>'; return; }
+    if (!c) { $('stage').innerHTML = '<div class="empty"><b>No cells yet</b><span>Add your designs, then find their cells.</span><button class="btn small" id="goImport" type="button">Add designs</button></div>'; $('goImport').onclick = () => show('import'); return; }
     S.sel = c.id;
     $('stage').innerHTML = `<div class="head"><h1>${esc(c.desc.name)}</h1><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span>
       <span class="chip">${esc(TYPE[c.desc.plugin] || c.desc.plugin)}</span><span class="chip">${esc(c.output || '')}</span></div>
@@ -758,10 +754,7 @@
   (async () => {
     renderScreens();
     try { engine = await bootEngine(); } catch (e) { $('stage').innerHTML = `<div class="err">${esc(e.message)} Reload the page to try again.</div>`; return; }
-    // example cells from the rules, so the studio opens showing what it makes
-    S.cells = (K.examples.cells || []).map(d => ({ id: uid(), desc: JSON.parse(JSON.stringify(d)), screenId: null, screens: [d.screen], crop: null }));
-    for (const c of S.cells) await buildCell(c);
-    S.sel = S.cells[0]?.id; renderIconPanel(); renderAll();
+    renderIconPanel(); renderAll();
     if (window.claude?.use) {
       const [smp, dl, m] = await Promise.all(['sample', 'downloads', 'mcp'].map(n => window.claude.use(n).catch(() => null)));
       sample = smp; downloads = dl; mcp = m;
@@ -771,6 +764,5 @@
     } else $('aiHint').textContent = 'Open the published studio to find cells with Claude.';
     $('dlAll').disabled = $('dlReport').disabled = false;
     renderScreens();
-    try { const v = localStorage.getItem('css.view'); if (['import', 'screens', 'compare'].includes(v)) show(v); } catch (e) {}
   })();
 })();

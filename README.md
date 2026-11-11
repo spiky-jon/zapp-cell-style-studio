@@ -46,7 +46,7 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
 |---|---|
 | `knowledge/rules.md` | The framework rules Claude follows. **Edit this to teach the studio something new.** |
 | `knowledge/schema.md` | The cell description format Claude answers in (and the converter reads). |
-| `knowledge/examples.json` | Worked examples from a reviewed build; also the studio's opening example cells. |
+| `knowledge/examples.json` | Worked examples from a reviewed build, sent to Claude with every screen. |
 | `src/index.html`, `src/studio.js` | The studio page and its logic. |
 | `src/convert.js` | Description -> build spec. Runs in the page and in Node. |
 | `engine/` | The cell engine: preview template (with `window.CellEngine`), builder library, plugin templates (16.0.0-alpha exports), tokens, action assets. |

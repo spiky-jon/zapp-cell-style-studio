@@ -194,8 +194,8 @@ ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13p
   <header class="top">
     <div class="brand"><span class="mark" aria-hidden="true"><i></i></span>Cell Style Studio <small>Zapp</small></div>
     <nav class="seg" role="tablist" aria-label="Studio views">
-      <button role="tab" id="t-import" aria-controls="v-import" aria-selected="false">Designs <span class="n" id="nScreens">0</span></button>
-      <button role="tab" id="t-cells" aria-controls="v-cells" aria-selected="true">Cells <span class="n" id="nCells">0</span></button>
+      <button role="tab" id="t-import" aria-controls="v-import" aria-selected="true">Designs <span class="n" id="nScreens">0</span></button>
+      <button role="tab" id="t-cells" aria-controls="v-cells" aria-selected="false">Cells <span class="n" id="nCells">0</span></button>
       <button role="tab" id="t-screens" aria-controls="v-screens" aria-selected="false">Screens</button>
       <button role="tab" id="t-compare" aria-controls="v-compare" aria-selected="false">Report</button>
     </nav>
@@ -207,7 +207,7 @@ ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13p
 
   <main style="min-height:0;display:grid">
     <!-- Designs -->
-    <section class="view" id="v-import" role="tabpanel" aria-labelledby="t-import" hidden>
+    <section class="view" id="v-import" role="tabpanel" aria-labelledby="t-import">
       <div class="panel">
         <div class="ph"><h2>Add designs</h2></div>
         <div class="pb">
@@ -255,7 +255,7 @@ ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13p
     </section>
 
     <!-- Cells -->
-    <section class="view" id="v-cells" role="tabpanel" aria-labelledby="t-cells">
+    <section class="view" id="v-cells" role="tabpanel" aria-labelledby="t-cells" hidden>
       <nav class="panel" aria-label="Cells">
         <div class="iconp" id="iconPanel"></div>
         <div class="iconp fontp" id="fontPanel" hidden></div>
@@ -263,10 +263,6 @@ ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13p
         <div class="list" id="list"></div>
       </nav>
       <div class="canvas">
-        <div class="banner" id="exampleBanner" hidden>
-          <span><b>Example cells.</b> These four come from the studio's rules. Add your designs to build your own.</span>
-          <button class="btn small" id="goImport" type="button">Add designs</button>
-        </div>
         <div class="stage" id="stage"></div>
         <div class="grid" id="grid"></div>
       </div>
