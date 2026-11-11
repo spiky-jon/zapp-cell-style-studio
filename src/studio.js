@@ -153,25 +153,32 @@
     const lib = ICONS.libraries[S.icons.library] || ICONS.libraries.lucide;
     return lib.icons[role] || ICONS.libraries.lucide.icons[role] || lib.icons['chevron-right'];
   }
-  async function iconPng(role, { size = 24, iconSize, color = '#FFFFFF', circle = null } = {}) {
-    const key = [S.icons.library, role, size, iconSize, color, circle].join('|');
+  // plate: a fill behind the icon; radius null = circle, 0 = square, n = rounded corners (points)
+  async function iconPng(role, { size = 24, height, iconSize, color = '#FFFFFF', circle = null, plate = null, radius = null } = {}) {
+    if (circle && !plate) { plate = circle; radius = null; }
+    const key = [S.icons.library, role, size, height, iconSize, color, plate, radius].join('|');
     if (iconCache.has(key)) return iconCache.get(key);
-    const k = 3, px = Math.round(size * k), ip = Math.round((iconSize || size) * k);
+    const k = 3, px = Math.round(size * k), py = Math.round((height || size) * k), ip = Math.round((iconSize || Math.min(size, height || size)) * k);
     const svg = iconSvg(role).replace('<svg', `<svg width="${ip}" height="${ip}" style="color:${color}"`);
     const img = new Image();
     await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error(`Icon ${role} didn't draw.`)); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
-    const c = document.createElement('canvas'); c.width = c.height = px; const g = c.getContext('2d');
-    if (circle) { g.fillStyle = circle; g.beginPath(); g.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2); g.fill(); }
-    // play glyphs sit a touch right of centre so they look centred in a circle
-    const nudge = circle && role === 'play' ? ip * 0.06 : 0;
-    g.drawImage(img, (px - ip) / 2 + nudge, (px - ip) / 2, ip, ip);
+    const c = document.createElement('canvas'); c.width = px; c.height = py; const g = c.getContext('2d');
+    if (plate) {
+      g.fillStyle = plate; g.beginPath();
+      if (radius == null) g.ellipse(px / 2, py / 2, px / 2, py / 2, 0, 0, Math.PI * 2);
+      else g.roundRect(0, 0, px, py, Math.min(radius * k, px / 2, py / 2));
+      g.fill();
+    }
+    // play glyphs sit a touch right of centre so they look centred on a plate
+    const nudge = plate && role === 'play' ? ip * 0.06 : 0;
+    g.drawImage(img, (px - ip) / 2 + nudge, (py - ip) / 2, ip, ip);
     const url = c.toDataURL('image/png'); iconCache.set(key, url); return url;
   }
   async function drawAssets(list) {
     const out = [];
     for (const a of list || []) {
       const color = a.kind === 'button' ? (a.flavour === 'flavour_2' ? S.icons.dark : S.icons.light) : a.color;
-      try { out.push({ ...a, color, dataUrl: await iconPng(a.role, { size: a.size, iconSize: a.iconSize, color, circle: a.circle }) }); } catch (e) { console.warn(e); }
+      try { out.push({ ...a, color, dataUrl: await iconPng(a.role, { size: a.size, height: a.height, iconSize: a.iconSize, color, circle: a.circle, plate: a.plate, radius: a.radius }) }); } catch (e) { console.warn(e); }
     }
     return out;
   }
@@ -182,7 +189,7 @@
     try {
       const scr = S.screens.find(s => s.id === c.screenId);
       const conv = C.toSpec(c.desc, { device: scr?.device || c.desc.device, screenW: scr?.screenW, collection: collection() });
-      c.spec = conv.spec; c.base = conv.base; c.warnings = conv.warnings;
+      c.spec = conv.spec; c.base = conv.base; c.warnings = conv.warnings; c.labels = conv.labels || [];
       await ensureFonts(c.desc);
       const built = engine.CellEngine.buildCell(BASES[conv.base], c.spec);
       c.json = built.json; c.output = built.output; c.overlay = built.overlay;
@@ -202,7 +209,8 @@
     for (const a of (c.assets || []).filter(a => a.kind === 'button')) (actionPng[a.asset] ||= {})[a.flavour] = a.dataUrl;
     return { screenW: c.spec.screen, pad: lay.padding || 0, layout: lay.type ? lay : null, appBg: c.spec.appBg, overlay: c.overlay?.dataUrl,
       title: c.spec.sampleTitle || 'Content Title', summary: c.spec.sampleSummary, ext: c.spec.sampleFeed,
-      badge: A('badge'), action: A('action'), infoIcon: A('header'), actionPng };
+      badge: A('badge'), action: A('action'), infoIcon: A('header'), actionPng,
+      actionLabels: Object.fromEntries((c.labels || []).map(l => [l.action, l.text])) };
   }
   const renderInEngine = c => engine.CellEngine.render(c.json, renderOpts(c));
 
@@ -355,10 +363,37 @@
       }
       renderScreens();
     }
+    await alignHeaders();
     S.busy = false; renderScreens(); renderAll();
     if (S.cells.length) { S.sel = S.sel || S.cells[0].id; show('cells'); toast(`${S.cells.length} cell styles ready`); }
   }
   $('analyse').addEventListener('click', analyse);
+
+  // Headers usually line up with the first item of the rail, list or grid under them. When a header's title starts a
+  // few points off that edge (a measuring slip), move it onto the edge; bigger differences are left as designed.
+  const leftPad = d => d.plugin === 'cell_info' && Array.isArray(d.header?.padding) && d.header.padding[3] != null ? num(d.header.padding[3]) : num((d.cell?.padding || [])[3]);
+  const insetOf = d => num(d.layout?.padding) + leftPad(d) + (d.plugin === 'cell_info' ? 0 : num((d.image?.margin || [])[3]));
+  async function alignHeaders() {
+    const want = new Map();
+    for (const scr of S.screens) {
+      const lay = scr.layout || [];
+      for (let i = 0; i < lay.length - 1; i++) {
+        const h = findCell(lay[i].cell), r = findCell(lay[i + 1].cell);
+        if (!h || !r || h.desc.plugin !== 'cell_info' || r.desc.plugin === 'cell_info' || !['rail', 'list', 'grid'].includes(lay[i + 1].component)) continue;
+        if (!want.has(h)) want.set(h, []); want.get(h).push({ inset: insetOf(r.desc), under: r.desc.name });
+      }
+    }
+    for (const [h, list] of want) {
+      const counts = new Map(); for (const x of list) counts.set(x.inset, (counts.get(x.inset) || 0) + 1);
+      const target = [...counts].sort((a, b) => b[1] - a[1])[0][0], now = insetOf(h.desc), diff = target - now;
+      if (!diff || Math.abs(diff) > 8) continue;
+      const d = h.desc, pad = target - num(d.layout?.padding);
+      if (Array.isArray(d.header?.padding) && d.header.padding[3] != null) d.header.padding[3] = pad;
+      else { d.cell = d.cell || {}; const p = Array.isArray(d.cell.padding) ? d.cell.padding : [0, 0, 0, 0]; p[3] = pad; d.cell.padding = p; }
+      log(`  Lined up ${d.name} with the first item of ${list[0].under} (${target}pt from the edge, was ${now}pt).`);
+      await buildCell(h);
+    }
+  }
 
   /* ---------- views ---------- */
   function show(v) {
@@ -560,6 +595,7 @@
     if (c.overlay) lines.push(`${c.overlay.file}: upload to image_overlay (the gradient over the image)`);
     for (const a of (c.assets || []).filter(a => !a.shared)) lines.push(`assets/${a.file}: upload to ${a.field}`);
     for (const a of (c.assets || []).filter(a => a.shared)) lines.push(`../plugin assets/${a.file}: ${a.field}`);
+    for (const l of c.labels || []) lines.push(`Button label: set the ${C.PLUGIN[l.action]?.name || l.action} plugin's label to "${l.text}"`);
     if ((c.assets || []).length) lines.push(`Icons: ${ICONS.libraries[S.icons.library]?.name || S.icons.library}`);
     const fn = fontNames([c]); if (fn.length) lines.push(`Fonts: ${fn.map(f => f.ps).join(', ')} (see ../fonts)`);
     const sec = t => (d.decisions || []).filter(x => x.type === t);
@@ -613,11 +649,24 @@
         dir.file(`thumbnails/${c.output.replace('.json', '@2x.png')}`, bytes(await engine.CellEngine.snapshot({ thumb: true })));
       } catch (e) { console.warn('thumbnail', e); }
     }
-    if (pluginAssets.size) {
+    // button labels are set once per action plugin: list each, and flag a plugin the designs label two ways
+    const labels = new Map();
+    for (const c of ok) for (const l of c.labels || []) { if (!labels.has(l.action)) labels.set(l.action, new Map()); labels.get(l.action).set(l.text, [...(labels.get(l.action).get(l.text) || []), c.desc.name]); }
+    if (pluginAssets.size || labels.size) {
       const pa = zip.folder('plugin assets');
       for (const a of pluginAssets.values()) pa.file(a.file, bytes(a.dataUrl));
-      pa.file('README.txt', `Action plugin button icons (${ICONS.libraries[S.icons.library]?.name || S.icons.library}). Upload each to its plugin in Zapp:\n\n` +
-        [...pluginAssets.values()].map(a => `${a.file}: ${a.field}`).join('\n') + '\n\nFlavour 1 is for dark button backgrounds, flavour 2 for light.\n');
+      const L = [];
+      if (pluginAssets.size) L.push(`Action plugin button icons (${ICONS.libraries[S.icons.library]?.name || S.icons.library}). Upload each to its plugin in Zapp:`, '',
+        ...[...pluginAssets.values()].map(a => `${a.file}: ${a.field}`), '', 'Flavour 1 is for dark button backgrounds, flavour 2 for light.', '');
+      if (labels.size) {
+        L.push('Button labels (set once on each action plugin, for the whole app):', '');
+        for (const [action, texts] of labels) {
+          const name = C.PLUGIN[action]?.name || action;
+          if (texts.size === 1) L.push(`${name} plugin › label: "${[...texts.keys()][0]}"`);
+          else L.push(`${name} plugin › label: the designs use ${[...texts].map(([t, cs]) => `"${t}" (${cs.join(', ')})`).join(' and ')}; one plugin has one label, so pick one or add a second ${name} plugin.`);
+        }
+      }
+      pa.file('README.txt', L.join('\n') + '\n');
     }
     const fn = fontNames(ok);
     if (fn.length) {

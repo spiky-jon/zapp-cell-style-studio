@@ -629,7 +629,9 @@ function makeButtons(showing) {
   for (let i = 1; i <= 3; i++) {
     const p = `mobile_button_${i}`;
     if (!on(`${p}_button_enabled`, false)) continue;
-    const act = ACTIONS[s(`${p}_assign_action`, DEFAULT_ACTION[i])] || { label: 'Button', icon: 'play' };
+    const aKey = s(`${p}_assign_action`, DEFAULT_ACTION[i]), base = ACTIONS[aKey] || { label: 'Button', icon: 'play' };
+    // the studio can preview the label an app sets on the action plugin (e.g. "My List" for favourites)
+    const act = (state.actionLabels || {})[aKey] ? { ...base, label: state.actionLabels[aKey] } : base;
     if (act.unhooked) { names.push(`${i}: ${act.label} (not rendered, feature not hooked up)`); continue; }
     const f = fontFor(s(platKey(p, 'ios_font_family', 'android_font_family'), 'Ubuntu-Bold'));
     const showLabel = on(`${p}_label_enabled`, true), showIcon = on(`${p}_asset_enabled`, true);
@@ -2448,6 +2450,7 @@ window.CellEngine = {
     if (!window.__BASE_PNG) window.__BASE_PNG = ACTION_PNG;
     ACTION_PNG = Object.assign({}, window.__BASE_PNG, opts.actionPng || {});
     state.infoIcon = opts.infoIcon || null;
+    state.actionLabels = opts.actionLabels || null;
     $('screenW').value = state.screenW; $('pad').value = state.pad; $('appbg').value = state.appBg;
     $('dTitle').value = opts.title ?? 'Content Title'; $('dSummary').value = opts.summary ?? 'Two rock-bottom drivers transport a wealthy teen to rehab, but their simple job spirals into chaos.';
     for (const [k, v] of Object.entries(opts.ext || {})) SAMPLE_EXT[k] = String(v);

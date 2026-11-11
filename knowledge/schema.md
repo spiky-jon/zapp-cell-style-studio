@@ -38,7 +38,9 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       },
       "overlay": null,                        // gradient over the image: { "direction": "vertical", "stops": [{ "at": 0, "color": "rgba(0,0,0,0)" }, { "at": 1, "color": "rgba(10,22,30,0.92)" }] }
       "secondaryImage": null,                 // { "key": "thumb_1", "width": 240, "height": 56, "align": "center", "beforeLabel": 1, "margin": [0,16,12,16], "fit": "center" }
-                                              //   beforeLabel: index of the label it sits above (1-3); omit to sit below the last label; "position": "over_image" for over the picture
+                                              //   beforeLabel: index of the label it sits above (1-3); omit to sit below the last label;
+                                              //   "position": "over_image" with "corner": "top_left | top_right | bottom_left | bottom_right | center" for over the picture
+                                              //   title treatments (show or film names drawn as artwork) are always this, reading thumb_1
       "zone": "bottom",                       // cell_3 only: where the text sits over the image: top | center | bottom
       "labels": [                             // in reading order, max 3 (see rules)
         {
@@ -56,15 +58,17 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
         }
       ],
       "buttons": null,                        // { "stacking": "horizontal|vertical", "align": "left|center", "gap": 8, "margin": [0,0,0,0], "afterLabel": 3 | "position": "over_image",
-                                              //   "items": [ { "action": "navigation|favourites|share|downloads|trailer", "label": true, "icon": true | "<icon role>", "iconPosition": "left|right|top",
+                                              //   "items": [ { "action": "navigation|favourites|share|downloads|trailer", "label": true, "text": "My List", "uppercase": false,
+                                              //               "icon": true | "<icon role>", "iconPosition": "left|right|top",
                                               //               "width": "fill" | "dynamic" | 260, "background": "#FFFFFF", "color": "#102C3D", "border": null, "radius": 2,
                                               //               "padding": [11,16,11,16], "font": {...}, "iconSize": 22, "iconFlavour": "light|dark" } ] }
       "progress": null,                       // { "position": "on_image | above_label_1 | below_label_1 | above_label_2 | below_label_2 | bottom_of_cell",
                                               //   "height": 4, "color": "#A0FCBB", "track": "#2E4B5C", "radius": 2, "margin": [6, 92, 0, 0] }
-      "badge": null,                          // an icon on the image or (cell_2) in the right-hand column:
-                                              //   { "icon": "chevron-right", "position": "cell_right | top_left | top_right | bottom_left | bottom_right | center",
-                                              //     "size": 24, "iconSize": 16, "color": "#FFFFFF", "circle": "#FFFFFF" | null, "margin": [0,0,0,16] }
-                                              //   circle: a filled circle behind the icon (play buttons); color is then the icon colour on it
+      "badge": null,                          // a static image the studio draws, on the image or (cell_2) in the right-hand column:
+                                              //   { "icon": "play", "position": "cell_right | top_left | top_right | bottom_left | bottom_right | center",
+                                              //     "width": 24, "height": 24, "iconSize": 14, "color": "#000000",
+                                              //     "background": "#A0F07C" | null, "shape": "square | rounded | circle", "radius": 4, "margin": [0,0,0,0] }
+                                              //   background: the plate behind the icon in the design's shape (square block, circle, rounded); color is the icon on it
       "action": null,                         // cell_2 action icon in the right-hand column (download, add to list):
                                               //   { "action": "downloads|favourites", "icon": "download", "size": 44, "iconSize": 24, "color": "#FFFFFF", "margin": [0,0,0,8] }
       "runtime": null,                        // duration pill (always bottom right of the image): { "background": "rgba(17,34,46,0.85)", "color": "#FFFFFF", "font": {...}, "radius": 3, "padding": [1,5,1,5], "margin": [0,6,6,0] }
@@ -123,6 +127,10 @@ Notes for the describer:
 - Ignore the status bar, app navigation bar, tab bar and bottom tab bar: they aren't cells.
 - Fonts: every `font.family` is a family listed in `fonts` (a Google Fonts family with its exact name and
   capitals, e.g. "DM Sans", or an uploaded font's family). Weight as a number.
+- Button `text` is the label exactly as the design writes it (the plugin's label is set to match); `uppercase`
+  only when the design is in capitals.
+- Left edges: give each cell the inset the design shows. Check that headers and the rails under them start at the
+  same x when they do in the design.
 - Inventory: list every visible element before describing cells, and make sure each one with a cell is really
   in that cell's labels, images or buttons. Keep the inventory honest: it's how reviewers check nothing was
   dropped.

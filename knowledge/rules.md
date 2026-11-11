@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 3 · phone and tablet · cell plugins 16.0.0-alpha
+Version 4 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -81,7 +81,11 @@ Choosing:
   `thumb_2` (poster), `thumb_3` (still). Aspect ratio from presets (16x9, 4x3, 1x1, 3x4, 2x3, 9x16) or a custom
   `WxH`. Corner radius, a border (width, colour) and a placeholder colour are available.
 - One **secondary image** (title logo, channel logo, rank artwork): fixed width and height, fitted inside that
-  box, positioned above or below a label or over the image. It has **no border** setting.
+  box, positioned above or below a label or over the image (in a corner or the centre, with margins). It has
+  **no border** setting.
+- A **title treatment** (a show or film name drawn as artwork, like a stylised logo over a hero) is always the
+  secondary image reading `thumb_1`, never a text label and never left out. When it sits over the bottom of the
+  key art, place it over the image (a corner or the centre) and fine-tune it with margins.
 - **Gradients and scrims** over the image are an **overlay image** (a PNG the studio generates from the gradient
   stops). There is no gradient setting on the cell.
 - A design element that overlaps another (a rank number tucked behind a poster) can't be layered. Draw the
@@ -95,7 +99,10 @@ Choosing:
   margins). A design with it elsewhere → keep bottom right and record the change; alternative: a content badge.
 - **Content badges** sit on the image (play buttons, LIVE pills, promo badges). A cell with no image can't show
   them.
-- **Cell badge** (cell_2): an icon in the right-hand column (chevron, arrow) or on the image.
+- **Cell badge**: one static image the studio draws and ships in the download, at **any width and height**,
+  placed in a corner or the centre of the image (Cell 2 also in its right-hand column), fine-tuned with margins.
+  Because it is an image, draw the design's shape exactly: a square green play block stays a **square**, a round
+  play button a circle, a chevron just the icon. It is the same on every item (it doesn't come from the feed).
 - **Action icon** (cell_2): e.g. a download button in the right-hand column.
 - **Progress bar**: on top of the image, above or below text label 1 or 2, or at the bottom of the cell. Colour,
   track colour, height, radius and margins. It **can't share a line with a label** (a bar with "2m left" at its
@@ -116,10 +123,14 @@ Choosing:
   to the labels or over the image.
 - Each button runs an **action plugin**: navigation (open / play), favourites (my list), share, downloads,
   trailer.
-- **Labels and icons come from the action plugin**, set once for the whole app. The navigation action has one
-  label (e.g. "Watch Now"), so two navigation buttons with different labels ("WATCH NOW" + "WATCH AD-FREE",
-  or "MORE INFO") aren't possible: drop the second button, or note that it needs its own action plugin.
-  A "MORE INFO" button that opens the show reads the navigation label.
+- **Labels and icons come from the action plugin**, set once for the whole app, and **the label can be changed
+  to match the design** ("My List" instead of the default "Add to Favorites", "Play" instead of "Watch Now").
+  Use the design's wording and casing, and record the label to set on the plugin. Each plugin has one label, so
+  two navigation buttons with different labels ("WATCH NOW" + "WATCH AD-FREE", or "MORE INFO") aren't possible:
+  drop the second button, or note that it needs its own action plugin.
+- Keep button rows lined up with what's above them. A row of icon-over-label buttons under a full-width button
+  or centred content is **centred**; when a button can't be built (no action plugin for it), centre the remaining
+  buttons rather than leaving a gap where the missing one was.
 - Icons come from the plugin's two flavours (light and dark): pick the flavour that suits the button colour.
   A one-off icon colour (e.g. a lime icon on one button) isn't possible.
 - Per button: fill (full width), dynamic (fits its label) or a fixed width; background, text colour, border,
@@ -127,6 +138,10 @@ Choosing:
 
 ## 7. Layout, spacing and behaviour
 
+- **Measure each cell's left edge separately.** Rail and list headers usually line up exactly with the first
+  item of the rail or list below them; heroes and banners are often inset differently on purpose. Copy what the
+  design does: compare the header title's left edge with the first tile's left edge, and give both the same
+  inset when they line up in the design.
 - Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
   **dividers** (thickness, colour, margins); they're inset by the cell's side padding. An edge-to-edge divider
   with padded content isn't possible: accept the inset, or move side spacing to the component.

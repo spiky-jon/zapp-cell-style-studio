@@ -986,7 +986,8 @@
        "letterSpacing": 0
       },
       "iconSize": 18,
-      "iconFlavour": "dark"
+      "iconFlavour": "dark",
+      "text": "Start watching"
      },
      {
       "action": "favourites",
@@ -1012,7 +1013,8 @@
        "letterSpacing": 0
       },
       "iconSize": 18,
-      "iconFlavour": "light"
+      "iconFlavour": "light",
+      "text": "Watchlist"
      }
     ]
    },
@@ -1030,8 +1032,468 @@
     },
     {
      "type": "changed",
-     "item": "Button labels and icons",
-     "text": "Labels and icons come from each action, set once for the whole app, so the episode-strip icon becomes the action's play icon."
+     "item": "Button icons",
+     "text": "Icons come from each action, so the episode-strip icon becomes the action's play icon; the labels Start watching and Watchlist are set on the actions to match."
+    }
+   ]
+  },
+  {
+   "name": "Continue Watching Tile",
+   "screen": "Home",
+   "purpose": "Continue watching rail: 16:9 still with a square green play block, then the show title and episode line.",
+   "bbox": {
+    "x": 0.05,
+    "y": 0.62,
+    "w": 0.4,
+    "h": 0.14
+   },
+   "plugin": "cell_1",
+   "status": "as_designed",
+   "layout": {
+    "type": "rail",
+    "itemWidth": 172,
+    "gap": 8,
+    "padding": 16
+   },
+   "appBackground": "#1C1C1C",
+   "cell": {
+    "background": "rgba(0,0,0,0)",
+    "radius": 0,
+    "padding": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "border": null
+   },
+   "image": {
+    "key": "image_base",
+    "ratio": "16x9",
+    "radius": 0,
+    "border": null,
+    "margin": [
+     0,
+     0,
+     8,
+     0
+    ],
+    "placeholder": "#2A2A2A"
+   },
+   "overlay": null,
+   "secondaryImage": null,
+   "labels": [
+    {
+     "role": "title",
+     "dataKey": "title",
+     "sample": "Apocalypse",
+     "font": {
+      "family": "Inter",
+      "weight": 500,
+      "size": 15,
+      "lineHeight": 20,
+      "letterSpacing": 0
+     },
+     "color": "#FFFFFF",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 1,
+     "uppercase": false,
+     "margin": [
+      0,
+      0,
+      2,
+      0
+     ]
+    },
+    {
+     "role": "episode",
+     "dataKey": "extensions.episode",
+     "sample": "Episode 5",
+     "font": {
+      "family": "Inter",
+      "weight": 400,
+      "size": 13,
+      "lineHeight": 17,
+      "letterSpacing": 0
+     },
+     "color": "#9A9A9A",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 1,
+     "uppercase": false,
+     "margin": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "badge": {
+    "icon": "play",
+    "position": "bottom_left",
+    "width": 24,
+    "height": 24,
+    "iconSize": 14,
+    "color": "#000000",
+    "background": "#A0F07C",
+    "shape": "square",
+    "radius": 0,
+    "margin": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "buttons": null,
+   "progress": null,
+   "runtime": null,
+   "decisions": [
+    {
+     "type": "works",
+     "text": "16:9 still with the square green play block in the bottom-left corner, a white title and a grey episode line."
+    },
+    {
+     "type": "works",
+     "text": "The play block is a static image drawn to the design's size and included in the download."
+    }
+   ]
+  },
+  {
+   "name": "Film Detail Hero",
+   "screen": "Film",
+   "purpose": "Film page hero: tall key art fading to dark with the title logo over its bottom edge, then the description, the meta line and a green Play button.",
+   "bbox": {
+    "x": 0.0,
+    "y": 0.0,
+    "w": 1.0,
+    "h": 0.66
+   },
+   "plugin": "cell_1",
+   "status": "workaround",
+   "layout": {
+    "type": "single",
+    "padding": 0
+   },
+   "appBackground": "#1C1C1C",
+   "cell": {
+    "background": "#1C1C1C",
+    "radius": 0,
+    "padding": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "border": null
+   },
+   "image": {
+    "key": "thumb_2",
+    "ratio": "3x4",
+    "radius": 0,
+    "border": null,
+    "margin": [
+     0,
+     0,
+     8,
+     0
+    ],
+    "placeholder": "#2A2A2A"
+   },
+   "overlay": {
+    "direction": "vertical",
+    "stops": [
+     {
+      "at": 0.6,
+      "color": "rgba(28,28,28,0)"
+     },
+     {
+      "at": 1,
+      "color": "#1C1C1C"
+     }
+    ]
+   },
+   "secondaryImage": {
+    "key": "thumb_1",
+    "width": 170,
+    "height": 64,
+    "align": "left",
+    "position": "over_image",
+    "corner": "bottom_left",
+    "margin": [
+     0,
+     0,
+     4,
+     12
+    ],
+    "fit": "bottom_left"
+   },
+   "labels": [
+    {
+     "role": "description",
+     "dataKey": "summary",
+     "sample": "(2012) Quentin Tarantino's darkly comic, multi-award-winning western starring Jamie Foxx",
+     "font": {
+      "family": "Inter",
+      "weight": 400,
+      "size": 14,
+      "lineHeight": 19,
+      "letterSpacing": 0
+     },
+     "color": "#FFFFFF",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 2,
+     "uppercase": false,
+     "margin": [
+      0,
+      12,
+      6,
+      12
+     ]
+    },
+    {
+     "role": "meta",
+     "dataKey": "extensions.meta",
+     "sample": "Film | 159 mins | 25 days left",
+     "font": {
+      "family": "Inter",
+      "weight": 400,
+      "size": 11,
+      "lineHeight": 15,
+      "letterSpacing": 0
+     },
+     "color": "#9A9A9A",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 1,
+     "uppercase": false,
+     "margin": [
+      0,
+      12,
+      0,
+      12
+     ]
+    }
+   ],
+   "buttons": {
+    "stacking": "vertical",
+    "align": "center",
+    "gap": 8,
+    "margin": [
+     12,
+     12,
+     0,
+     12
+    ],
+    "afterLabel": 2,
+    "items": [
+     {
+      "action": "navigation",
+      "label": true,
+      "text": "Play",
+      "uppercase": false,
+      "icon": "play",
+      "iconPosition": "left",
+      "width": "fill",
+      "background": "#A0F07C",
+      "color": "#000000",
+      "border": null,
+      "radius": 0,
+      "padding": [
+       10,
+       16,
+       10,
+       16
+      ],
+      "font": {
+       "family": "Inter",
+       "weight": 500,
+       "size": 15,
+       "lineHeight": 20,
+       "letterSpacing": 0
+      },
+      "iconSize": 14,
+      "iconFlavour": "dark"
+     }
+    ]
+   },
+   "progress": null,
+   "runtime": null,
+   "decisions": [
+    {
+     "type": "works",
+     "text": "Tall key art fading into the dark background, with the title logo over its bottom edge, the description, the grey meta line and a full-width green Play button."
+    },
+    {
+     "type": "changed",
+     "item": "Split into two cells",
+     "text": "One cell's buttons share one direction, so the row of My List and Share buttons continues in Film Detail Actions, placed directly below."
+    },
+    {
+     "type": "changed",
+     "item": "Rating and access icons",
+     "text": "The rating, subtitles, AD and HD icons can't sit inside a text label, so the meta line shows text only."
+    },
+    {
+     "type": "alternative",
+     "text": "The feed can add the access information as words to the meta line (for example \"Subtitles · AD · HD\")."
+    }
+   ]
+  },
+  {
+   "name": "Film Detail Actions",
+   "screen": "Film",
+   "purpose": "Continues Film Detail Hero: a centred row of icon-over-label buttons for My List and Share.",
+   "bbox": {
+    "x": 0.0,
+    "y": 0.66,
+    "w": 1.0,
+    "h": 0.07
+   },
+   "plugin": "cell_2",
+   "status": "workaround",
+   "layout": {
+    "type": "single",
+    "padding": 0
+   },
+   "appBackground": "#1C1C1C",
+   "cell": {
+    "background": "#1C1C1C",
+    "radius": 0,
+    "padding": [
+     12,
+     12,
+     12,
+     12
+    ],
+    "border": null,
+    "dividerTop": null,
+    "dividerBottom": null
+   },
+   "image": null,
+   "overlay": null,
+   "secondaryImage": null,
+   "labels": [],
+   "buttons": {
+    "stacking": "horizontal",
+    "align": "center",
+    "gap": 0,
+    "margin": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "items": [
+     {
+      "action": "favourites",
+      "label": true,
+      "text": "My List",
+      "uppercase": false,
+      "icon": "plus",
+      "iconPosition": "top",
+      "width": 120,
+      "background": "rgba(0,0,0,0)",
+      "color": "#FFFFFF",
+      "border": null,
+      "radius": 0,
+      "padding": [
+       4,
+       0,
+       4,
+       0
+      ],
+      "font": {
+       "family": "Inter",
+       "weight": 400,
+       "size": 11,
+       "lineHeight": 14,
+       "letterSpacing": 0
+      },
+      "iconSize": 22,
+      "iconFlavour": "light"
+     },
+     {
+      "action": "share",
+      "label": true,
+      "text": "Share",
+      "uppercase": false,
+      "icon": "share-ios",
+      "iconPosition": "top",
+      "width": 120,
+      "background": "rgba(0,0,0,0)",
+      "color": "#FFFFFF",
+      "border": null,
+      "radius": 0,
+      "padding": [
+       4,
+       0,
+       4,
+       0
+      ],
+      "font": {
+       "family": "Inter",
+       "weight": 400,
+       "size": 11,
+       "lineHeight": 14,
+       "letterSpacing": 0
+      },
+      "iconSize": 22,
+      "iconFlavour": "light"
+     }
+    ]
+   },
+   "progress": null,
+   "runtime": null,
+   "decisions": [
+    {
+     "type": "works",
+     "text": "My List and Share buttons with white icons above their labels, centred under the Play button."
+    },
+    {
+     "type": "changed",
+     "item": "Rate button left out",
+     "text": "There is no rating action to run, so the Rate button can't be built; the other two buttons are centred instead of leaving a gap."
+    },
+    {
+     "type": "changed",
+     "item": "Continues the hero",
+     "text": "This cell carries on from Film Detail Hero, directly below it."
+    },
+    {
+     "type": "alternative",
+     "text": "Add a rating action plugin to bring back the Rate button as a third button in this row."
     }
    ]
   }

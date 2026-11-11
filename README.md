@@ -31,6 +31,9 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
 7. **Icons**: Claude picks the icon library closest to the design's icon style (Lucide, Phosphor, Tabler,
    Heroicons, Material Symbols, from `knowledge/icons.json`); the icon panel switches library and colours.
    Every icon a cell uses (badges, action icons, header buttons, plugin button flavours) is drawn as a PNG @3x.
+   Cell badges are drawn to the design's size and shape (square, rounded or round plate behind the icon).
+   Button labels use the design's wording; the zip lists the label to set on each action plugin.
+   After each run, headers that sit a few points off the first item of the rail below are lined up with it.
 8. **Screens**: each screen mocked up from the built cells, laid out as the components Claude described
    (single, rail, list, grid), next to the original.
 9. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each

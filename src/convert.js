@@ -81,7 +81,7 @@
       Object.assign(set, {
         [`${p}_button_enabled`]: true, [`${p}_assign_action`]: action, [`${p}_display_mode`]: mode, [`${p}_label_enabled`]: b.label !== false,
         [`${p}_asset_enabled`]: !!b.icon, [`${p}_asset_alignment`]: b.iconPosition === 'right' ? 'right' : b.iconPosition === 'top' ? 'above' : 'left',
-        [`${p}_contents_alignment`]: 'center', [`${p}_text_transform`]: b.uppercase === false ? 'default' : 'uppercase',
+        [`${p}_contents_alignment`]: 'center', [`${p}_text_transform`]: b.uppercase === true ? 'uppercase' : 'default',
         [`${p}_padding_top`]: pad[0], [`${p}_padding_right`]: pad[1], [`${p}_padding_bottom`]: pad[2], [`${p}_padding_left`]: pad[3],
         [`${p}_border_size`]: b.border ? num(b.border.width, 1) : 0, [`${p}_asset_width`]: num(b.iconSize, 20), [`${p}_asset_height`]: num(b.iconSize, 20),
         [`${p}_horizontal_gutter`]: num(b.iconGap, 8), [`${p}_vertical_gutter`]: 6, [`${p}_action_asset_flavour`]: b.iconFlavour === 'dark' ? 'flavour_2' : 'flavour_1',
@@ -92,6 +92,8 @@
       Object.assign(bind, { [`${p}_background_color`]: bg, [`${p}_focused_background_color`]: bg, [`${p}_font_color`]: fg, [`${p}_focused_font_color`]: fg,
         [`${p}_border_color`]: bc, [`${p}_focused_border_color`]: bc, [`${p}_corner_radius`]: num(b.radius, 0) });
       text[p] = F(b.font || { family: 'Inter', weight: 500, size: 15, lineHeight: 20 });
+      // the design's label (e.g. "My List"): set once on the action plugin, so record it for the README and the preview
+      if (typeof b.text === 'string' && b.text.trim() && b.label !== false) notes.buttonLabels.push({ action, text: b.text.trim() });
       if (b.icon && PLUGIN[action]) notes.buttonIcons.push({ action, role: (typeof b.icon === 'string' && b.icon !== 'true') ? b.icon : PLUGIN[action].role });
       if (b.font && b.font.family) notes.fonts.add(b.font.family);
       void n;
@@ -109,7 +111,7 @@
 
   // Main entry: description -> { base, spec, warnings, fonts }
   function toSpec(d, opts = {}) {
-    const notes = { fonts: new Set(), warnings: [], buttonIcons: [] };
+    const notes = { fonts: new Set(), warnings: [], buttonIcons: [], buttonLabels: [] };
     const plugin = IDENT[d.plugin] ? d.plugin : 'cell_2';
     const tablet = opts.device === 'tablet' || d.device === 'tablet';
     const screen = opts.screenW || (tablet ? 1133 : 393);
@@ -214,7 +216,7 @@
         secondary_image_image_sizing: 'fit', secondary_image_fit_position: sec.fit || (sec.align === 'center' ? 'center' : 'bottom_left'),
         secondary_image_align: ['left', 'center', 'right'].includes(sec.align) ? sec.align : 'left', secondary_image_image_key: sec.key || 'thumb_1',
         secondary_image_margin_top: m[0], secondary_image_margin_right: m[1], secondary_image_margin_bottom: m[2], secondary_image_margin_left: m[3] });
-      if (sec.position === 'over_image') set.secondary_image_position = 'over_image';
+      if (sec.position === 'over_image') Object.assign(set, { secondary_image_position: 'over_image', secondary_image_image_position: sec.corner || 'bottom_left' });
     }
 
     // runtime pill
@@ -237,12 +239,15 @@
     // cell badge: an icon on the image or in Cell 2's right-hand column (chevron, play button)
     const bd = d.badge;
     if (bd && bd.icon) {
-      const m = box(bd.margin), sz = num(bd.size, 24);
+      // a static image the studio draws: any width and height, an optional plate behind the icon (circle, square or rounded)
+      const m = box(bd.margin), w = num(bd.width, num(bd.size, 24)), h = num(bd.height, num(bd.size, 24));
+      const plate = bd.background ? color(bd.background, null) : bd.circle ? color(bd.circle, null) : null;
+      const shape = bd.shape || (bd.circle ? 'circle' : num(bd.radius, 0) > 0 ? 'rounded' : 'square');
       const pos = bd.position === 'cell_right' && plugin !== 'cell_2' ? 'bottom_right' : (bd.position || (plugin === 'cell_2' ? 'cell_right' : 'center'));
-      Object.assign(set, { cell_badge_switch: true, cell_badge_position: pos, cell_badge_width: sz, cell_badge_height: sz,
+      Object.assign(set, { cell_badge_switch: true, cell_badge_position: pos, cell_badge_width: w, cell_badge_height: h,
         cell_badge_margin_top: m[0], cell_badge_margin_right: m[1], cell_badge_margin_bottom: m[2], cell_badge_margin_left: m[3] });
-      assets.push({ kind: 'badge', role: bd.icon, size: sz, iconSize: num(bd.iconSize, bd.circle ? Math.round(sz * 0.5) : sz), color: color(bd.color, '#FFFFFF'),
-        circle: bd.circle ? color(bd.circle, null) : null, file: `${slug(name)}-badge@3x.png`,
+      assets.push({ kind: 'badge', role: bd.icon, size: w, height: h, iconSize: num(bd.iconSize, plate ? Math.round(Math.min(w, h) * 0.5) : Math.min(w, h)), color: color(bd.color, '#FFFFFF'),
+        plate, shape: plate ? shape : null, radius: shape === 'circle' ? null : shape === 'square' ? 0 : num(bd.radius, 4), file: `${slug(name)}-badge@3x.png`,
         field: plugin === 'cell_2' ? 'cell_badge (and selected_cell_badge)' : 'cell_badge_default (and cell_badge_selected)' });
     }
     // action icon (e.g. download in an episode row)
@@ -265,7 +270,9 @@
 
     // labels: one stack in the cell's text zone, with the secondary image and buttons anchored around them
     const items = labels.map((l, i) => labelItem(l, i, notes));
-    if (sec && sec.position !== 'over_image') {
+    // the secondary image is a stack item either way; over the picture it pins itself there (otherwise the builder turns it off)
+    if (sec && sec.position === 'over_image') items.push({ id: 'secondary', type: 'image', position: 'over_image' });
+    else if (sec) {
       const at = Math.max(0, Math.min(items.length, (num(sec.beforeLabel, 1) || 1) - 1));
       items.splice(sec.beforeLabel ? at : items.length, 0, { id: 'secondary', type: 'image' });
     }
@@ -292,7 +299,7 @@
       for (const fl of [1, 2]) assets.push({ kind: 'button', plugin: pl.name, asset: pl.asset, flavour: `flavour_${fl}`, role: bi.role, size: 24, iconSize: 24,
         file: `${slug(pl.name)}-button-flavor-${fl}@3x.png`, field: `${pl.name} plugin › Mobile button asset - flavor ${fl}`, shared: true });
     }
-    return { base, spec, warnings: notes.warnings, fonts: [...notes.fonts], assets };
+    return { base, spec, warnings: notes.warnings, fonts: [...notes.fonts], assets, labels: notes.buttonLabels };
   }
 
   const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN };
