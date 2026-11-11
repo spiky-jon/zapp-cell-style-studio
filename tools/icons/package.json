@@ -1,0 +1,6 @@
+{
+  "name": "zapp-cell-style-studio-icons",
+  "private": true,
+  "description": "Icon libraries the studio's icon set is extracted from. npm install, then: python3 extract.py ../../knowledge/icons.json",
+  "dependencies": { "lucide-static": "0.460.0", "@phosphor-icons/core": "2.1.1", "@tabler/icons": "3.19.0", "heroicons": "2.1.5", "@material-symbols/svg-400": "0.23.0" }
+}

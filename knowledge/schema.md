@@ -56,13 +56,21 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
         }
       ],
       "buttons": null,                        // { "stacking": "horizontal|vertical", "align": "left|center", "gap": 8, "margin": [0,0,0,0], "afterLabel": 3 | "position": "over_image",
-                                              //   "items": [ { "action": "navigation|favourites|share|downloads|trailer", "label": true, "icon": true, "iconPosition": "left|right|top",
+                                              //   "items": [ { "action": "navigation|favourites|share|downloads|trailer", "label": true, "icon": true | "<icon role>", "iconPosition": "left|right|top",
                                               //               "width": "fill" | "dynamic" | 260, "background": "#FFFFFF", "color": "#102C3D", "border": null, "radius": 2,
                                               //               "padding": [11,16,11,16], "font": {...}, "iconSize": 22, "iconFlavour": "light|dark" } ] }
       "progress": null,                       // { "position": "on_image | above_label_1 | below_label_1 | above_label_2 | below_label_2 | bottom_of_cell",
                                               //   "height": 4, "color": "#A0FCBB", "track": "#2E4B5C", "radius": 2, "margin": [6, 92, 0, 0] }
+      "badge": null,                          // an icon on the image or (cell_2) in the right-hand column:
+                                              //   { "icon": "chevron-right", "position": "cell_right | top_left | top_right | bottom_left | bottom_right | center",
+                                              //     "size": 24, "iconSize": 16, "color": "#FFFFFF", "circle": "#FFFFFF" | null, "margin": [0,0,0,16] }
+                                              //   circle: a filled circle behind the icon (play buttons); color is then the icon colour on it
+      "action": null,                         // cell_2 action icon in the right-hand column (download, add to list):
+                                              //   { "action": "downloads|favourites", "icon": "download", "size": 44, "iconSize": 24, "color": "#FFFFFF", "margin": [0,0,0,8] }
       "runtime": null,                        // duration pill (always bottom right of the image): { "background": "rgba(17,34,46,0.85)", "color": "#FFFFFF", "font": {...}, "radius": 3, "padding": [1,5,1,5], "margin": [0,6,6,0] }
-      "header": null,                         // cell_info only: { "title": <label>, "button": { "text": "View All", "font": {...}, "color": "#EBF66F" } | null, "padding": [20, null, 12, null] }
+      "header": null,                         // cell_info only: { "title": <label>, "button": { "text": "View All" | null, "icon": "chevron-right" | null, "iconSize": 20,
+                                              //   "font": {...}, "color": "#EBF66F" } | null, "padding": [20, null, 12, null] }
+                                              //   An arrow or chevron that signals "see more" becomes an icon-only header button on the right (text null).
       "decisions": [                          // what works, what changed and why, and the suggested alternative
         { "type": "works", "text": "2:3 poster with a lime tag that hides when the feed has no tag." },
         { "type": "changed", "item": "Duration pill position", "text": "The runtime pill always sits bottom right; the design shows it top right." },
@@ -73,9 +81,34 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
 }
 ```
 
+## Whole response
+
+```jsonc
+{
+  "cells": [ ... ],                           // new cell styles on this screen
+  "seen": [ "Section Header" ],               // already-described styles that also appear on this screen
+  "screen": [                                 // this screen top to bottom, as components of cells (for the screen mock-up)
+    { "cell": "Hero Card", "component": "single" },
+    { "cell": "Section Header", "component": "single" },
+    { "cell": "Poster Tile", "component": "rail", "count": 4 },          // rail: horizontal list; count = items visible
+    { "cell": "Episode Row", "component": "list", "count": 3 },          // list: vertical list
+    { "cell": "Poster Tile", "component": "grid", "columns": 3, "count": 6 }
+  ],
+  "icons": { "library": "lucide", "light": "#FFFFFF", "dark": "#121212", "why": "Thin rounded outline icons" }
+}
+```
+
+`icons.library` is the closest match to the design's icon style, from: `lucide` (Outline, 2px rounded strokes (iOS-like, Feather family)), `phosphor-regular` (Outline, 1.5px rounded strokes, friendly geometric), `phosphor-bold` (Heavy outline, bold rounded strokes), `phosphor-fill` (Solid filled shapes, rounded), `tabler` (Outline, 2px strokes, slightly technical), `heroicons-outline` (Outline, 1.5px strokes, clean UI), `heroicons-solid` (Solid filled, clean UI), `material-outlined` (Android / Google style outline, square-ish ends), `material-rounded` (Android / Google style outline, rounded ends), `material-rounded-fill` (Android / Google style, solid filled, rounded).
+`light` is the icon colour for dark backgrounds, `dark` the colour for light backgrounds.
+
+Icon roles (use these names wherever an icon is named): `play`, `plus`, `check`, `heart`, `bookmark`, `share-ios`, `share-network`, `download`, `download-progress`, `download-done`, `download-error`, `download-expired`, `trailer`, `calendar-plus`, `more-horizontal`, `more-vertical`, `volume-mute`, `volume-on`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `arrow-right`, `info`, `close`, `lock`, `search`, `star`, `live`, `list`.
+
 Notes for the describer:
 
 - One entry per distinct cell *style*. Ten posters in a rail are one Poster Tile.
+- Screenshots often overlap (a long screen captured in several parts). If a style on this screen matches one
+  already described, even under a different name or with slightly different sample text, list it in `seen`; do
+  not describe it again.
 - Ignore the status bar, app navigation bar, tab bar and bottom tab bar: they aren't cells.
 - Fonts: give the family as designed (e.g. "Inter", "DM Sans", "SF Pro Text"). Weight as a number.
 - Measure in points: the studio tells you the image's pixel width and the screen width in points.

@@ -6,11 +6,16 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const K = window.KNOWLEDGE, BASES = window.CELL_BASES, C = window.Convert;
-  const S = { screens: [], cells: [], sel: null, example: true, busy: false };
+  const S = { screens: [], cells: [], sel: null, example: true, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false };
+  const ICONS = K.icons;
   let engine = null, sample = null, downloads = null, mcp = null, figmaSession = null;
   const uid = () => Math.random().toString(36).slice(2, 9);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const toast = msg => { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2600); };
+  const toast = (msg, action) => {
+    const t = $('toast'), b = $('toastBtn'); $('toastMsg').textContent = msg;
+    b.hidden = !action; if (action) { b.textContent = action.label; b.onclick = () => { t.classList.remove('on'); action.run(); }; }
+    t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), action ? 6000 : 2600);
+  };
   const STATUS = { as_designed: 'As designed', adapted: 'Adapted', workaround: 'Workaround' };
   const TYPE = { cell_1: 'Cell 1', cell_2: 'Cell 2', cell_3: 'Cell 3', cell_info: 'Group Info' };
   const collection = () => $('collection').value.trim() || 'Studio';
@@ -41,6 +46,35 @@
     }
   }
 
+  /* ---------- icons: role -> PNG @3x from the chosen library ---------- */
+  const iconCache = new Map();
+  function iconSvg(role) {
+    const lib = ICONS.libraries[S.icons.library] || ICONS.libraries.lucide;
+    return lib.icons[role] || ICONS.libraries.lucide.icons[role] || lib.icons['chevron-right'];
+  }
+  async function iconPng(role, { size = 24, iconSize, color = '#FFFFFF', circle = null } = {}) {
+    const key = [S.icons.library, role, size, iconSize, color, circle].join('|');
+    if (iconCache.has(key)) return iconCache.get(key);
+    const k = 3, px = Math.round(size * k), ip = Math.round((iconSize || size) * k);
+    const svg = iconSvg(role).replace('<svg', `<svg width="${ip}" height="${ip}" style="color:${color}"`);
+    const img = new Image();
+    await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error(`Icon ${role} didn't draw.`)); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    const c = document.createElement('canvas'); c.width = c.height = px; const g = c.getContext('2d');
+    if (circle) { g.fillStyle = circle; g.beginPath(); g.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2); g.fill(); }
+    // play glyphs sit a touch right of centre so they look centred in a circle
+    const nudge = circle && role === 'play' ? ip * 0.06 : 0;
+    g.drawImage(img, (px - ip) / 2 + nudge, (px - ip) / 2, ip, ip);
+    const url = c.toDataURL('image/png'); iconCache.set(key, url); return url;
+  }
+  async function drawAssets(list) {
+    const out = [];
+    for (const a of list || []) {
+      const color = a.kind === 'button' ? (a.flavour === 'flavour_2' ? S.icons.dark : S.icons.light) : a.color;
+      try { out.push({ ...a, color, dataUrl: await iconPng(a.role, { size: a.size, iconSize: a.iconSize, color, circle: a.circle }) }); } catch (e) { console.warn(e); }
+    }
+    return out;
+  }
+
   /* ---------- build one cell: description -> spec -> JSON -> render -> snapshot ---------- */
   async function buildCell(c) {
     c.error = null; c.warnings = [];
@@ -51,14 +85,25 @@
       await ensureFonts(conv.fonts);
       const built = engine.CellEngine.buildCell(BASES[conv.base], c.spec);
       c.json = built.json; c.output = built.output; c.overlay = built.overlay;
-      const lay = c.spec.layout || {};
-      const r = engine.CellEngine.render(c.json, { screenW: c.spec.screen, pad: lay.type === 'rail' ? lay.padding : (lay.padding || 0), layout: lay.type ? lay : null,
-        appBg: c.spec.appBg, overlay: c.overlay?.dataUrl, title: c.spec.sampleTitle || 'Content Title', summary: c.spec.sampleSummary, ext: c.spec.sampleFeed });
+      c.assets = await drawAssets(conv.assets);
+      const r = renderInEngine(c);
+      c.size = { w: r.width, h: r.height };
       c.notes = (r.notes || []).filter(n => !/style keys from the full set|Upload the real image|stand-in/i.test(n));
       await new Promise(r => setTimeout(r, 60));
       c.snap = await engine.CellEngine.snapshot({ scale: 2, pad: 12 });
+      c.snapRaw = await engine.CellEngine.snapshot({ scale: 2, pad: 0 });
     } catch (e) { c.error = e.message || String(e); console.error(e); }
   }
+
+  function renderOpts(c) {
+    const lay = c.spec.layout || {}, A = k => (c.assets || []).find(a => a.kind === k)?.dataUrl || null;
+    const actionPng = {};
+    for (const a of (c.assets || []).filter(a => a.kind === 'button')) (actionPng[a.asset] ||= {})[a.flavour] = a.dataUrl;
+    return { screenW: c.spec.screen, pad: lay.padding || 0, layout: lay.type ? lay : null, appBg: c.spec.appBg, overlay: c.overlay?.dataUrl,
+      title: c.spec.sampleTitle || 'Content Title', summary: c.spec.sampleSummary, ext: c.spec.sampleFeed,
+      badge: A('badge'), action: A('action'), infoIcon: A('header'), actionPng };
+  }
+  const renderInEngine = c => engine.CellEngine.render(c.json, renderOpts(c));
 
   /* ---------- crops ---------- */
   function cropOf(scr, bbox) {
@@ -158,7 +203,8 @@
       `The attached image is the "${scr.name}" screen. It is ${scr.w} px wide and ${scr.h} px tall. The screen is ${scr.screenW} points wide (${scr.device}), so 1 point = ${(scr.w / scr.screenW).toFixed(3)} px. Give every size in points.`,
       scr.meta ? `Figma layer data for this frame: ${scr.meta.slice(0, 2000)}` : '',
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
-      'Return {"cells": [ ...new cell styles on this screen... ], "seen": [ ...names of already-described styles visible here... ]}.',
+      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names) and icons.',
+      S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
       'Include every distinct content cell style on the screen (headers, tiles, rows, heroes, banners, info blocks, button rows). Skip the status bar, app navigation bar, tab strips and bottom tab bar.',
     ].filter(Boolean).join('\n');
   }
@@ -180,6 +226,12 @@
           log(`  ${d.name}: building (${TYPE[d.plugin] || d.plugin})`);
           await buildCell(c); renderAll();
         }
+        if (Array.isArray(res?.screen)) scr.layout = res.screen.filter(x => x && x.cell);
+        if (res?.icons?.library && ICONS.libraries[res.icons.library] && !S.iconsTouched && !S.iconsSet) {
+          S.icons = { library: res.icons.library, light: C.color(res.icons.light, '#FFFFFF'), dark: C.color(res.icons.dark, '#121212'), why: res.icons.why || '' };
+          S.iconsSet = true; renderIconPanel();
+          for (const c of S.cells) await buildCell(c);
+        }
         for (const n of res?.seen || []) { const c = S.cells.find(x => x.desc.name.toLowerCase() === String(n).toLowerCase()); if (c && !c.screens.includes(scr.name)) c.screens.push(scr.name); }
         scr.state = 'Done'; log(`${scr.name}: ${found.length} new cell style${found.length === 1 ? '' : 's'}.`);
       } catch (e) {
@@ -196,11 +248,12 @@
 
   /* ---------- views ---------- */
   function show(v) {
-    for (const t of ['import', 'cells', 'compare']) { $('t-' + t).setAttribute('aria-selected', t === v); $('v-' + t).hidden = t !== v; }
+    for (const t of ['import', 'cells', 'screens', 'compare']) { $('t-' + t).setAttribute('aria-selected', t === v); $('v-' + t).hidden = t !== v; }
     if (v === 'compare') renderDoc();
+    if (v === 'screens') renderMock();
     try { localStorage.setItem('css.view', v); } catch (e) {}
   }
-  for (const t of ['import', 'cells', 'compare']) $('t-' + t).addEventListener('click', () => show(t));
+  for (const t of ['import', 'cells', 'screens', 'compare']) $('t-' + t).addEventListener('click', () => show(t));
   $('goImport').addEventListener('click', () => show('import'));
 
   const cellBg = c => c.spec?.appBg || '#121212';
@@ -245,7 +298,7 @@
     const d = c.desc;
     const labels = d.plugin === 'cell_info' ? (d.header?.title ? [d.header.title] : []) : (d.labels || []);
     box.innerHTML = `
-      <div class="sec"><div class="row" style="justify-content:space-between"><span class="lab">Cell</span><button class="btn small" id="dlOne" type="button">Download this cell</button></div>
+      <div class="sec"><div class="row" style="justify-content:space-between"><span class="lab">Cell</span><span class="row" style="gap:6px"><button class="btn small" id="rmOne" type="button">Remove</button><button class="btn small" id="dlOne" type="button">Download this cell</button></span></div>
         <div class="kv">
           <label for="iName">Name</label><input class="inp" id="iName" value="${esc(d.name)}">
           <label for="iType">Type</label><select class="inp" id="iType">${Object.entries(TYPE).map(([k, v]) => `<option value="${k}" ${k === d.plugin ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -274,6 +327,63 @@
     if ($('dkSec')) $('dkSec').onchange = e => { d.secondaryImage.key = e.target.value.trim() || 'thumb_1'; rebuild(); };
     $('iApply').onclick = async () => { try { c.desc = JSON.parse($('iJson').value); await rebuild(); toast('Rebuilt'); } catch (e) { $('iMsg').textContent = `That isn't valid JSON: ${e.message}`; } };
     $('dlOne').onclick = () => downloadZip([c], `${C.slug(d.name)}.zip`);
+    $('rmOne').onclick = () => {
+      const at = S.cells.indexOf(c); S.cells.splice(at, 1);
+      S.sel = (S.cells[at] || S.cells[at - 1] || {}).id || null; renderAll();
+      toast(`Removed ${d.name}`, { label: 'Undo', run: () => { S.cells.splice(at, 0, c); S.sel = c.id; renderAll(); } });
+    };
+  }
+
+  /* ---------- icon library ---------- */
+  const PREVIEW_ROLES = ['play', 'plus', 'check', 'share-ios', 'download', 'chevron-right', 'heart', 'more-horizontal', 'close'];
+  function renderIconPanel() {
+    const box = $('iconPanel'), lib = ICONS.libraries[S.icons.library];
+    box.innerHTML = `<div class="row" style="justify-content:space-between"><span class="lab">Icons</span><span class="hint">${S.iconsSet && !S.iconsTouched ? 'matched to the designs' : ''}</span></div>
+      <select class="inp" id="iconLib" aria-label="Icon library">${Object.entries(ICONS.libraries).map(([k, v]) => `<option value="${k}" ${k === S.icons.library ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
+      <div class="strip" aria-hidden="true">${PREVIEW_ROLES.map(r => `<img alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent((lib.icons[r] || '').replace('<svg', `<svg width="20" height="20" style="color:${S.icons.light}"`))}">`).join('')}</div>
+      <span class="hint">${esc(lib.style)}${S.icons.why ? ` · ${esc(S.icons.why)}` : ''}</span>
+      <div class="cols"><label class="sw"><input type="color" id="icLight" value="${esc(S.icons.light.slice(0, 7))}"> On dark</label><label class="sw"><input type="color" id="icDark" value="${esc(S.icons.dark.slice(0, 7))}"> On light</label></div>`;
+    const changed = async () => { S.iconsTouched = true; iconCache.clear(); renderIconPanel(); for (const c of S.cells) await buildCell(c); renderAll(); toast('Icons redrawn'); };
+    $('iconLib').onchange = e => { S.icons.library = e.target.value; S.icons.why = ''; changed(); };
+    $('icLight').onchange = e => { S.icons.light = e.target.value.toUpperCase(); changed(); };
+    $('icDark').onchange = e => { S.icons.dark = e.target.value.toUpperCase(); changed(); };
+  }
+
+  /* ---------- screens mock-up ---------- */
+  const findCell = name => S.cells.find(c => c.desc.name.toLowerCase() === String(name).toLowerCase());
+  function mockBlock(item, W) {
+    const c = findCell(item.cell); if (!c || !c.snapRaw || !c.size) return '';
+    const lay = c.spec.layout || {}, comp = item.component || lay.type || 'single';
+    const pad = num(lay.padding), gap = num(lay.gap ?? lay.rowGap ?? 8), cw = c.size.w, ch = c.size.h;
+    const im = (w, h) => `<img src="${c.snapRaw}" alt="" style="width:${w}px;height:${h}px">`;
+    if (comp === 'rail') { const n = Math.max(1, Math.min(12, +item.count || 4));
+      return `<div class="blk" style="gap:${gap}px;padding-left:${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>`; }
+    if (comp === 'list') { const n = Math.max(1, Math.min(12, +item.count || 3));
+      return `<div class="blk" style="flex-direction:column;gap:${num(lay.rowGap ?? 0)}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>`; }
+    if (comp === 'grid') { const cols = Math.max(1, +item.columns || 3), n = Math.max(cols, Math.min(18, +item.count || cols * 2));
+      const g = num(lay.gap ?? 8), w = (W - pad * 2 - g * (cols - 1)) / cols, h = ch * w / cw;
+      return `<div class="blk" style="flex-wrap:wrap;gap:${g}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(w, h)).join('')}</div>`; }
+    return `<div class="blk" style="padding-left:${Math.max(0, (W - cw) / 2)}px">${im(cw, ch)}</div>`;
+  }
+  const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
+  function renderMock() {
+    const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
+    if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>Find cells from your designs; each screen is rebuilt here from its cells.</span></div>`; return; }
+    box.innerHTML = done.map(scr => {
+      const W = scr.screenW, tablet = scr.device === 'tablet', disp = tablet ? 560 : 300, k = disp / W, H = scr.h * W / scr.w;
+      const first = findCell((scr.layout.find(i => findCell(i.cell)) || {}).cell);
+      const bg = first?.spec?.appBg || '#000';
+      const missing = scr.layout.filter(i => !findCell(i.cell)).map(i => i.cell);
+      return `<section class="mscreen"><h2>${esc(scr.name)} <span class="hint">${tablet ? 'Tablet' : 'Phone'} · ${W}pt</span></h2>
+        <div class="mpair">
+          <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
+          <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(H * k)}px;background:${esc(bg)}">
+            <div class="inner" style="width:${W}px;transform:scale(${k})">${scr.layout.map(i => mockBlock(i, W)).join('')}</div></div></div>
+          <div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(i.component || 'single')}${i.count ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
+            ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
+            <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>
+        </div></section>`;
+    }).join('');
   }
 
   /* ---------- downloads ---------- */
@@ -287,6 +397,9 @@
     const d = c.desc, lines = [`${d.name} - ${c.json?.meta?.identifier || d.plugin}`, `${collection()} · built by Zapp Cell Style Studio (rules ${K.version})`, '', d.purpose || '', '',
       `${c.output}: import into the cell builder`, `thumbnails/${c.output.replace('.json', '@2x.png')}: thumbnail for the cell style (500 x 280 @2x)`];
     if (c.overlay) lines.push(`${c.overlay.file}: upload to image_overlay (the gradient over the image)`);
+    for (const a of (c.assets || []).filter(a => !a.shared)) lines.push(`assets/${a.file}: upload to ${a.field}`);
+    for (const a of (c.assets || []).filter(a => a.shared)) lines.push(`../plugin assets/${a.file}: ${a.field}`);
+    if ((c.assets || []).length) lines.push(`Icons: ${ICONS.libraries[S.icons.library]?.name || S.icons.library}`);
     const sec = t => (d.decisions || []).filter(x => x.type === t);
     if (sec('works').length) lines.push('', 'What works:', ...sec('works').map(x => `  - ${x.text}`));
     if (sec('changed').length) lines.push('', 'Changes to fit the cell framework:', ...sec('changed').map(x => `  - ${x.item ? x.item + ': ' : ''}${x.text}`));
@@ -299,18 +412,26 @@
     const ok = list.filter(c => c.json && !c.error);
     if (!ok.length) { toast('No built cells to download yet.'); return; }
     toast('Building the folder…');
-    const zip = new JSZip();
+    const zip = new JSZip(), pluginAssets = new Map();
     for (const c of ok) {
       const dir = zip.folder(c.desc.name.replace(/[\\/:*?"<>|]+/g, '-'));
       dir.file(c.output, JSON.stringify(c.json));
       dir.file('README.txt', readme(c));
       if (c.overlay) dir.file(c.overlay.file, bytes(c.overlay.dataUrl));
+      for (const a of c.assets || []) {
+        if (a.shared) { pluginAssets.set(a.file, a); continue; }
+        dir.file(`assets/${a.file}`, bytes(a.dataUrl));
+      }
       try {
-        const lay = c.spec.layout || {};
-        engine.CellEngine.render(c.json, { screenW: c.spec.screen, pad: lay.padding || 0, layout: lay.type ? lay : null, appBg: c.spec.appBg, overlay: c.overlay?.dataUrl,
-          title: c.spec.sampleTitle || 'Content Title', summary: c.spec.sampleSummary, ext: c.spec.sampleFeed });
+        renderInEngine(c);
         dir.file(`thumbnails/${c.output.replace('.json', '@2x.png')}`, bytes(await engine.CellEngine.snapshot({ thumb: true })));
       } catch (e) { console.warn('thumbnail', e); }
+    }
+    if (pluginAssets.size) {
+      const pa = zip.folder('plugin assets');
+      for (const a of pluginAssets.values()) pa.file(a.file, bytes(a.dataUrl));
+      pa.file('README.txt', `Action plugin button icons (${ICONS.libraries[S.icons.library]?.name || S.icons.library}). Upload each to its plugin in Zapp:\n\n` +
+        [...pluginAssets.values()].map(a => `${a.file}: ${a.field}`).join('\n') + '\n\nFlavour 1 is for dark button backgrounds, flavour 2 for light.\n');
     }
     await save(name, await zip.generateAsync({ type: 'uint8array' }));
   }
@@ -391,7 +512,7 @@
     // example cells from the rules, so the studio opens showing what it makes
     S.cells = (K.examples.cells || []).map(d => ({ id: uid(), desc: JSON.parse(JSON.stringify(d)), screenId: null, screens: [d.screen], crop: null }));
     for (const c of S.cells) await buildCell(c);
-    S.sel = S.cells[0]?.id; renderAll();
+    S.sel = S.cells[0]?.id; renderIconPanel(); renderAll();
     if (window.claude?.use) {
       const [smp, dl, m] = await Promise.all(['sample', 'downloads', 'mcp'].map(n => window.claude.use(n).catch(() => null)));
       sample = smp; downloads = dl; mcp = m;
@@ -401,6 +522,6 @@
     } else $('aiHint').textContent = 'Open the published studio to find cells with Claude.';
     $('dlAll').disabled = $('dlReport').disabled = false;
     renderScreens();
-    try { const v = localStorage.getItem('css.view'); if (v === 'import' || v === 'compare') show(v); } catch (e) {}
+    try { const v = localStorage.getItem('css.view'); if (['import', 'screens', 'compare'].includes(v)) show(v); } catch (e) {}
   })();
 })();

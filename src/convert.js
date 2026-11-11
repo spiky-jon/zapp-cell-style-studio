@@ -8,6 +8,14 @@
   const ACTIONS = { navigation: 'navigation_action', play: 'navigation_action', favourites: 'local_storage_favourites_action', favorites: 'local_storage_favourites_action',
     mylist: 'local_storage_favourites_action', share: 'native_share_action', downloads: 'offline-content-button', download: 'offline-content-button', trailer: 'trailer_action' };
 
+  // action plugin -> name, its first asset (the engine's icon key) and the icon role drawn for it
+  const PLUGIN = {
+    navigation_action: { name: 'Navigation', asset: 'navigation', role: 'play' },
+    local_storage_favourites_action: { name: 'Favourites', asset: 'favorite-default', role: 'plus', active: 'check' },
+    native_share_action: { name: 'Share', asset: 'share', role: 'share-ios' },
+    'offline-content-button': { name: 'Downloads', asset: 'download-download', role: 'download' },
+    trailer_action: { name: 'Trailer', asset: 'trailer', role: 'trailer' },
+  };
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : d);
   const box = (b, d = [0, 0, 0, 0]) => {
     if (typeof b === 'number') return [b, b, b, b].map(x => num(x));
@@ -80,6 +88,7 @@
       Object.assign(bind, { [`${p}_background_color`]: bg, [`${p}_focused_background_color`]: bg, [`${p}_font_color`]: fg, [`${p}_focused_font_color`]: fg,
         [`${p}_border_color`]: bc, [`${p}_focused_border_color`]: bc, [`${p}_corner_radius`]: num(b.radius, 0) });
       text[p] = F(b.font || { family: 'Inter', weight: 500, size: 15, lineHeight: 20 });
+      if (b.icon && PLUGIN[action]) notes.buttonIcons.push({ action, role: (typeof b.icon === 'string' && b.icon !== 'true') ? b.icon : PLUGIN[action].role });
       if (b.font && b.font.family) notes.fonts.add(b.font.family);
       void n;
     });
@@ -96,13 +105,13 @@
 
   // Main entry: description -> { base, spec, warnings, fonts }
   function toSpec(d, opts = {}) {
-    const notes = { fonts: new Set(), warnings: [] };
+    const notes = { fonts: new Set(), warnings: [], buttonIcons: [] };
     const plugin = IDENT[d.plugin] ? d.plugin : 'cell_2';
     const tablet = opts.device === 'tablet' || d.device === 'tablet';
     const screen = opts.screenW || (tablet ? 1133 : 393);
     const name = (opts.prefix ? opts.prefix + ' ' : '') + (d.name || 'Cell');
     const cell = d.cell || {};
-    const set = {}, bind = {}, text = {};
+    const set = {}, bind = {}, text = {}, assets = [];
     const labels = (d.labels || []).slice(0, 3);
     if ((d.labels || []).length > 3) notes.warnings.push(`${(d.labels || []).length} labels described; only the first 3 are built.`);
     let base = plugin;
@@ -117,27 +126,31 @@
     else spec.layout = { padding: num(lay.padding, 0) };
 
     if (plugin === 'cell_info') {
-      const h = d.header || {}, t = h.title || labels[0] || {}, btn = h.button;
+      const h = d.header || {}, t = h.title || labels[0] || {}, btn = h.button && (h.button.text || h.button.icon) ? h.button : null;
+      const btnText = btn && btn.text ? String(btn.text) : '', btnIcon = btn && btn.icon ? String(btn.icon) : '';
       const pad = Array.isArray(h.padding) ? h.padding : box(cell.padding, [20, 0, 12, 0]);
       const P = v => (v === null || v === undefined ? '' : String(num(v)));
       Object.assign(set, {
         group_info_padding_top: P(pad[0]), group_info_padding_right: P(pad[1]), group_info_padding_bottom: P(pad[2]), group_info_padding_left: P(pad[3]),
         group_info_margin_top: '', group_info_margin_bottom: '', group_info_border_top_thickness: 0, group_info_border_bottom_thickness: 0,
-        badge_asset_switch: false, badge_asset: '', button_icon_switch: false, button_icon_asset: '',
-        button_element_switch: !!btn, button_text_switch: !!btn, button_text_key: 'other', button_text_custom_data_key: btn ? String(btn.text || 'View All') : '',
+        badge_asset_switch: false, badge_asset: '', button_icon_asset: '',
+        button_element_switch: !!btn, button_text_switch: !!btnText, button_text_key: 'other', button_text_custom_data_key: btnText,
+        button_icon_switch: !!btnIcon, button_icon_width: num(btn && btn.iconSize, 24), button_icon_height: num(btn && btn.iconSize, 24),
         button_element_padding_top: 0, button_element_padding_right: 0, button_element_padding_bottom: 0, button_element_padding_left: 0,
         button_element_margin_left: 12, button_element_border_thickness: 0, button_element_corner_radius: 0, button_element_vertical_position: 'center',
         title_text_switch: true, title_text_data_key: (t.dataKey === 'title' || !t.dataKey) ? 'title' : 'other', title_text_custom_data_key: (t.dataKey && t.dataKey !== 'title') ? t.dataKey : '',
         title_text_number_of_lines: Math.max(1, num(t.lines, 1)), title_text_alignment: t.align || 'left', title_text_transform: t.uppercase ? 'uppercase' : 'default',
         title_text_margin_top: '', title_text_margin_right: '', title_text_margin_bottom: '', title_text_margin_left: '' });
       text.title_text = F(t.font); if (t.font) notes.fonts.add(t.font.family);
-      if (btn) { text.button_text = F(btn.font || t.font); if (btn.font) notes.fonts.add(btn.font.family); }
+      if (btnText) { text.button_text = F(btn.font || t.font); if (btn.font) notes.fonts.add(btn.font.family); }
+      if (btnIcon) assets.push({ kind: 'header', role: btnIcon, size: num(btn.iconSize, 24), iconSize: num(btn.iconSize, 24), color: color(btn.color, '#FFFFFF'),
+        file: `${slug(name)}-header-icon@3x.png`, field: 'button_icon_asset (header button icon)' });
       Object.assign(bind, { title_text_font_color: color(t.color, '#FFFFFF'), button_text_font_color: color(btn && btn.color, '#FFFFFF'),
         button_element_background_color: CLEAR, button_element_border_color: CLEAR, group_info_background_color: color(cell.background, CLEAR),
         group_info_border_top_color: CLEAR, group_info_border_bottom_color: CLEAR });
       spec.base = 'cell_info.base.json'; spec.set = set; spec.text = text; spec.bind = bind;
       spec.sampleFeed = {}; spec.sampleTitle = t.sample || 'Section title';
-      return { base: 'cell_info', spec, warnings: notes.warnings, fonts: [...notes.fonts] };
+      return { base: 'cell_info', spec, warnings: notes.warnings, fonts: [...notes.fonts], assets };
     }
 
     const img = d.image || null;
@@ -217,6 +230,28 @@
         progress_bar_progress_bar_corner_radius: num(d.progress.radius, 0), progress_bar_total_bar_corner_radius: num(d.progress.radius, 0) });
     }
 
+    // cell badge: an icon on the image or in Cell 2's right-hand column (chevron, play button)
+    const bd = d.badge;
+    if (bd && bd.icon) {
+      const m = box(bd.margin), sz = num(bd.size, 24);
+      const pos = bd.position === 'cell_right' && plugin !== 'cell_2' ? 'bottom_right' : (bd.position || (plugin === 'cell_2' ? 'cell_right' : 'center'));
+      Object.assign(set, { cell_badge_switch: true, cell_badge_position: pos, cell_badge_width: sz, cell_badge_height: sz,
+        cell_badge_margin_top: m[0], cell_badge_margin_right: m[1], cell_badge_margin_bottom: m[2], cell_badge_margin_left: m[3] });
+      assets.push({ kind: 'badge', role: bd.icon, size: sz, iconSize: num(bd.iconSize, bd.circle ? Math.round(sz * 0.5) : sz), color: color(bd.color, '#FFFFFF'),
+        circle: bd.circle ? color(bd.circle, null) : null, file: `${slug(name)}-badge@3x.png`,
+        field: plugin === 'cell_2' ? 'cell_badge (and selected_cell_badge)' : 'cell_badge_default (and cell_badge_selected)' });
+    }
+    // action icon (e.g. download in an episode row)
+    const ac = d.action;
+    if (ac && ac.action) {
+      const id = ACTIONS[String(ac.action).toLowerCase().replace(/[^a-z]/g, '')] || 'offline-content-button';
+      const m = box(ac.margin), sz = num(ac.size, 44);
+      Object.assign(set, { action_switch: true, action_identifier: id, action_position: plugin === 'cell_2' ? 'cell_right' : (ac.position || 'top_right'),
+        action_width: sz, action_height: sz, action_margin_top: m[0], action_margin_right: m[1], action_margin_bottom: m[2], action_margin_left: m[3] });
+      assets.push({ kind: 'action', role: ac.icon || (PLUGIN[id] || {}).role || 'download', size: sz, iconSize: num(ac.iconSize, Math.round(sz * 0.55)), color: color(ac.color, '#FFFFFF'),
+        file: `${slug(name)}-action@3x.png`, field: `unselected_action_icon (and selected_action_icon) · ${(PLUGIN[id] || {}).name || 'action'} plugin` });
+    }
+
     // buttons
     if (d.buttons && (d.buttons.items || []).length) {
       const b = buttonsSpec(d.buttons, notes);
@@ -245,9 +280,17 @@
     spec.sampleFeed = Object.fromEntries(labels.filter(l => l.dataKey && !['title', 'summary'].includes(l.dataKey) && l.sample).map(l => [l.dataKey, String(l.sample)]));
     spec.sampleTitle = (labels.find(l => (l.dataKey || '') === 'title') || {}).sample;
     spec.sampleSummary = (labels.find(l => (l.dataKey || '') === 'summary') || {}).sample;
-    return { base, spec, warnings: notes.warnings, fonts: [...notes.fonts] };
+    // plugin button assets: one per action plugin, in both flavours (flavour 1 for dark backgrounds, flavour 2 for light)
+    const seenPlugins = new Set();
+    for (const bi of notes.buttonIcons) {
+      if (seenPlugins.has(bi.action)) continue; seenPlugins.add(bi.action);
+      const pl = PLUGIN[bi.action];
+      for (const fl of [1, 2]) assets.push({ kind: 'button', plugin: pl.name, asset: pl.asset, flavour: `flavour_${fl}`, role: bi.role, size: 24, iconSize: 24,
+        file: `${slug(pl.name)}-button-flavor-${fl}@3x.png`, field: `${pl.name} plugin › Mobile button asset - flavor ${fl}`, shared: true });
+    }
+    return { base, spec, warnings: notes.warnings, fonts: [...notes.fonts], assets };
   }
 
-  const api = { toSpec, psName, famPrefix, color, box, slug, pascal };
+  const api = { toSpec, psName, famPrefix, color, box, slug, pascal, PLUGIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

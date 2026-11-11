@@ -2440,6 +2440,10 @@ window.CellEngine = {
     Object.assign(state, { screenW: opts.screenW || 393, pad: opts.pad ?? 0, layout: opts.layout || null, appBg: opts.appBg || '#121212',
       ovl: opts.overlay || null, badge: opts.badge || null, action: opts.action || null, hoverBadge: null, contentBadge: null,
       presetArt: null, art: opts.art || null, sec: opts.sec || null, zoom: 1, platform: opts.platform || 'ios' });
+    // icons the studio generated: button assets per plugin asset name and flavour, the header button icon
+    if (!window.__BASE_PNG) window.__BASE_PNG = ACTION_PNG;
+    ACTION_PNG = Object.assign({}, window.__BASE_PNG, opts.actionPng || {});
+    state.infoIcon = opts.infoIcon || null;
     $('screenW').value = state.screenW; $('pad').value = state.pad; $('appbg').value = state.appBg;
     $('dTitle').value = opts.title ?? 'Content Title'; $('dSummary').value = opts.summary ?? 'Two rock-bottom drivers transport a wealthy teen to rehab, but their simple job spirals into chaos.';
     for (const [k, v] of Object.entries(opts.ext || {})) SAMPLE_EXT[k] = String(v);

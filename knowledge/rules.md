@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 1 · phone and tablet · cell plugins 16.0.0-alpha
+Version 2 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -19,6 +19,9 @@ Choosing:
 - Text under a picture → `cell_1`. Text beside a picture, or no picture → `cell_2`. Text on a picture → `cell_3`.
 - A poster with a small tag on it (NEW, RECENTLY ADDED) → `cell_3` with the tag in the bottom zone.
 - A header row above a rail or list → `cell_info`.
+- A header title followed by an arrow or chevron (e.g. "New & Trending >") is a call to action: the row opens
+  the full list. An icon can't sit straight after the title, so build the title on the left and an **icon-only
+  header button** (the chevron) on the right. It matches the look and does the same job. Status `adapted`.
 - If a `cell_3` design puts the text **below** the image (title, description and button under key art), it can
   be built with bottom cell padding that reserves the space, but the text then can't grow; prefer `cell_1`
   unless the design needs `cell_3`-only features.
@@ -68,7 +71,15 @@ Choosing:
   end): put the label on the line above (right-aligned) and give the bar a right margin to leave room. Extra
   bottom margin only adds space under the cell.
 
-## 5. Buttons
+## 5. Icons and plugin assets
+
+- Every icon a cell uses is a deliverable: button icons (per action plugin, two flavours: flavour 1 for dark
+  backgrounds, flavour 2 for light), cell badges (chevrons, play buttons), action icons and header icons.
+- The studio draws them from an icon library chosen to match the design's icon style (outline or filled, stroke
+  weight, rounded or square ends). Name icons by role (`play`, `chevron-right`, `download`...).
+- A play button on a thumbnail is a cell badge with a filled circle behind the icon.
+
+## 6. Buttons
 
 - Up to **3 buttons** per cell, stacked horizontally or vertically, aligned left or centre, positioned relative
   to the labels or over the image.
@@ -83,7 +94,7 @@ Choosing:
 - Per button: fill (full width), dynamic (fits its label) or a fixed width; background, text colour, border,
   corner radius, padding, font; icon left, right or above the label.
 
-## 6. Layout, spacing and behaviour
+## 7. Layout, spacing and behaviour
 
 - Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
   **dividers** (thickness, colour, margins); they're inset by the cell's side padding. An edge-to-edge divider
@@ -91,6 +102,7 @@ Choosing:
 - Cell 2 **centres its text vertically** against the image when the text is shorter than the image, and
   top-aligns when taller. A full-width line under both the image and the text (e.g. a synopsis under an episode
   row) isn't possible: the text stays beside the image.
+- Describe each screen as components top to bottom (single, rail, list, grid) so the studio can mock it up.
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
 - **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them
@@ -100,7 +112,7 @@ Choosing:
 - Negative margins work but should be tested on device; prefer layouts that avoid them (e.g. swap which picture
   is the main image).
 
-## 7. Reporting decisions
+## 8. Reporting decisions
 
 For every cell, record:
 - `works`: what carries over as designed.

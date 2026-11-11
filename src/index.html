@@ -144,8 +144,32 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
 .rc .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px }
 .banner { background: var(--raised); box-shadow: var(--shadow); border-radius: var(--r); padding: 10px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap }
 #toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--canvas); padding: 8px 14px; border-radius: 10px; font-weight: 500; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20 }
-#toast.on { opacity: 1 }
+#toast.on { opacity: 1; pointer-events: auto }
+#toast { display: flex; gap: 12px; align-items: center }
+#toastBtn { border: 0; background: transparent; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0 }
+/* icon library panel */
+.iconp { margin: 10px 10px 4px; padding: 10px; background: var(--raised); border-radius: 10px; box-shadow: var(--shadow); display: grid; gap: 8px }
+.iconp .strip { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; border-radius: 8px; background: var(--ink) }
+.iconp .strip img { width: 20px; height: 20px }
+.iconp .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px }
+.iconp .sw { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
+.iconp input[type=color] { width: 26px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer }
+/* screens */
+#v-screens { grid-template-columns: minmax(0, 1fr) }
+.mock { padding: 18px; display: grid; gap: 28px }
+.mscreen { display: grid; gap: 10px }
+.mscreen h2 { font-size: 15px; margin: 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap }
+.mpair { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start }
+.mcol { display: grid; gap: 6px; justify-items: start }
+.phone { width: 300px; border-radius: 22px; overflow: hidden; box-shadow: 0 0 0 1px var(--line-strong), 0 10px 30px rgba(0,0,0,.12); position: relative; flex: none }
+.phone > img { display: block; width: 100% }
+.phone .inner { transform-origin: 0 0; position: absolute; left: 0; top: 0 }
+.phone .blk { display: flex; overflow: hidden }
+.phone .blk img { display: block; flex: none }
+.mside { flex: 1; min-width: 220px; display: grid; gap: 6px; align-content: start }
+.mside ol { margin: 0; padding-left: 18px; color: var(--ink-2) }
 #engine { position: fixed; left: -10000px; top: 0; width: 1500px; height: 1200px; border: 0; visibility: hidden }
+.phone.tablet { width: 560px; border-radius: 14px }
 @media (max-width: 1100px) { #v-cells { grid-template-columns: 220px minmax(0, 1fr) } .insp { grid-column: 1 / -1 } }
 @media (max-width: 760px) {
   .top { grid-template-columns: 1fr; justify-items: start } .top .actions { justify-self: start }
@@ -160,6 +184,7 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
     <nav class="seg" role="tablist" aria-label="Studio views">
       <button role="tab" id="t-import" aria-controls="v-import" aria-selected="false">Designs <span class="n" id="nScreens">0</span></button>
       <button role="tab" id="t-cells" aria-controls="v-cells" aria-selected="true">Cells <span class="n" id="nCells">0</span></button>
+      <button role="tab" id="t-screens" aria-controls="v-screens" aria-selected="false">Screens</button>
       <button role="tab" id="t-compare" aria-controls="v-compare" aria-selected="false">Report</button>
     </nav>
     <div class="actions">
@@ -213,6 +238,7 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
     <!-- Cells -->
     <section class="view" id="v-cells" role="tabpanel" aria-labelledby="t-cells">
       <nav class="panel" aria-label="Cells">
+        <div class="iconp" id="iconPanel"></div>
         <div class="ph"><h2>Cell styles</h2><span class="sub" id="listHint"></span></div>
         <div class="list" id="list"></div>
       </nav>
@@ -227,13 +253,18 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
       <aside class="panel insp" id="insp" aria-label="Cell details"></aside>
     </section>
 
+    <!-- Screens -->
+    <section class="view" id="v-screens" role="tabpanel" aria-labelledby="t-screens" hidden>
+      <div class="panel"><div class="mock" id="mock"></div></div>
+    </section>
+
     <!-- Report -->
     <section class="view" id="v-compare" role="tabpanel" aria-labelledby="t-compare" hidden>
       <div class="panel"><div class="doc" id="doc"></div></div>
     </section>
   </main>
 </div>
-<div id="toast" role="status" aria-live="polite"></div>
+<div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastBtn" type="button" hidden>Undo</button></div>
 <iframe id="engine" title="Cell engine" aria-hidden="true" tabindex="-1"></iframe>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
