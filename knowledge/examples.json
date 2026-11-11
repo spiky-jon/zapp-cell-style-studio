@@ -718,6 +718,322 @@
      "text": "The text centres against the image; the design top-aligns the title."
     }
    ]
+  },
+  {
+   "name": "Show Detail Hero",
+   "screen": "Show",
+   "purpose": "Show page hero: full-width key art fading to black, then a genre line, a large title and the synopsis.",
+   "bbox": {
+    "x": 0.0,
+    "y": 0.0,
+    "w": 1.0,
+    "h": 0.62
+   },
+   "plugin": "cell_1",
+   "status": "workaround",
+   "layout": {
+    "type": "single",
+    "padding": 0
+   },
+   "appBackground": "#000000",
+   "cell": {
+    "background": "#000000",
+    "radius": 0,
+    "padding": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "border": null
+   },
+   "image": {
+    "key": "image_base",
+    "ratio": "16x9",
+    "radius": 0,
+    "border": null,
+    "margin": [
+     0,
+     0,
+     8,
+     0
+    ],
+    "placeholder": "#1A1A1A"
+   },
+   "overlay": {
+    "direction": "vertical",
+    "stops": [
+     {
+      "at": 0.55,
+      "color": "rgba(0,0,0,0)"
+     },
+     {
+      "at": 1,
+      "color": "#000000"
+     }
+    ]
+   },
+   "secondaryImage": null,
+   "labels": [
+    {
+     "role": "genre",
+     "dataKey": "extensions.genre",
+     "sample": "Comedy",
+     "font": {
+      "family": "Inter",
+      "weight": 400,
+      "size": 12,
+      "lineHeight": 16,
+      "letterSpacing": 0
+     },
+     "color": "#A3A3A3",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 1,
+     "uppercase": false,
+     "margin": [
+      0,
+      16,
+      4,
+      16
+     ]
+    },
+    {
+     "role": "title",
+     "dataKey": "title",
+     "sample": "Ellie & Natasia",
+     "font": {
+      "family": "Inter",
+      "weight": 700,
+      "size": 24,
+      "lineHeight": 30,
+      "letterSpacing": -0.2
+     },
+     "color": "#FFFFFF",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 2,
+     "uppercase": false,
+     "margin": [
+      0,
+      16,
+      12,
+      16
+     ]
+    },
+    {
+     "role": "synopsis",
+     "dataKey": "summary",
+     "sample": "Surreal sketch show from triple threats Ellie White and Natasia Demetriou. Expect bizarre characters, excellent guest stars and a song about snakes.",
+     "font": {
+      "family": "Inter",
+      "weight": 400,
+      "size": 13,
+      "lineHeight": 18,
+      "letterSpacing": 0
+     },
+     "color": "#B3B3B3",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 4,
+     "uppercase": false,
+     "margin": [
+      0,
+      16,
+      0,
+      16
+     ]
+    }
+   ],
+   "buttons": null,
+   "progress": null,
+   "runtime": null,
+   "decisions": [
+    {
+     "type": "works",
+     "text": "Edge-to-edge key art fading to black, with the genre line, bold title and grey synopsis below it."
+    },
+    {
+     "type": "changed",
+     "item": "Split into two cells",
+     "text": "A cell shows at most three text lines, so the next-episode line and the buttons continue in Show Detail Actions, placed directly below."
+    },
+    {
+     "type": "alternative",
+     "text": "Place both cells as single components with no gap so they read as one block."
+    }
+   ]
+  },
+  {
+   "name": "Show Detail Actions",
+   "screen": "Show",
+   "purpose": "Continues Show Detail Hero: the next-episode line with Start watching and Watchlist buttons.",
+   "bbox": {
+    "x": 0.0,
+    "y": 0.62,
+    "w": 1.0,
+    "h": 0.24
+   },
+   "plugin": "cell_2",
+   "status": "workaround",
+   "layout": {
+    "type": "single",
+    "padding": 0
+   },
+   "appBackground": "#000000",
+   "cell": {
+    "background": "#000000",
+    "radius": 0,
+    "padding": [
+     12,
+     16,
+     16,
+     16
+    ],
+    "border": null,
+    "dividerTop": null,
+    "dividerBottom": null
+   },
+   "image": null,
+   "overlay": null,
+   "secondaryImage": null,
+   "labels": [
+    {
+     "role": "next-episode",
+     "dataKey": "extensions.next-episode",
+     "sample": "Series 1: Episode 1 · 15 mins",
+     "font": {
+      "family": "Inter",
+      "weight": 700,
+      "size": 14,
+      "lineHeight": 20,
+      "letterSpacing": 0
+     },
+     "color": "#FFFFFF",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 1,
+     "uppercase": false,
+     "margin": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "buttons": {
+    "stacking": "vertical",
+    "align": "center",
+    "gap": 8,
+    "margin": [
+     16,
+     0,
+     0,
+     0
+    ],
+    "afterLabel": 1,
+    "items": [
+     {
+      "action": "navigation",
+      "label": true,
+      "icon": "play",
+      "iconPosition": "left",
+      "width": "fill",
+      "background": "#F2F2F2",
+      "color": "#000000",
+      "border": null,
+      "radius": 6,
+      "padding": [
+       12,
+       16,
+       12,
+       16
+      ],
+      "font": {
+       "family": "Inter",
+       "weight": 600,
+       "size": 15,
+       "lineHeight": 20,
+       "letterSpacing": 0
+      },
+      "iconSize": 18,
+      "iconFlavour": "dark"
+     },
+     {
+      "action": "favourites",
+      "label": true,
+      "icon": "plus",
+      "iconPosition": "left",
+      "width": "fill",
+      "background": "rgba(0,0,0,0)",
+      "color": "#FFFFFF",
+      "border": null,
+      "radius": 6,
+      "padding": [
+       12,
+       16,
+       12,
+       16
+      ],
+      "font": {
+       "family": "Inter",
+       "weight": 600,
+       "size": 15,
+       "lineHeight": 20,
+       "letterSpacing": 0
+      },
+      "iconSize": 18,
+      "iconFlavour": "light"
+     }
+    ]
+   },
+   "progress": null,
+   "runtime": null,
+   "decisions": [
+    {
+     "type": "works",
+     "text": "Bold next-episode line with two stacked full-width buttons: Start watching plays the next episode and Watchlist adds the show to the list."
+    },
+    {
+     "type": "changed",
+     "item": "Continues the hero",
+     "text": "This cell carries on from Show Detail Hero, because one cell can't hold five lines of text and two buttons."
+    },
+    {
+     "type": "changed",
+     "item": "Button labels and icons",
+     "text": "Labels and icons come from each action, set once for the whole app, so the episode-strip icon becomes the action's play icon."
+    }
+   ]
   }
  ]
 }

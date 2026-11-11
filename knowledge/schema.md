@@ -85,6 +85,17 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
 
 ```jsonc
 {
+  "inventory": [                              // FIRST: every visible element on the screen, top to bottom, and where it is built
+    { "element": "Genre line \"Comedy\"", "cell": "Show Detail Hero", "slot": "label 1" },
+    { "element": "Title \"Ellie & Natasia\"", "cell": "Show Detail Hero", "slot": "label 2" },
+    { "element": "Next episode line", "cell": "Show Detail Actions", "slot": "label 1" },
+    { "element": "Start watching button", "cell": "Show Detail Actions", "slot": "button 1" },
+    { "element": "Bottom tab bar", "cell": null, "reason": "app navigation, not a cell" }
+  ],                                          // cell null only when a rule says it can't be built (give the reason)
+  "fonts": [                                  // one entry per typeface in the design
+    { "seen": "titles and buttons: bold geometric sans", "family": "Inter", "source": "google",   // google | uploaded
+      "alternatives": ["Figtree", "Manrope"], "why": "Tall x-height, flat terminals, single-storey a" }
+  ],
   "cells": [ ... ],                           // new cell styles on this screen
   "seen": [ "Section Header" ],               // already-described styles that also appear on this screen
   "screen": [                                 // this screen top to bottom, as components of cells (for the screen mock-up)
@@ -110,7 +121,11 @@ Notes for the describer:
   already described, even under a different name or with slightly different sample text, list it in `seen`; do
   not describe it again.
 - Ignore the status bar, app navigation bar, tab bar and bottom tab bar: they aren't cells.
-- Fonts: give the family as designed (e.g. "Inter", "DM Sans", "SF Pro Text"). Weight as a number.
+- Fonts: every `font.family` is a family listed in `fonts` (a Google Fonts family with its exact name and
+  capitals, e.g. "DM Sans", or an uploaded font's family). Weight as a number.
+- Inventory: list every visible element before describing cells, and make sure each one with a cell is really
+  in that cell's labels, images or buttons. Keep the inventory honest: it's how reviewers check nothing was
+  dropped.
 - Measure in points: the studio tells you the image's pixel width and the screen width in points.
 - If the design needs more than the cell can do, build the closest version and record each difference as a
   `changed` decision with the reason from the rules, plus an `alternative` where there is one.

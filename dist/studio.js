@@ -6,7 +6,8 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const K = window.KNOWLEDGE, BASES = window.CELL_BASES, C = window.Convert;
-  const S = { screens: [], cells: [], sel: null, example: true, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false };
+  const S = { screens: [], cells: [], sel: null, example: true, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false,
+    fonts: { uploads: {}, picks: [] } };
   const ICONS = K.icons;
   let engine = null, sample = null, downloads = null, mcp = null, figmaSession = null;
   const uid = () => Math.random().toString(36).slice(2, 9);
@@ -31,20 +32,120 @@
       f.srcdoc = window.ENGINE_HTML;
     });
   }
-  const loadedFonts = new Set();
-  async function ensureFonts(families) {
-    const doc = engine.document;
-    for (const fam of families || []) {
-      if (!fam || loadedFonts.has(fam) || /^(SF|San Francisco|-apple|system)/i.test(fam)) continue;
-      loadedFonts.add(fam);
+  /* ---------- fonts: Google Fonts by family, or font files the user uploaded ---------- */
+  // S.fonts.uploads[family] = { faces: [{ ps, weight, italic, ext, data, file }] }; status[family] = google | missing | uploaded | system
+  const SYSTEM_FONT = /^(SF|San Francisco|-apple|system|Roboto$)/i;
+  const fontStatus = {}, fontLinks = new Set();
+  const fontsIn = desc => {
+    const out = new Map();
+    (function walk(o) {
+      if (!o || typeof o !== 'object') return;
+      if (typeof o.family === 'string' && ('weight' in o || 'size' in o)) { if (!out.has(o.family)) out.set(o.family, new Set()); out.get(o.family).add(Math.round((+o.weight || 400) / 100) * 100); }
+      for (const v of Object.values(o)) walk(v);
+    })(desc);
+    return out;
+  };
+  const googleCss = (fam, weights) => `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fam).replace(/%20/g, '+')}${weights ? `:wght@${weights.join(';')}` : ''}&display=swap`;
+  // loads a stylesheet into a document; resolves true when it loaded, false on an error (Google answers 400 for unknown families or weights)
+  const linkCss = (doc, href) => new Promise(ok => {
+    const l = doc.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    l.onload = () => ok(true); l.onerror = () => { l.remove(); ok(false); }; setTimeout(() => ok(true), 4000); doc.head.append(l);
+  });
+  async function loadGoogle(fam, weights) {
+    const ws = [...weights].sort((a, b) => a - b), key = fam + '|' + ws.join(',');
+    if (fontLinks.has(key)) return; fontLinks.add(key);
+    let ok = false;
+    for (const href of [googleCss(fam, ws), googleCss(fam, null)]) {
+      ok = await linkCss(engine.document, href);
+      if (ok) { linkCss(document, href); break; }
+    }
+    fontStatus[fam] = ok ? 'google' : 'missing';
+    if (ok) try { await Promise.all(ws.map(w => engine.document.fonts.load(`${w} 16px "${fam}"`))); } catch (e) { /* falls back */ }
+  }
+  async function ensureFonts(desc) {
+    for (const [fam, weights] of fontsIn(desc)) {
+      if (S.fonts.uploads[fam]) { fontStatus[fam] = 'uploaded'; continue; }
+      if (SYSTEM_FONT.test(fam)) { fontStatus[fam] = 'system'; continue; }
       engine.CellEngine.registerFont(C.famPrefix(fam), fam);
-      const l = doc.createElement('link'); l.rel = 'stylesheet';
-      l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fam).replace(/%20/g, '+')}:wght@300;400;500;600;700;800;900&display=swap`;
-      doc.head.append(l);
-      await new Promise(r => { l.onload = l.onerror = r; setTimeout(r, 2500); });
-      try { await Promise.all([400, 500, 700].map(w => doc.fonts.load(`${w} 16px "${fam}"`))); } catch (e) { /* falls back */ }
+      await loadGoogle(fam, weights);
     }
   }
+  // nearest upright face for a weight, so the cell JSON names a font file that exists
+  const faceFor = (family, weight) => {
+    const u = S.fonts.uploads[family]; if (!u || !u.faces.length) return null;
+    const up = u.faces.filter(f => !f.italic), pool = up.length ? up : u.faces;
+    return pool.reduce((a, f) => Math.abs(f.weight - weight) < Math.abs(a.weight - weight) ? f : a);
+  };
+  C.setFontResolver((family, weight) => faceFor(family, weight)?.ps || null);
+
+  // reads family, PostScript name, weight and italic from a TrueType / OpenType file (name and OS/2 tables)
+  function parseFont(buf) {
+    const v = new DataView(buf), tag = o => String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
+    const sig = v.getUint32(0);
+    if (sig !== 0x00010000 && tag(0) !== 'OTTO' && tag(0) !== 'true') throw new Error(tag(0) === 'wOFF' || tag(0) === 'wOF2' ? 'web font (WOFF): apps need the .ttf or .otf file' : "not a TrueType or OpenType font");
+    const tables = {}, n = v.getUint16(4);
+    for (let i = 0; i < n; i++) { const o = 12 + i * 16; tables[tag(o)] = { off: v.getUint32(o + 8), len: v.getUint32(o + 12) }; }
+    const names = {};
+    if (tables.name) {
+      const b = tables.name.off, count = v.getUint16(b + 2), strings = b + v.getUint16(b + 4);
+      for (let i = 0; i < count; i++) {
+        const r = b + 6 + i * 12, plat = v.getUint16(r), lang = v.getUint16(r + 4), id = v.getUint16(r + 6), len = v.getUint16(r + 8), off = strings + v.getUint16(r + 10);
+        if (![1, 2, 4, 6, 16, 17].includes(id)) continue;
+        let s = '';
+        if (plat === 3 || plat === 0) { if (plat === 3 && lang !== 0x409 && names[id]) continue; for (let j = 0; j < len; j += 2) s += String.fromCharCode(v.getUint16(off + j)); }
+        else if (plat === 1) { if (names[id]) continue; for (let j = 0; j < len; j++) s += String.fromCharCode(v.getUint8(off + j)); }
+        else continue;
+        if (s) names[id] = s;
+      }
+    }
+    let weight = 400, italic = false;
+    if (tables['OS/2']) { const o = tables['OS/2'].off; weight = v.getUint16(o + 4) || 400; italic = !!(v.getUint16(o + 62) & 1); }
+    const sub = names[17] || names[2] || '';
+    if (/italic|oblique/i.test(sub)) italic = true;
+    const family = (names[16] || names[1] || '').trim();
+    if (!family) throw new Error('the font has no family name');
+    return { family, ps: (names[6] || `${C.famPrefix(family)}-${sub.replace(/\s+/g, '') || 'Regular'}`).trim(), weight: Math.min(1000, Math.max(100, weight)), italic, sub };
+  }
+  const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+  async function addFontFiles(files) {
+    const added = [];
+    for (const f of files) {
+      if (!/\.(ttf|otf|woff2?)$/i.test(f.name)) { toast(`${f.name} isn't a font file (.ttf or .otf).`); continue; }
+      try {
+        const buf = await f.arrayBuffer(), info = parseFont(buf), ext = f.name.split('.').pop().toLowerCase();
+        const u = (S.fonts.uploads[info.family] ||= { faces: [] });
+        if (u.faces.some(x => x.ps === info.ps)) continue;
+        const face = { ...info, ext, file: f.name, data: new Uint8Array(buf) };
+        u.faces.push(face); u.faces.sort((a, b) => a.weight - b.weight || a.italic - b.italic);
+        // an @font-face rule with the file inline, in both documents (the engine's snapshots copy stylesheets, not FontFace objects)
+        const css = `@font-face{font-family:"${info.family}";src:url(data:font/${ext === 'otf' ? 'otf' : 'ttf'};base64,${b64(face.data)});font-weight:${info.weight};font-style:${info.italic ? 'italic' : 'normal'};font-display:block}`;
+        for (const doc of [document, engine?.document].filter(Boolean)) { const st = doc.createElement('style'); st.dataset.font = info.ps; st.textContent = css; doc.head.append(st); }
+        engine?.CellEngine.registerFace(info.ps, info.family, info.weight);
+        fontStatus[info.family] = 'uploaded';
+        try { await engine?.document.fonts.load(`${info.italic ? 'italic ' : ''}${info.weight} 16px "${info.family}"`); } catch (e) {}
+        added.push(`${info.family} ${info.sub || info.weight}`);
+      } catch (e) { toast(`${f.name}: ${e.message}.`); }
+    }
+    renderFontFiles(); renderFontPanel();
+    if (added.length) {
+      toast(`Added ${added.length} font${added.length > 1 ? 's' : ''}`);
+      // cells already using an uploaded family pick up its real file names
+      const fams = new Set(Object.keys(S.fonts.uploads));
+      for (const c of S.cells) if ([...fontsIn(c.desc).keys()].some(f => fams.has(f))) await buildCell(c);
+      renderAll();
+    }
+  }
+  function renderFontFiles() {
+    const box = $('fontFiles'), fams = Object.entries(S.fonts.uploads);
+    box.innerHTML = fams.map(([fam, u]) => `<div class="ff"><b style="font-family:'${esc(fam)}',var(--f-ui)">${esc(fam)}</b>
+      <span class="hint">${u.faces.map(f => `${f.weight}${f.italic ? ' italic' : ''}`).join(', ')}</span><button class="btn ghost small" type="button" data-rmfont="${esc(fam)}">Remove</button></div>`).join('');
+    box.querySelectorAll('[data-rmfont]').forEach(b => b.onclick = () => {
+      const fam = b.dataset.rmfont;
+      for (const f of S.fonts.uploads[fam].faces) for (const doc of [document, engine?.document].filter(Boolean)) doc.querySelectorAll(`style[data-font="${CSS.escape(f.ps)}"]`).forEach(x => x.remove());
+      delete S.fonts.uploads[fam]; delete fontStatus[fam]; renderFontFiles(); renderFontPanel();
+    });
+  }
+  $('fontInput').addEventListener('change', async e => { await addFontFiles([...e.target.files]); e.target.value = ''; });
 
   /* ---------- icons: role -> PNG @3x from the chosen library ---------- */
   const iconCache = new Map();
@@ -82,7 +183,7 @@
       const scr = S.screens.find(s => s.id === c.screenId);
       const conv = C.toSpec(c.desc, { device: scr?.device || c.desc.device, screenW: scr?.screenW, collection: collection() });
       c.spec = conv.spec; c.base = conv.base; c.warnings = conv.warnings;
-      await ensureFonts(conv.fonts);
+      await ensureFonts(c.desc);
       const built = engine.CellEngine.buildCell(BASES[conv.base], c.spec);
       c.json = built.json; c.output = built.output; c.overlay = built.overlay;
       c.assets = await drawAssets(conv.assets);
@@ -205,6 +306,10 @@
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
       'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names) and icons.',
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
+      Object.keys(S.fonts.uploads).length ? `UPLOADED FONTS (the design's own font files; wherever the design's type matches one, use its family name exactly and set "source": "uploaded"): ${Object.entries(S.fonts.uploads).map(([f, u]) => `${f} (weights ${[...new Set(u.faces.filter(x => !x.italic).map(x => x.weight))].join(', ')})`).join('; ')}` : '',
+      S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
+      'Work in this order: write the inventory first (every visible element, top to bottom), then fonts, then the cells that build every inventory element, then seen, screen and icons.',
+      'Fidelity comes first (RULES section 0): match the screenshot as closely as the rules allow. Never leave out visible text, images or buttons to keep a block in one cell; split it into stacked cells instead.',
       'Include every distinct content cell style on the screen (headers, tiles, rows, heroes, banners, info blocks, button rows). Skip the status bar, app navigation bar, tab strips and bottom tab bar.',
     ].filter(Boolean).join('\n');
   }
@@ -232,6 +337,15 @@
           S.iconsSet = true; renderIconPanel();
           for (const c of S.cells) await buildCell(c);
         }
+        for (const f of Array.isArray(res?.fonts) ? res.fonts : []) {
+          if (!f || typeof f.family !== 'string' || S.fonts.picks.some(p => p.family === f.family)) continue;
+          S.fonts.picks.push({ family: f.family, seen: String(f.seen || ''), why: String(f.why || ''), source: f.source || 'google',
+            alternatives: (Array.isArray(f.alternatives) ? f.alternatives : []).filter(a => typeof a === 'string' && a !== f.family).slice(0, 4) });
+        }
+        scr.inventory = Array.isArray(res?.inventory) ? res.inventory.filter(i => i && i.element) : [];
+        const left = scr.inventory.filter(i => !i.cell);
+        for (const i of left) log(`  Left out: ${i.element}${i.reason ? ` (${i.reason})` : ''}`);
+        renderFontPanel();
         for (const n of res?.seen || []) { const c = S.cells.find(x => x.desc.name.toLowerCase() === String(n).toLowerCase()); if (c && !c.screens.includes(scr.name)) c.screens.push(scr.name); }
         scr.state = 'Done'; log(`${scr.name}: ${found.length} new cell style${found.length === 1 ? '' : 's'}.`);
       } catch (e) {
@@ -272,7 +386,7 @@
       <div class="thumbs"><div style="background:var(--chip)">${c.crop ? `<img src="${c.crop}" alt="">` : '<span class="hint">No original</span>'}</div><div style="background:${esc(cellBg(c))}">${c.snap ? `<img src="${c.snap}" alt="">` : ''}</div></div>
       <div class="t"><b>${esc(c.desc.name)}</b><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span></div></button>`).join('');
     $('grid').querySelectorAll('.card').forEach(b => b.onclick = () => { S.sel = b.dataset.id; renderAll(); $('stage').scrollIntoView({ block: 'nearest' }); });
-    renderStage(); renderInspector();
+    renderStage(); renderInspector(); renderFontPanel();
   }
   function decisionsHtml(d) {
     const icon = { works: '✓', changed: '!', alternative: '→' };
@@ -349,21 +463,65 @@
     $('icDark').onchange = e => { S.icons.dark = e.target.value.toUpperCase(); changed(); };
   }
 
+  /* ---------- fonts in use ---------- */
+  function renderFontPanel() {
+    const box = $('fontPanel'); if (!box) return;
+    const use = new Map();
+    for (const c of S.cells) for (const [f] of fontsIn(c.desc)) use.set(f, (use.get(f) || 0) + 1);
+    box.hidden = !use.size; if (!use.size) return;
+    const uploads = Object.keys(S.fonts.uploads);
+    const NOTE = { missing: 'Not on Google Fonts: pick another or add the file', uploaded: 'Your font file', system: 'System font', google: 'Google Fonts' };
+    box.innerHTML = `<div class="row" style="justify-content:space-between"><span class="lab">Fonts</span><label class="hint link" for="fontInput">Add font files</label></div>` +
+      [...use].sort((a, b) => b[1] - a[1]).map(([fam, n]) => {
+        const pick = S.fonts.picks.find(p => p.family === fam) || {}, st = fontStatus[fam] || 'google';
+        const opts = [...new Set([fam, ...(pick.alternatives || []), ...uploads])];
+        return `<div class="fr"><div class="fs" style="font-family:'${esc(fam)}',var(--f-ui)">Ag<span>${esc(fam)}</span></div>
+          <select class="inp" data-fam="${esc(fam)}" aria-label="Font used instead of ${esc(fam)}">${opts.map(o => `<option ${o === fam ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Another Google font…</option></select>
+          <span class="hint${st === 'missing' ? ' bad' : ''}">${esc(NOTE[st])} · ${n} cell${n > 1 ? 's' : ''}${pick.seen ? ` · ${esc(pick.seen)}` : ''}${pick.why ? `. ${esc(pick.why)}` : ''}</span></div>`;
+      }).join('');
+    box.querySelectorAll('select[data-fam]').forEach(sel => sel.onchange = () => {
+      const from = sel.dataset.fam;
+      if (sel.value !== '__other') return swapFont(from, sel.value);
+      sel.value = from;
+      if (sel.nextElementSibling?.classList.contains('other')) return;
+      sel.insertAdjacentHTML('afterend', `<div class="row other"><input class="inp" placeholder="Google font name, e.g. Manrope" aria-label="Google font name"><button class="btn small" type="button">Use</button></div>`);
+      const row = sel.nextElementSibling, inp = row.querySelector('input'), go = () => { const v = inp.value.trim(); if (v) swapFont(from, v); };
+      row.querySelector('button').onclick = go; inp.onkeydown = e => { if (e.key === 'Enter') go(); }; inp.focus();
+    });
+  }
+  async function swapFont(from, to) {
+    if (!to || to === from) return;
+    const touched = [];
+    for (const c of S.cells) {
+      let hit = false;
+      (function walk(o) { if (!o || typeof o !== 'object') return; if (o.family === from && ('weight' in o || 'size' in o)) { o.family = to; hit = true; } for (const v of Object.values(o)) walk(v); })(c.desc);
+      if (hit) touched.push(c);
+    }
+    const p = S.fonts.picks.find(x => x.family === from);
+    if (p) { p.alternatives = [...new Set([from, ...p.alternatives.filter(a => a !== to)])].slice(0, 5); p.family = to; }
+    else S.fonts.picks.push({ family: to, seen: '', why: '', alternatives: [from] });
+    toast(`Switching to ${to}…`);
+    for (const c of touched) await buildCell(c);
+    renderAll();
+    toast(fontStatus[to] === 'missing' ? `${to} isn't on Google Fonts (names are case-sensitive)` : `${touched.length} cell${touched.length === 1 ? '' : 's'} now use ${to}`);
+  }
+
   /* ---------- screens mock-up ---------- */
   const findCell = name => S.cells.find(c => c.desc.name.toLowerCase() === String(name).toLowerCase());
   function mockBlock(item, W) {
-    const c = findCell(item.cell); if (!c || !c.snapRaw || !c.size) return '';
+    const c = findCell(item.cell); if (!c || !c.snapRaw || !c.size) return { html: '', h: 0 };
     const lay = c.spec.layout || {}, comp = item.component || lay.type || 'single';
     const pad = num(lay.padding), gap = num(lay.gap ?? lay.rowGap ?? 8), cw = c.size.w, ch = c.size.h;
     const im = (w, h) => `<img src="${c.snapRaw}" alt="" style="width:${w}px;height:${h}px">`;
     if (comp === 'rail') { const n = Math.max(1, Math.min(12, +item.count || 4));
-      return `<div class="blk" style="gap:${gap}px;padding-left:${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>`; }
+      return { h: ch, html: `<div class="blk" style="gap:${gap}px;padding-left:${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>` }; }
     if (comp === 'list') { const n = Math.max(1, Math.min(12, +item.count || 3));
-      return `<div class="blk" style="flex-direction:column;gap:${num(lay.rowGap ?? 0)}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>`; }
+      return { h: n * ch + (n - 1) * num(lay.rowGap ?? 0), html: `<div class="blk" style="flex-direction:column;gap:${num(lay.rowGap ?? 0)}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>` }; }
     if (comp === 'grid') { const cols = Math.max(1, +item.columns || 3), n = Math.max(cols, Math.min(18, +item.count || cols * 2));
       const g = num(lay.gap ?? 8), w = (W - pad * 2 - g * (cols - 1)) / cols, h = ch * w / cw;
-      return `<div class="blk" style="flex-wrap:wrap;gap:${g}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(w, h)).join('')}</div>`; }
-    return `<div class="blk" style="padding-left:${Math.max(0, (W - cw) / 2)}px">${im(cw, ch)}</div>`;
+      const rows = Math.ceil(n / cols);
+      return { h: rows * h + (rows - 1) * g, html: `<div class="blk" style="flex-wrap:wrap;gap:${g}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(w, h)).join('')}</div>` }; }
+    return { h: ch, html: `<div class="blk" style="padding-left:${Math.max(0, (W - cw) / 2)}px">${im(cw, ch)}</div>` };
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
   function renderMock() {
@@ -374,12 +532,15 @@
       const first = findCell((scr.layout.find(i => findCell(i.cell)) || {}).cell);
       const bg = first?.spec?.appBg || '#000';
       const missing = scr.layout.filter(i => !findCell(i.cell)).map(i => i.cell);
+      // the mock grows when the cells run longer than the screenshot (split cells, sample text)
+      const blocks = scr.layout.map(i => mockBlock(i, W)), contentH = blocks.reduce((a, b) => a + b.h, 0);
       return `<section class="mscreen"><h2>${esc(scr.name)} <span class="hint">${tablet ? 'Tablet' : 'Phone'} · ${W}pt</span></h2>
         <div class="mpair">
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
-          <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(H * k)}px;background:${esc(bg)}">
-            <div class="inner" style="width:${W}px;transform:scale(${k})">${scr.layout.map(i => mockBlock(i, W)).join('')}</div></div></div>
+          <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
+            <div class="inner" style="width:${W}px;transform:scale(${k})">${blocks.map(b => b.html).join('')}</div></div></div>
           <div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(i.component || 'single')}${i.count ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
+            ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
             ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
             <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>
         </div></section>`;
@@ -400,12 +561,37 @@
     for (const a of (c.assets || []).filter(a => !a.shared)) lines.push(`assets/${a.file}: upload to ${a.field}`);
     for (const a of (c.assets || []).filter(a => a.shared)) lines.push(`../plugin assets/${a.file}: ${a.field}`);
     if ((c.assets || []).length) lines.push(`Icons: ${ICONS.libraries[S.icons.library]?.name || S.icons.library}`);
+    const fn = fontNames([c]); if (fn.length) lines.push(`Fonts: ${fn.map(f => f.ps).join(', ')} (see ../fonts)`);
     const sec = t => (d.decisions || []).filter(x => x.type === t);
     if (sec('works').length) lines.push('', 'What works:', ...sec('works').map(x => `  - ${x.text}`));
     if (sec('changed').length) lines.push('', 'Changes to fit the cell framework:', ...sec('changed').map(x => `  - ${x.item ? x.item + ': ' : ''}${x.text}`));
     if (sec('alternative').length) lines.push('', 'Suggested approach:', ...sec('alternative').map(x => `  - ${x.text}`));
     if (c.spec?.layout?.type === 'rail') lines.push('', `Component: horizontal list, item width ${c.spec.layout.itemWidth}, gap ${c.spec.layout.gap}.`);
     return lines.join('\n') + '\n';
+  }
+  // every font face the cells name: { ps, family, weight, face (uploaded file) | null, status }
+  function fontNames(list) {
+    const out = new Map();
+    for (const c of list) for (const [fam, ws] of fontsIn(c.desc)) for (const w of ws) {
+      const face = faceFor(fam, w), ps = face ? face.ps : C.psName({ family: fam, weight: w });
+      if (!out.has(ps)) out.set(ps, { ps, family: fam, weight: face ? face.weight : w, face, status: face ? 'uploaded' : fontStatus[fam] || 'google' });
+    }
+    return [...out.values()].sort((a, b) => a.family.localeCompare(b.family) || a.weight - b.weight);
+  }
+  function fontsReadme(fn) {
+    const up = fn.filter(f => f.face), gf = fn.filter(f => !f.face && f.status !== 'system'), sys = fn.filter(f => f.status === 'system');
+    const L = ['Fonts these cell styles use', '',
+      'Cell styles name each font by its PostScript name (iOS) and font file name (Android). Add each font to the app with',
+      'the file named exactly as listed, so the same name works on both.', ''];
+    if (up.length) L.push('Your font files (included here, renamed to match):', ...up.map(f => `  ${f.ps}.${f.face.ext}  (${f.family} ${f.weight}${f.face.italic ? ' italic' : ''}, from ${f.face.file})`), '');
+    if (gf.length) {
+      L.push('Google Fonts (free and open-licensed; download the family, then name each static file as listed):');
+      for (const fam of [...new Set(gf.map(f => f.family))]) L.push(`  ${fam}${gf.some(f => f.family === fam && f.status === 'missing') ? ' (not found on Google Fonts: choose another family or supply the file)' : ''}: https://fonts.google.com/specimen/${encodeURIComponent(fam).replace(/%20/g, '+')}`,
+        ...gf.filter(f => f.family === fam).map(f => `    ${f.ps}.ttf  (weight ${f.weight})`));
+      L.push('');
+    }
+    if (sys.length) L.push('System fonts (already on the device):', ...sys.map(f => `  ${f.ps}`), '');
+    return L.join('\n');
   }
   async function downloadZip(list, name) {
     if (!window.JSZip) { toast("The zip library didn't load."); return; }
@@ -433,17 +619,30 @@
       pa.file('README.txt', `Action plugin button icons (${ICONS.libraries[S.icons.library]?.name || S.icons.library}). Upload each to its plugin in Zapp:\n\n` +
         [...pluginAssets.values()].map(a => `${a.file}: ${a.field}`).join('\n') + '\n\nFlavour 1 is for dark button backgrounds, flavour 2 for light.\n');
     }
+    const fn = fontNames(ok);
+    if (fn.length) {
+      const fz = zip.folder('fonts');
+      for (const f of fn.filter(x => x.face)) fz.file(`${f.ps}.${f.face.ext}`, f.face.data);
+      fz.file('README.txt', fontsReadme(fn));
+    }
     await save(name, await zip.generateAsync({ type: 'uint8array' }));
   }
   $('dlAll').addEventListener('click', () => downloadZip(S.cells, `${C.slug(collection())}-cells.zip`));
 
   /* ---------- report (on screen + PDF) ---------- */
   const counts = () => Object.fromEntries(Object.keys(STATUS).map(k => [k, S.cells.filter(c => c.desc.status === k).length]));
+  // "Inter (Google Fonts, closest match to the design's sans) · Acme Sans (supplied)"
+  function fontSummary() {
+    const fams = [...new Set(fontNames(S.cells).map(f => f.family))];
+    return fams.map(f => { const st = S.fonts.uploads[f] ? 'supplied font' : fontStatus[f] === 'system' ? 'system font' : fontStatus[f] === 'missing' ? 'not found on Google Fonts' : 'Google Fonts';
+      const p = S.fonts.picks.find(x => x.family === f); return `${f} (${st}${p?.seen ? `, for ${p.seen}` : ''})`; }).join(' · ');
+  }
   function renderDoc() {
     const n = counts();
     $('doc').innerHTML = `<div style="display:grid;gap:8px"><span class="lab">${esc(collection())} · Cell style report</span><h1>Designs and built cells, side by side</h1>
       <p class="lede">Each cell style found in the designs, built as an importable Zapp cell. For every cell: the original, the built cell as the platform preview draws it, what works, what changed to fit the cell framework and why, and the suggested approach.</p>
-      <div class="row"><span class="pill as_designed">${n.as_designed} as designed</span><span class="pill adapted">${n.adapted} adapted</span><span class="pill workaround">${n.workaround} workaround</span></div></div>
+      <div class="row"><span class="pill as_designed">${n.as_designed} as designed</span><span class="pill adapted">${n.adapted} adapted</span><span class="pill workaround">${n.workaround} workaround</span></div>
+      ${fontSummary() ? `<p class="hint">Fonts: ${esc(fontSummary())}</p>` : ''}</div>
       ${S.cells.length ? `<table><tr><th>Cell</th><th>Screen</th><th>Built on</th><th>Result</th><th>Main change</th></tr>${S.cells.map(c => { const ch = (c.desc.decisions || []).find(x => x.type === 'changed');
         return `<tr><td><b>${esc(c.desc.name)}</b></td><td>${esc(c.screens?.join(', ') || c.desc.screen || '')}</td><td>${esc(TYPE[c.desc.plugin] || '')}</td><td><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span></td><td>${esc(ch ? (ch.item || ch.text) : '—')}</td></tr>`; }).join('')}</table>` : '<p class="hint">No cells yet.</p>'}
       ${S.cells.map(c => `<section class="rc"><h2>${esc(c.desc.name)} <span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span></h2>
@@ -467,7 +666,8 @@
     text(`${collection()} · Cell style report`, 9, { color: muted, after: 6 });
     text('Designs and built cells, side by side', 22, { bold: true, after: 4 });
     text('Each cell style found in the designs, built as an importable Zapp cell: the original, the built cell as the platform preview draws it, what works, what changed to fit the cell framework and why, and the suggested approach.', 10.5, { color: [70, 70, 76], after: 6 });
-    const n = counts(); text(`${S.cells.length} cell styles · ${n.as_designed} as designed · ${n.adapted} adapted · ${n.workaround} workaround`, 10, { bold: true, after: 6 });
+    const n = counts(); text(`${S.cells.length} cell styles · ${n.as_designed} as designed · ${n.adapted} adapted · ${n.workaround} workaround`, 10, { bold: true, after: 3 });
+    const fs = fontSummary(); if (fs) text(`Fonts: ${fs}`, 9.5, { color: [70, 70, 76], after: 6 }); else y += 3;
     // summary table
     pdf.setDrawColor(...line);
     for (const c of S.cells) {

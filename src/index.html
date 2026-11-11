@@ -154,6 +154,18 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
 .iconp .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px }
 .iconp .sw { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
 .iconp input[type=color] { width: 26px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer }
+/* fonts */
+.fontp .fr { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--line) }
+.fontp .fr:first-of-type { border-top: 0; padding-top: 0 }
+.fontp .fs { font-size: 20px; line-height: 1.1; display: flex; align-items: baseline; gap: 8px; color: var(--ink) }
+.fontp .fs span { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.fontp .other { gap: 6px } .fontp .other .inp { flex: 1; min-width: 0 }
+.hint.bad { color: var(--warn, #8A5A00) }
+.link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px }
+.fflist { display: grid; gap: 6px }
+.fflist .ff { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--chip) }
+.fflist .ff b { font-size: 15px } .fflist .ff .hint { grid-column: 1 } .fflist .ff button { grid-row: 1 / span 2; grid-column: 2 }
+ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px }
 /* screens */
 #v-screens { grid-template-columns: minmax(0, 1fr) }
 .mock { padding: 18px; display: grid; gap: 28px }
@@ -211,6 +223,13 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
             <p class="hint">Link to a page or a section of screen frames. Uses your Figma connection on Claude; the file must be one your Figma account can open.</p>
           </div>
           <div class="field">
+            <span>Fonts <span class="hint">(optional)</span></span>
+            <div class="row"><label class="btn small" for="fontInput">Add font files</label><span class="hint">.ttf or .otf</span></div>
+            <input type="file" id="fontInput" accept=".ttf,.otf,font/ttf,font/otf" multiple hidden>
+            <div class="fflist" id="fontFiles"></div>
+            <p class="hint">The design's own fonts. Cells use them wherever the type matches, and the download includes the files. Without them, the studio picks the closest Google Fonts.</p>
+          </div>
+          <div class="field">
             <span>Device for new screens</span>
             <div class="row">
               <select class="inp" id="device" style="width:auto"><option value="phone">Phone</option><option value="tablet">Tablet (landscape)</option></select>
@@ -239,6 +258,7 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
     <section class="view" id="v-cells" role="tabpanel" aria-labelledby="t-cells">
       <nav class="panel" aria-label="Cells">
         <div class="iconp" id="iconPanel"></div>
+        <div class="iconp fontp" id="fontPanel" hidden></div>
         <div class="ph"><h2>Cell styles</h2><span class="sub" id="listHint"></span></div>
         <div class="list" id="list"></div>
       </nav>

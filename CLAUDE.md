@@ -8,7 +8,7 @@ Read README.md first. Key points for any session:
   changes what can be built, into `src/convert.js` and `knowledge/schema.md`. Bump the version line in rules.md.
 - **Engine source of truth.** `engine/template.html` and `engine/lib/*.mjs` come from the cell preview tool
   (cell-tokens). Keep them in step when the preview changes; the studio drives the template through
-  `window.CellEngine` (buildCell, render, snapshot, registerFont). `window.CELL_ENGINE_MODE` stops the engine
+  `window.CellEngine` (buildCell, render, snapshot, registerFont, registerFace). `window.CELL_ENGINE_MODE` stops the engine
   from using artifact capabilities.
 - **After any change:** `python3 tools/build.py && node tools/test.mjs`, then republish `dist/` (see README for
   the file list and capabilities). Publishing again to the same artifact keeps its link.

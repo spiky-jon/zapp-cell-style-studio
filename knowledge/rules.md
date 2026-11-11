@@ -1,10 +1,28 @@
 # Zapp mobile cell styles: rules
 
-Version 2 · phone and tablet · cell plugins 16.0.0-alpha
+Version 3 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
 the rules say isn't possible, build the closest version and say what changed, why, and the alternative.
+
+## 0. Priorities
+
+Apply these in order, every time, so the same design always gives the same cells:
+
+1. **Keep everything visible.** Every piece of text, image and button in the design appears in a built cell.
+   Never drop a visible element to keep a block in one cell: when a block has more than a cell can hold (more
+   than 3 labels, labels and buttons that won't fit), **split it into stacked cells** that read the same feed
+   and share the background, so they look like one block. Leave something out only when a rule says it can't
+   be built at all (an icon inside a label, an expand chevron), and record why.
+2. **Match the look.** Sizes, spacing, colours, fonts and alignment as close to the screenshot as the cell
+   allows.
+3. **Then use the fewest cells.** Only after 1 and 2.
+
+How to split a block, so it splits the same way each time: the first cell takes the image and the labels in
+reading order until it is full (3 labels); the next cell takes the remaining labels and the buttons. Name the
+second cell after the first with what it holds (e.g. "Show Detail Hero" and "Show Detail Actions"). Status
+`workaround`, with a decision on each cell saying which cell continues it.
 
 ## 1. The four cell types
 
@@ -40,9 +58,22 @@ Choosing:
 - No gradient fills on text.
 - Per label: alignment (left, centre, right), number of lines (truncates with …), uppercase transform, margins.
 - Each label reads a **data key**: `title`, `summary`, or any feed path such as `extensions.genre`.
-- When content needs more than 3 lines (e.g. an expanded live panel: logo, title, time, description, "up next"),
-  **split it across two cells** placed as two components that read the same feed. Record this as a
+- When content needs more than 3 lines (e.g. a show hero: genre, title, synopsis, next episode, buttons; or an
+  expanded live panel: logo, title, time, description, "up next"), **split it across two cells** placed as two
+  components that read the same feed (see Priorities). Never leave a line out instead. Record this as a
   `workaround`.
+
+## 2a. Fonts
+
+- Name every font by **family** and weight. Match the design's type to the closest **Google Fonts** family
+  (same classification, proportions, x-height, letterform details such as a single- or double-storey "a"), and
+  give two Google alternatives.
+- When the user supplies font files, they are the design's own fonts: use them, by their family name, wherever
+  the design's type matches.
+- Use one family per distinct typeface in the design, and keep the same choice for the same type across every
+  screen.
+- If the design uses the phone's system font (SF Pro), name the closest Google family (Inter) and mention SF Pro
+  as an alternative.
 
 ## 3. Images
 

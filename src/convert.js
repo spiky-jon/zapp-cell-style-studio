@@ -32,7 +32,11 @@
     return d;
   };
   const famPrefix = family => String(family || 'Inter').replace(/[^A-Za-z0-9]/g, '');
-  const psName = f => `${famPrefix(f && f.family)}-${WEIGHTS[Math.round(((f && f.weight) || 400) / 100) * 100] || 'Regular'}`;
+  // uploaded fonts carry their own PostScript names; the studio sets a resolver (family, weight) -> name | null
+  let fontResolver = null;
+  const setFontResolver = fn => { fontResolver = typeof fn === 'function' ? fn : null; };
+  const psName = f => (fontResolver && f && f.family && fontResolver(f.family, (f && f.weight) || 400))
+    || `${famPrefix(f && f.family)}-${WEIGHTS[Math.round(((f && f.weight) || 400) / 100) * 100] || 'Regular'}`;
   const F = f => ({ font: psName(f), size: num(f && f.size, 14), lineHeight: num(f && f.lineHeight, Math.round(num(f && f.size, 14) * 1.3)), letterSpacing: num(f && f.letterSpacing, 0) });
   const ratioOf = r => {
     const s = String(r || '16x9').replace(/[: /]/g, 'x').toLowerCase();
@@ -291,6 +295,6 @@
     return { base, spec, warnings: notes.warnings, fonts: [...notes.fonts], assets };
   }
 
-  const api = { toSpec, psName, famPrefix, color, box, slug, pascal, PLUGIN };
+  const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

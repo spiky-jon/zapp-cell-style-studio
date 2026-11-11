@@ -21,14 +21,21 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
    `engine/lib/tokens.mjs` from the plugin templates in `engine/bases/`, renders it, and snapshots it.
 4. **Review**: gallery of original vs built, an inspector per cell (type, result, decisions, data keys, full
    description editable and rebuildable). Cells that are mistakes or duplicates can be removed (with undo).
-5. **Icons**: Claude picks the icon library closest to the design's icon style (Lucide, Phosphor, Tabler,
+5. **Consistency**: Claude lists every visible element first (the inventory) and follows the priorities in
+   `knowledge/rules.md`: keep everything visible (split a block into stacked cells rather than drop a line), match
+   the look, then use the fewest cells. Anything left out is listed with its reason in the log and the Screens tab.
+6. **Fonts**: Claude matches each typeface to the closest Google Fonts family, with alternatives the Fonts panel
+   can switch to (or any Google family typed in). Designers can add their own .ttf or .otf files on the Designs tab:
+   the studio reads each file's family, PostScript name and weight, uses them in the preview and the cell JSON,
+   and includes them in the download's `fonts/` folder.
+7. **Icons**: Claude picks the icon library closest to the design's icon style (Lucide, Phosphor, Tabler,
    Heroicons, Material Symbols, from `knowledge/icons.json`); the icon panel switches library and colours.
    Every icon a cell uses (badges, action icons, header buttons, plugin button flavours) is drawn as a PNG @3x.
-6. **Screens**: each screen mocked up from the built cells, laid out as the components Claude described
+8. **Screens**: each screen mocked up from the built cells, laid out as the components Claude described
    (single, rail, list, grid), next to the original.
-7. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each
+9. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each
    asset, 500x280@2x thumbnail, overlay PNG when there's a gradient, `assets/` icons; plus a `plugin assets`
-   folder for action plugin button icons) and a PDF report.
+   folder for action plugin button icons; a `fonts` folder with the font files and names) and a PDF report.
 
 ## Repo
 

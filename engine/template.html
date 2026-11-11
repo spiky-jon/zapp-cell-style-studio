@@ -511,6 +511,9 @@ function webAliases(m) {
 
 function fontFor(name) {
   name = name || '';
+  // faces from font files the studio registered (PostScript name -> family and weight)
+  const face = (window.FONT_FACES || {})[name];
+  if (face) return { fam: `"${face.family}", system-ui, sans-serif`, w: face.weight };
   const w = /Black|Heavy/.test(name) ? 900 : /ExtraBold/.test(name) ? 800 : /Semi[Bb]old/.test(name) ? 600
           : /Bold/.test(name) ? 700 : /Medium/.test(name) ? 500 : /Light/.test(name) ? 300 : 400;
   let fam;
@@ -2435,6 +2438,7 @@ window.CellEngine = {
     return { json: built.json, output: built.output, dropped: built.dropped || [], overlay, buttons: built.buttons || [] };
   },
   registerFont(prefix, family) { (window.FONT_MAP ||= {})[prefix] = family; },
+  registerFace(psName, family, weight) { (window.FONT_FACES ||= {})[psName] = { family, weight: weight || 400 }; },
   // Draws a cell. opts: screenW, pad, appBg, layout, overlay (data URL), title, summary, ext ({'extensions.x': 'text'}), platform
   render(json, opts = {}) {
     Object.assign(state, { screenW: opts.screenW || 393, pad: opts.pad ?? 0, layout: opts.layout || null, appBg: opts.appBg || '#121212',
