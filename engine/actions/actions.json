@@ -1,0 +1,94 @@
+{
+  "about": "Button assets for the action plugins, built from Figma 237:1432 (Action Assets). Each asset comes in two flavours: flavour 1 for dark backgrounds, flavour 2 for light backgrounds. 24pt, exported @3x.",
+  "figma": "237:1432",
+  "size": 24,
+  "scale": 3,
+  "flavours": {
+    "flavour_1": {
+      "label": "Flavor 1",
+      "file": "flavor-1",
+      "token": "Surface/on-surface-1",
+      "inactive": "Surface/on-surface-1-25%"
+    },
+    "flavour_2": {
+      "label": "Flavor 2",
+      "file": "flavor-2",
+      "token": "Surface/base",
+      "inactive": "Surface/base-25%"
+    }
+  },
+  "plugins": [
+    {
+      "action": "navigation_action",
+      "plugin": "Navigation",
+      "assets": [
+        "navigation"
+      ],
+      "web": "play"
+    },
+    {
+      "action": "local_storage_favourites_action",
+      "plugin": "Favourites",
+      "assets": [
+        "favorite-default",
+        "favorite-active"
+      ],
+      "web": "favorite"
+    },
+    {
+      "action": "trailer_action",
+      "plugin": "Trailer",
+      "assets": [
+        "trailer"
+      ],
+      "web": "trailer"
+    },
+    {
+      "action": "native_share_action",
+      "plugin": "Share",
+      "assets": [
+        "share"
+      ]
+    },
+    {
+      "action": "offline-content-button",
+      "plugin": "Downloads",
+      "assets": [
+        "download-download",
+        "download-process",
+        "download-complete",
+        "download-error",
+        "download-expired"
+      ]
+    },
+    {
+      "action": null,
+      "plugin": "Add to calendar",
+      "assets": [
+        "add-to-calendar"
+      ]
+    },
+    {
+      "action": null,
+      "plugin": "More",
+      "assets": [
+        "more"
+      ]
+    },
+    {
+      "action": "mute_unmute_action",
+      "plugin": "Mute/unmute",
+      "assets": [
+        "volume-mute",
+        "volume-mute-inactive",
+        "volume-unmute",
+        "volume-unmute-inactive"
+      ]
+    }
+  ],
+  "inactive": [
+    "volume-mute-inactive",
+    "volume-unmute-inactive"
+  ],
+  "about_web": "Web Cell 3 buttons name actions differently: play (Navigation), favorite (Favourites), trailer (Trailer). Popup Menu and Mute / Unmute are also offered on web."
+}

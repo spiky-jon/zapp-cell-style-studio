@@ -1,0 +1,113 @@
+# Zapp mobile cell styles: rules
+
+Version 1 · phone and tablet · cell plugins 16.0.0-alpha
+
+These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
+(ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
+the rules say isn't possible, build the closest version and say what changed, why, and the alternative.
+
+## 1. The four cell types
+
+| Type | Use it for | Structure |
+|---|---|---|
+| `cell_1` | Tiles with text **below** the image (news tiles, thumbnails with titles under them) | Image on top, then up to 3 labels stacked below, optional buttons |
+| `cell_2` | Rows with the image **beside** the text (episode rows, list rows), and **text-only** cells (info blocks, action rows, channel rows) | Optional image on the left at a fixed width, up to 3 labels to its right, optional right-hand column (cell badge or action icon) |
+| `cell_3` | Text and buttons **over** the image (hero cards, posters with tags, detail heroes) | Full-width image; labels in one of three zones over it (top, centre, bottom), up to 3 per zone; optional buttons |
+| `cell_info` | Rail and list headers ("Continue Watching", "View All") | One title, an optional text button on the right |
+
+Choosing:
+- Text under a picture → `cell_1`. Text beside a picture, or no picture → `cell_2`. Text on a picture → `cell_3`.
+- A poster with a small tag on it (NEW, RECENTLY ADDED) → `cell_3` with the tag in the bottom zone.
+- A header row above a rail or list → `cell_info`.
+- If a `cell_3` design puts the text **below** the image (title, description and button under key art), it can
+  be built with bottom cell padding that reserves the space, but the text then can't grow; prefer `cell_1`
+  unless the design needs `cell_3`-only features.
+
+## 2. Text labels
+
+- **At most 3 labels** per cell (`cell_1`, `cell_2`), or 3 per zone (`cell_3`). Cell 2 has a 4th label in its
+  template but apps only render 3: never use it.
+- **One style per label**: one font, size, weight, colour and letter spacing. A line that mixes weights
+  ("**Up next:** Lorraine") or colours ("06:00 · <green>13m left</green>") must use one style, or be split into
+  separate labels.
+- **No icons inside labels** (subtitles, guidance ratings, inline dots as images). Leave the icon out, or note
+  it as feed artwork.
+- Labels can have a **background colour, padding and a corner radius** (tags, pills). The radius applies to all
+  four corners or none: a tab with one rounded corner becomes square.
+- No gradient fills on text.
+- Per label: alignment (left, centre, right), number of lines (truncates with …), uppercase transform, margins.
+- Each label reads a **data key**: `title`, `summary`, or any feed path such as `extensions.genre`.
+- When content needs more than 3 lines (e.g. an expanded live panel: logo, title, time, description, "up next"),
+  **split it across two cells** placed as two components that read the same feed. Record this as a
+  `workaround`.
+
+## 3. Images
+
+- One **main image** per cell, from a feed media key: `image_base` (landscape key art), `thumb_1` (title logo),
+  `thumb_2` (poster), `thumb_3` (still). Aspect ratio from presets (16x9, 4x3, 1x1, 3x4, 2x3, 9x16) or a custom
+  `WxH`. Corner radius, a border (width, colour) and a placeholder colour are available.
+- One **secondary image** (title logo, channel logo, rank artwork): fixed width and height, fitted inside that
+  box, positioned above or below a label or over the image. It has **no border** setting.
+- **Gradients and scrims** over the image are an **overlay image** (a PNG the studio generates from the gradient
+  stops). There is no gradient setting on the cell.
+- A design element that overlaps another (a rank number tucked behind a poster) can't be layered. Draw the
+  effect into artwork the feed supplies (e.g. one rank image per position, cropped so it looks tucked behind),
+  and place the pieces side by side. Record as `workaround`.
+- Promo banners, collection tiles and date strips that are part of the artwork are just images.
+
+## 4. Badges, pills and progress
+
+- **Duration / runtime pill**: always **bottom right** of the image (background, colour, font, radius, padding,
+  margins). A design with it elsewhere → keep bottom right and record the change; alternative: a content badge.
+- **Content badges** sit on the image (play buttons, LIVE pills, promo badges). A cell with no image can't show
+  them.
+- **Cell badge** (cell_2): an icon in the right-hand column (chevron, arrow) or on the image.
+- **Action icon** (cell_2): e.g. a download button in the right-hand column.
+- **Progress bar**: on top of the image, above or below text label 1 or 2, or at the bottom of the cell. Colour,
+  track colour, height, radius and margins. It **can't share a line with a label** (a bar with "2m left" at its
+  end): put the label on the line above (right-aligned) and give the bar a right margin to leave room. Extra
+  bottom margin only adds space under the cell.
+
+## 5. Buttons
+
+- Up to **3 buttons** per cell, stacked horizontally or vertically, aligned left or centre, positioned relative
+  to the labels or over the image.
+- Each button runs an **action plugin**: navigation (open / play), favourites (my list), share, downloads,
+  trailer.
+- **Labels and icons come from the action plugin**, set once for the whole app. The navigation action has one
+  label (e.g. "Watch Now"), so two navigation buttons with different labels ("WATCH NOW" + "WATCH AD-FREE",
+  or "MORE INFO") aren't possible: drop the second button, or note that it needs its own action plugin.
+  A "MORE INFO" button that opens the show reads the navigation label.
+- Icons come from the plugin's two flavours (light and dark): pick the flavour that suits the button colour.
+  A one-off icon colour (e.g. a lime icon on one button) isn't possible.
+- Per button: fill (full width), dynamic (fits its label) or a fixed width; background, text colour, border,
+  corner radius, padding, font; icon left, right or above the label.
+
+## 6. Layout, spacing and behaviour
+
+- Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
+  **dividers** (thickness, colour, margins); they're inset by the cell's side padding. An edge-to-edge divider
+  with padded content isn't possible: accept the inset, or move side spacing to the component.
+- Cell 2 **centres its text vertically** against the image when the text is shorter than the image, and
+  top-aligns when taller. A full-width line under both the image and the text (e.g. a synopsis under an episode
+  row) isn't possible: the text stays beside the image.
+- Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
+  widths, grid columns, side insets. Note them, don't build them.
+- **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them
+  out and record why. Show an expanded state as its own cell(s).
+- A composition that depends on an exact width (number + poster) only works in a horizontal list with a fixed
+  item width.
+- Negative margins work but should be tested on device; prefer layouts that avoid them (e.g. swap which picture
+  is the main image).
+
+## 7. Reporting decisions
+
+For every cell, record:
+- `works`: what carries over as designed.
+- `changed`: each visible difference, named (`item`), with the rule-based reason in plain words.
+- `alternative`: the suggested approach where there is one.
+
+Status: `as_designed` (nothing material changed), `adapted` (visible changes), `workaround` (not possible
+directly; built another way).
+
+Write decisions for a customer: plain language, no internal key names, one sentence each.

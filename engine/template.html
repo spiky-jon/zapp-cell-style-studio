@@ -1,0 +1,2486 @@
+<title>Cell Preview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,900&family=Roboto:wght@400;500;700;900&family=Ubuntu:wght@400;500;700&display=swap">
+<style>
+/* Layout: workbench. Controls rail on the left, device stage on the right, readout of what's on beneath the stage. */
+:root{
+  --bg:#E8EBEF; --panel:#FFFFFF; --fg:#14171C; --muted:#5B6371; --line:#D3D8E0;
+  --accent:#08876A; --accent-ink:#FFFFFF; --warn:#9A5300; --warn-bg:#FFF2DF;
+  --stage:#D2D7DF; --chip:#EDF0F4;
+  --f-ui:"Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101216; --panel:#191C22; --fg:#E7EAEF; --muted:#97A0AE; --line:#2B3039;
+    --accent:#33D2A6; --accent-ink:#05251C; --warn:#FFB65E; --warn-bg:#2D2313;
+    --stage:#0A0B0E; --chip:#22262E; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101216; --panel:#191C22; --fg:#E7EAEF; --muted:#97A0AE; --line:#2B3039;
+  --accent:#33D2A6; --accent-ink:#05251C; --warn:#FFB65E; --warn-bg:#2D2313;
+  --stage:#0A0B0E; --chip:#22262E; color-scheme:dark;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;line-height:1.45}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:21px;font-weight:700;margin:0;letter-spacing:-0.015em;text-wrap:balance}
+header p{margin:0;color:var(--muted)}
+.ident{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:316px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.group{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.group:first-child{padding-top:0;border-top:0}
+.gtitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin:0}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label,.flabel{font-size:12px;font-weight:600;color:var(--fg)}
+input[type=text],input[type=number],select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;box-sizing:border-box;min-width:0}
+textarea{font-family:var(--f-mono);font-size:11px;line-height:1.4;min-height:88px;resize:vertical}
+input[type=file]{font-size:12px;color:var(--muted);max-width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);color:var(--fg);padding:7px 8px;font:inherit;font-weight:600;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+.check input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--chip);color:var(--fg);border-radius:6px;padding:7px 10px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.err{font-size:12px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:8px 10px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font-size:12px;color:var(--muted);margin:0}
+
+.stagecol{display:flex;flex-direction:column;gap:16px;min-width:0}
+.stage{background:var(--stage);border-radius:10px;padding:28px 16px;overflow-x:auto;display:flex}
+.device{flex:none;margin:0 auto;border-radius:34px;padding:10px;background:#1E2026;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 18px 40px rgba(0,0,0,.28)}
+.screen{border-radius:26px;overflow:hidden;position:relative}
+.appbar{height:54px;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-weight:700;font-size:13px;letter-spacing:.02em;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04)}
+.component{padding-block:24px 18px}
+.dims{font-family:var(--f-mono);font-size:11px;color:rgba(255,255,255,.5);text-align:center;margin-top:10px}
+
+.readout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+@media (max-width:1100px){.readout{grid-template-columns:minmax(0,1fr)}}
+.list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.list li{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.list li:first-child{border-top:0}
+.list .k{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);padding-top:1px}
+.list .v{min-width:0;overflow-wrap:anywhere}
+.notes{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.notes li{font-size:13px;padding:8px 10px;border-radius:6px;background:var(--chip)}
+.notes li.w{background:var(--warn-bg);color:var(--fg)}
+.notes li.w b{color:var(--warn)}
+code{font-family:var(--f-mono);font-size:.88em}
+
+/* --- the cell itself: literal colours here come from the imported JSON, not the page theme --- */
+.cell{position:relative;box-sizing:border-box;overflow:hidden}
+.cell>.zone{z-index:6}
+.stack1{position:relative;display:flex;flex-direction:column;z-index:5}
+.outline .stack1{outline:1px dashed rgba(255,206,0,.9);outline-offset:-1px}
+.cellBorder{position:absolute;pointer-events:none;z-index:20;box-sizing:border-box}
+.imgbox{position:relative;overflow:hidden;box-sizing:border-box}
+.art,.ovl{position:absolute;inset:0;background-size:cover;background-position:center}
+.zone{position:absolute;left:0;right:0;display:flex;flex-direction:column;z-index:5}
+.zone-top{top:0}.zone-center{top:50%;transform:translateY(-50%)}.zone-bottom{bottom:0}
+.lbl{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;box-sizing:border-box;overflow-wrap:anywhere;flex:none}
+.mbtns{display:flex;flex:none}
+.mbtn{display:inline-flex;align-items:center;box-sizing:border-box;white-space:nowrap;flex:none}
+.mbtn svg{flex:none}
+.glyph{display:flex;align-items:center;justify-content:center;z-index:8}
+.hov{opacity:0;transition:opacity .15s;pointer-events:none}
+.cell:hover .hov,.cell.hovering .hov{opacity:1}
+.hovb{position:absolute;inset:0;z-index:10;box-sizing:border-box;pointer-events:none}
+
+.outline .zone{outline:1px dashed rgba(255,206,0,.9);outline-offset:-1px}
+.outline .lbl,.outline .mbtns,.outline .sec{outline:1px dashed rgba(64,196,255,.95);outline-offset:-1px;position:relative}
+.outline [data-tag]::after{content:attr(data-tag);position:absolute;right:2px;top:2px;font:600 9px/1.2 "JetBrains Mono",monospace;color:#111;background:rgba(64,196,255,.95);padding:1px 3px;border-radius:2px;letter-spacing:0;text-transform:none;z-index:30}
+.outline .zone[data-tag]::after{background:rgba(255,206,0,.95);left:2px;right:auto}
+.outline .component{background:repeating-linear-gradient(135deg,rgba(255,80,120,.16) 0 6px,transparent 6px 12px)}
+.outline .cellwrap{background:var(--appbg)}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+.contrast{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.contrast li{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.4;padding:6px 8px;border-radius:6px;background:var(--chip)}
+.contrast li.bad{background:var(--warn-bg)}
+.contrast li.bad b{color:var(--warn)}
+.contrast .pair{flex:none;width:34px;height:26px;border-radius:5px;display:grid;place-items:center;font-weight:700;font-size:13px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.3)}
+.contrast .ct{min-width:0}
+.tokref{font-family:var(--f-mono);font-size:10.5px;font-weight:500;color:var(--muted);margin-left:4px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.quiet{background:transparent;color:var(--muted);align-self:flex-start}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hexrow{display:flex;gap:6px;align-items:center}
+.hexrow input[type=color]{width:36px;height:34px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);flex:none;cursor:pointer}
+.hexrow input[type=text]{font-family:var(--f-mono);font-size:12.5px}
+.ramp{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.ramps{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ramps .ramp{margin-top:6px}
+.ramp li{display:grid;grid-template-columns:24px 26px 1fr;align-items:center;gap:6px;padding:0 6px 0 0;font-size:12px;border-top:1px solid var(--line)}
+.ramp li:first-child{border-top:0}
+.ramp .chip{height:24px}
+.ramp .st{font-weight:700;font-variant-numeric:tabular-nums}
+.ramp .hx{font-family:var(--f-mono);font-size:11.5px}
+.ramp .lv{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+details.sw summary{cursor:pointer;font-size:12px;font-weight:600}
+.swlist{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.swlist li{display:flex;align-items:center;gap:6px;font-size:11.5px;min-width:0}
+.swlist .dot{width:14px;height:14px;border-radius:4px;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.35)}
+.swlist .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[hidden]{display:none!important}
+/* screens */
+.sgap{flex:none;width:170px}.sfiles{flex:none}.sfilebtns{display:flex;gap:6px}.sfilebtns .btn{cursor:pointer}
+.sstage{background:var(--stage);border-radius:10px;padding:24px 16px;display:flex;gap:24px;align-items:flex-start;overflow-x:auto}
+.sdevice{flex:none;border-radius:34px;padding:10px;background:#1E2026;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 18px 40px rgba(0,0,0,.28)}
+.sscreen{border-radius:26px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.sscroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.scomp{position:relative;box-sizing:border-box}
+.scomp[data-label]:hover{outline:1px dashed rgba(4,207,153,.8);outline-offset:-1px}
+.scomp[data-label]:hover::after{content:attr(data-label);position:absolute;left:4px;top:4px;z-index:50;font:600 11px/1.3 var(--f-mono,monospace);color:#04cf99;background:rgba(0,0,0,.75);padding:2px 6px;border-radius:4px;pointer-events:none;white-space:nowrap}
+.srail{display:flex;overflow:hidden}
+.srail>*,.sgrid>*{flex:none}
+.sgrid{display:grid}
+.snav{display:flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box}
+.stabs{display:flex;justify-content:space-around;align-items:center;flex:none;box-sizing:border-box;padding:8px 0 20px}
+.stabs span{font:600 10px/1.2 -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.stabs i{width:22px;height:22px;border-radius:6px;border:2px solid currentColor;opacity:.8}
+.slegend{list-style:none;margin:0;padding:0;font-size:12px;min-width:240px;max-width:340px;display:flex;flex-direction:column;gap:6px}
+.slegend li{display:flex;gap:8px;align-items:baseline}.slegend b{font-family:var(--f-mono,monospace);font-size:11px;font-weight:600;color:var(--muted);flex:none;width:22px}
+/* gallery */
+.viewseg{margin-left:auto;min-width:280px}
+/* the editor keeps rendering (it draws the thumbnails), so in gallery view it is laid out off-screen */
+.offstage{position:absolute!important;left:-100000px;top:0;width:1288px;visibility:hidden}
+.gbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.gbar .hint{flex:1;min-width:220px}
+.gbrand{flex:none;width:220px;max-width:100%}
+.gdev{flex:none;width:240px;max-width:100%}
+.gcard.wide{grid-column:span 2}
+@media (max-width:640px){.gcard.wide{grid-column:auto}}
+.gchip.tag{color:var(--accent);background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.gcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;align-items:start}
+.gcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.gthumb{background:var(--stage);padding:14px;display:flex;justify-content:center;overflow:hidden}
+.gthumb .gscale{border-radius:18px;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.25);flex:none}
+.gthumb .gscale>.screen{transform-origin:top left;border-radius:0;pointer-events:none}
+.gbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line)}
+.gname{font-size:14px;font-weight:700;margin:0;letter-spacing:-0.01em}
+.gmeta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.kgroup{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.kgroup h3{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:6px 0 0}
+.kf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center}
+.kf>label{grid-column:1/-1;font-size:12px;font-weight:600;color:var(--fg);display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.kf>label .kcode{font-family:var(--f-mono);font-size:10.5px;font-weight:400;color:var(--muted)}
+.kf input{font-family:var(--f-mono);font-size:12.5px}
+.kf.changed input{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.kf .kreset{font-size:11px;padding:4px 8px}
+.kf.off>label{color:var(--muted)}
+details.koff>summary{cursor:pointer;font-size:12px;color:var(--muted);margin-top:8px}
+.gchip.keys{color:var(--fg);box-shadow:inset 0 0 0 1px var(--accent);background:transparent}
+.gchip{font-family:var(--f-mono);font-size:11px;color:var(--muted);background:var(--chip);border-radius:4px;padding:2px 6px}
+.gtogs{display:flex;flex-direction:column;gap:10px}
+.extfields{display:flex;flex-direction:column;gap:10px}
+.gtog{display:flex;flex-direction:column;gap:4px}
+.gtog .flabel{font-size:11px;font-weight:600;color:var(--muted)}
+.gtog .seg button{padding:6px 6px;font-size:12px}
+.gfoot{display:flex;align-items:center;gap:8px;margin-top:2px}
+.gfoot .hint{flex:1;min-width:0}
+
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:4px;padding:4px;border-radius:8px;background:var(--bg)}
+.tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:600;padding:6px 4px;border-radius:6px;cursor:pointer;line-height:1.2;display:flex;align-items:center;justify-content:center;text-align:center;min-height:36px}
+.tabs button:hover{color:var(--fg)}
+.tabs button[aria-selected="true"]{background:var(--panel);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.14),inset 0 0 0 1px var(--line)}
+.group.tabpanel{border-top:0;padding-top:0}
+.tabpanel>.gtitle{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Cell Preview</h1>
+    <span class="ident" id="ident">cell_3_mobile</span>
+    <p>Renders a cell style export at device size so you can check it against a mockup before importing.</p>
+    <div class="seg viewseg" role="group" aria-label="View">
+      <button type="button" id="vEditor" aria-pressed="true">Editor</button>
+      <button type="button" id="vGallery" aria-pressed="false">Gallery</button>
+      <button type="button" id="vScreens" aria-pressed="false">Screens</button>
+    </div>
+  </header>
+
+  <section id="screens" aria-label="Screen preview" hidden>
+    <div class="gbar">
+      <div class="field gbrand"><label for="sLayout">Layout</label><select id="sLayout"></select></div>
+      <div class="field gbrand"><label for="sScreen">Screen</label><select id="sScreen"></select></div>
+      <div class="field gbrand"><label for="sFeed">Feed</label><select id="sFeed"></select></div>
+      <div class="field sgap"><label for="sGap">Gap between components</label><input type="number" id="sGap" value="24" min="0" max="80"></div>
+      <div class="field sfiles"><span class="flabel">Load your own</span>
+        <div class="sfilebtns"><label class="btn" for="sLayoutFile">layout.json</label><input type="file" id="sLayoutFile" accept=".json,application/json" hidden>
+        <label class="btn" for="sStylesFile">cell_styles.json</label><input type="file" id="sStylesFile" accept=".json,application/json" hidden></div></div>
+    </div>
+    <p class="hint" id="sHint"></p>
+    <p class="hint" id="sMsg" role="status"></p>
+    <div class="sstage"><div class="sdevice" id="sDevice"><div class="sscreen" id="sScreenBox"></div></div><ul class="slegend" id="sLegend"></ul></div>
+  </section>
+  <section id="gallery" aria-label="Cell gallery" hidden>
+    <div class="gbar">
+      <div class="field gbrand"><label for="gColl">Collection</label><select id="gColl"></select></div>
+      <div class="field gbrand"><label for="gBrand">Brand</label><select id="gBrand"></select></div>
+      <div class="field gdev"><span class="flabel" id="gDevLab">Device</span>
+        <div class="seg" role="group" aria-labelledby="gDevLab" id="gDevice">
+          <button type="button" data-v="all" aria-pressed="true">All</button>
+          <button type="button" data-v="Mobile" aria-pressed="false">Mobile</button>
+          <button type="button" data-v="Tablet" aria-pressed="false">Tablet</button>
+          <button type="button" data-v="Web" aria-pressed="false">Web</button>
+        </div></div>
+      <p class="hint" id="gHint"></p>
+      <button class="btn primary" id="gAll" type="button">Download all</button>
+    </div>
+    <p class="hint" id="gMsg" role="status"></p>
+    <div class="gcards" id="gCards"></div>
+  </section>
+
+  <div class="grid" id="editor">
+    <aside class="panel" aria-label="Controls">
+      <div class="tabs" role="tablist" aria-label="Control sections">
+        <button type="button" role="tab" id="tab-json" aria-controls="tp-json" aria-selected="true" tabindex="0">Cell JSON</button>
+        <button type="button" role="tab" id="tab-keys" aria-controls="tp-keys" aria-selected="false" tabindex="-1">Data keys</button>
+        <button type="button" role="tab" id="tab-tokens" aria-controls="tp-tokens" aria-selected="false" tabindex="-1">Design tokens</button>
+        <button type="button" role="tab" id="tab-brand" aria-controls="tp-brand" aria-selected="false" tabindex="-1">New brand mode</button>
+        <button type="button" role="tab" id="tab-export" aria-controls="tp-export" aria-selected="false" tabindex="-1">Export</button>
+        <button type="button" role="tab" id="tab-device" aria-controls="tp-device" aria-selected="false" tabindex="-1">Device</button>
+        <button type="button" role="tab" id="tab-feed" aria-controls="tp-feed" aria-selected="false" tabindex="-1">Sample feed</button>
+      </div>
+      <section class="group tabpanel" role="tabpanel" id="tp-json" aria-labelledby="tab-json">
+        <h2 class="gtitle">Cell JSON</h2>
+        <div class="field">
+          <label for="preset">Example</label>
+          <select id="preset"></select>
+        </div>
+        <div class="field">
+          <label for="header">Header</label>
+          <select id="header">
+            <option value="image">Secondary image (logo)</option>
+            <option value="text">Title text (h2)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="contentType">Content type</label>
+          <select id="contentType">
+            <option value="movie">Movie</option>
+            <option value="show">TV Show</option>
+          </select>
+          <p class="hint" id="contentHint" hidden>This hero has one button set, so content type doesn't change it.</p>
+        </div>
+        <div class="field">
+          <label for="file">Open an export</label>
+          <input type="file" id="file" accept=".json,application/json">
+        </div>
+        <div class="field">
+          <label for="json">Or paste JSON</label>
+          <textarea id="json" spellcheck="false"></textarea>
+          <button class="btn" id="apply" type="button">Render pasted JSON</button>
+          <div class="err" id="err" hidden></div>
+        </div>
+      </section>
+
+      <section class="group tabpanel" role="tabpanel" id="tp-keys" aria-labelledby="tab-keys" hidden>
+        <h2 class="gtitle">Data keys</h2>
+        <p class="hint" id="kHint"></p>
+        <div id="kFields"></div>
+        <button class="btn" id="kResetAll" type="button" hidden>Reset all to the cell's defaults</button>
+        <datalist id="kTextKeys"></datalist>
+        <datalist id="kImageKeys"></datalist>
+      </section>
+
+      <section class="group tabpanel" role="tabpanel" id="tp-tokens" aria-labelledby="tab-tokens" hidden>
+        <h2 class="gtitle" id="tokT">Design tokens</h2>
+        <div class="field"><label for="tBrand">Brand</label><select id="tBrand"></select></div>
+        <div class="field">
+          <span class="flabel" id="btnStyleLab">Primary buttons</span>
+          <div class="seg" role="group" aria-labelledby="btnStyleLab" data-setting="buttons">
+            <button type="button" data-v="accent">Accent</button>
+            <button type="button" data-v="neutral">Neutral</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="flabel" id="lblStyleLab">Button labels</span>
+          <div class="seg" role="group" aria-labelledby="lblStyleLab" data-setting="labels">
+            <button type="button" data-v="sentence">Sentence</button>
+            <button type="button" data-v="uppercase">Uppercase</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="flabel" id="corStyleLab">Button corners</span>
+          <div class="seg" role="group" aria-labelledby="corStyleLab" data-setting="buttonCorners">
+            <button type="button" data-v="round">Round</button>
+            <button type="button" data-v="pill">Pill</button>
+            <button type="button" data-v="sharp">Sharp</button>
+          </div>
+          <p class="hint" id="bsHint"></p>
+        </div>
+        <p class="hint" id="tHint"></p>
+        <ul class="contrast" id="tContrast" aria-label="Contrast checks"></ul>
+        <details class="sw">
+          <summary>Surface tokens</summary>
+          <ul class="swlist" id="surfaceSw"></ul>
+        </details>
+        <div class="field">
+          <label for="tokFiles">Update from Figma exports</label>
+          <input type="file" id="tokFiles" multiple accept=".zip,.json,application/json,application/zip">
+        </div>
+        <p class="hint" id="tSource"></p>
+        <p class="hint" id="tokMsg" role="status"></p>
+      </section>
+
+      <section class="group tabpanel" role="tabpanel" id="tp-brand" aria-labelledby="tab-brand" hidden>
+        <h2 class="gtitle" id="nT">New brand mode</h2>
+        <div class="field"><label for="nName">Brand mode name</label><input type="text" id="nName" value="Brand 2" autocomplete="off"></div>
+        <div class="ramps">
+          <div class="field">
+            <label for="nHex">Neutral (900)</label>
+            <div class="hexrow"><input type="color" id="nPick" value="#151325" aria-label="Pick the darkest neutral"><input type="text" id="nHex" value="#151325" spellcheck="false" autocomplete="off"></div>
+            <ol class="ramp" id="nRamp" aria-label="Generated neutral scale"></ol>
+          </div>
+          <div class="field">
+            <label for="aHex">Accent (500)</label>
+            <div class="hexrow"><input type="color" id="aPick" value="#804bfb" aria-label="Pick the accent colour"><input type="text" id="aHex" value="#804BFB" spellcheck="false" autocomplete="off"></div>
+            <ol class="ramp" id="aRamp" aria-label="Generated accent scale"></ol>
+          </div>
+        </div>
+        <div class="field">
+          <label for="aStyle">Accent curve</label>
+          <select id="aStyle"></select>
+        </div>
+        <p class="hint" id="nMsg" role="status"></p>
+        <div class="btnrow">
+          <button class="btn" id="nPreview" type="button">Preview on heroes</button>
+          <button class="btn primary" id="nSave" type="button">Save brand mode</button>
+        </div>
+        <button class="btn quiet" id="nRemove" type="button" hidden>Remove this brand mode</button>
+      </section>
+
+      <section class="group tabpanel" role="tabpanel" id="tp-export" aria-labelledby="tab-export" hidden>
+        <h2 class="gtitle" id="eT">Export</h2>
+        <div class="btnrow">
+          <button class="btn" id="copy" type="button">Copy JSON</button>
+          <button class="btn" id="dlJson" type="button" hidden>Download JSON</button>
+          <button class="btn" id="dlPng" type="button" hidden>Download overlay</button>
+          <button class="btn" id="dlBadge" type="button" hidden>Download cell badge</button>
+          <button class="btn" id="dlAction" type="button" hidden>Download action icon</button>
+        </div>
+        <p class="hint" id="copyMsg" role="status"></p>
+      </section>
+
+      <section class="group tabpanel" role="tabpanel" id="tp-device" aria-labelledby="tab-device" hidden>
+        <h2 class="gtitle">Device</h2>
+        <div class="field">
+          <span class="flabel" id="platLab">Platform</span>
+          <div class="seg" role="group" aria-labelledby="platLab">
+            <button type="button" id="pIos" aria-pressed="true">iOS</button>
+            <button type="button" id="pAnd" aria-pressed="false">Android</button>
+          </div>
+        </div>
+        <div class="row3">
+          <div class="field"><label for="screenW">Screen</label><input type="number" id="screenW" value="393" min="240" max="1400"></div>
+          <div class="field"><label for="pad">Side pad</label><input type="number" id="pad" value="20" min="0" max="200"></div>
+          <div class="field"><label for="zoom">Zoom</label>
+            <select id="zoom"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.25">125%</option></select></div>
+        </div>
+        <div class="field"><label for="appbg">Screen background <span class="tokref">Surface/base</span></label><input type="text" id="appbg" value="#121212"></div>
+        <div class="row3" id="webRow" hidden>
+          <div class="field"><label for="bp">Web breakpoint</label>
+            <select id="bp"><option>Mobile</option><option>Tablet</option><option selected>Desktop</option><option>Large Desktop</option></select></div>
+        </div>
+        <div class="row3" id="tabRow" hidden>
+          <div class="field"><label for="tabMode">Tab size (set by the Tabs component)</label>
+            <select id="tabMode"><option value="dynamic">Dynamic</option><option value="fixed">Fixed (200)</option><option value="fractional">Fractional</option></select></div>
+        </div>
+        <label class="check"><input type="checkbox" id="hoverOn"> Show the hover state (or hover over the cell)</label>
+        <label class="check"><input type="checkbox" id="outline"> Show zones, labels and padding</label>
+      </section>
+
+      <section class="group tabpanel" role="tabpanel" id="tp-feed" aria-labelledby="tab-feed" hidden>
+        <h2 class="gtitle">Sample feed item</h2>
+        <div class="field"><label for="dFeedTitle">Feed title <span class="tokref">group info cells</span></label><input type="text" id="dFeedTitle" value="Continue Watching"></div>
+        <div class="field"><label for="dTitle">title</label><input type="text" id="dTitle" value="Content Title"></div>
+        <div class="field"><label for="dSummary">summary</label><input type="text" id="dSummary" value="Two rock-bottom drivers transport a wealthy teen to rehab, but their simple job spirals into a chaotic journey of drugs, danger, and crime as their passenger derails their plans."></div>
+        <div class="row2">
+          <div class="field"><label for="dSection">extensions.section</label><input type="text" id="dSection" value="Drama"></div>
+          <div class="field"><label for="dProgress">Progress %</label><input type="number" id="dProgress" value="45" min="0" max="100"></div>
+        </div>
+        <div id="extFields" class="extfields"></div>
+        <div class="field"><label for="artFile">Artwork image</label><input type="file" id="artFile" accept="image/*"></div>
+        <div class="field"><label for="secFile">Secondary image</label><input type="file" id="secFile" accept="image/*"></div>
+        <div class="field"><label for="ovlFile">Overlay image</label><input type="file" id="ovlFile" accept="image/*"></div>
+        <p class="hint">Label zones are drawn across the whole cell, so cell bottom padding leaves room for content below the artwork. Images hosted on Applicaster can't load here, so upload them. Without an overlay file, a dark bottom gradient stands in for it.</p>
+      </section>
+    </aside>
+
+    <div class="stagecol">
+      <div class="stage" id="stage">
+        <div class="device" id="device">
+          <div class="screen" id="screen">
+            <div class="component" id="component"><div class="cellwrap" id="cellwrap"></div></div>
+            <div class="dims" id="dims"></div>
+            <div style="height:60px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="readout">
+        <section class="panel" aria-labelledby="showT">
+          <h2 class="gtitle" id="showT">Showing</h2>
+          <ul class="list" id="showing"></ul>
+        </section>
+        <section class="panel" aria-labelledby="notesT">
+          <h2 class="gtitle" id="notesT">Notes</h2>
+          <ul class="notes" id="notes"></ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const PRESETS = __PRESETS__;
+// One shared sample feed item: every cell reads the same values, and the Sample feed tab edits them.
+const SAMPLE_EXT = Object.assign({}, ...PRESETS.map(p => p.custom || {}));
+const notesExtra = [];
+const REF_KEYS = new Set(PRESETS[0].json.config.styles.map(e => e.key));
+
+const state = {
+  map: {}, json: null, platform: 'ios', screenW: 393, pad: 20, zoom: 1, outline: false, appBg: '#121212',
+  art: null, ovl: null,
+};
+const $ = id => document.getElementById(id);
+
+/* ---------- value access ---------- */
+const has = k => state.map[k] !== undefined && state.map[k] !== null;
+const n = (k, d = 0) => { if (!has(k) || state.map[k] === '') return d; const x = parseFloat(state.map[k]); return isNaN(x) ? d : x; };
+const s = (k, d = '') => has(k) ? String(state.map[k]) : d;
+const on = (k, d = false) => has(k) ? (state.map[k] === true || state.map[k] === 'true') : d;
+const transparent = c => !c || /^transparent$/i.test(String(c).trim()) || /rgba\([^)]*,\s*0(\.0+)?\s*\)$/.test(c.replace(/\s+/g, ' '));
+
+const DATA_COLORS = {};
+function toMap(json) {
+  const m = {};
+  for (const k in DATA_COLORS) delete DATA_COLORS[k];
+  ['styles', 'assets', 'general'].forEach(sec => (json?.config?.[sec] || []).forEach(e => { m[e.key] = e.value; }));
+  // colour fields can name a feed key (extensions.background-color) instead of a colour: use the sample feed's value
+  ['styles', 'assets'].forEach(sec => (json?.config?.[sec] || []).forEach(e => {
+    if (e.type === 'color_picker_rgba' && /^[a-z_]+\.[\w.-]+$/i.test(String(e.value).trim())) { DATA_COLORS[e.key] = e.value; m[e.key] = SAMPLE_EXT[e.value] || 'rgba(128,128,128,1)'; }
+  }));
+  const webFonts = ['styles', 'assets'].some(sec => (json?.config?.[sec] || []).some(e => e.type === 'web_font_selector'));
+  return json?.meta?.identifier === 'cell_3_v2' || m.buttons_container_switch !== undefined || webFonts ? webAliases(m) : m;
+}
+// The web Cell 3 (cell_3_v2) names some keys differently; the preview draws it with the mobile names.
+function webAliases(m) {
+  const a = {}, put = (k, v) => { if (m[k] === undefined) a[k] = v; };
+  const BTN = { switch: 'button_enabled', enable_label_1: 'label_enabled', enable_asset: 'asset_enabled', font_family: 'ios_font_family', letter_spacing: 'ios_letter_spacing', content_alignment: 'contents_alignment' };
+  for (const [k, v] of Object.entries(m)) {
+    let r;
+    if ((r = k.match(/^button(\d)_(.+)$/))) {
+      const b = `mobile_button_${r[1]}_`, rest = BTN[r[2]] || r[2].replace(/^hover_/, 'focused_');
+      put(b + rest, v);
+      if (rest === 'ios_font_family') put(b + 'android_font_family', v);
+      if (rest === 'ios_letter_spacing') put(b + 'android_letter_spacing', v);
+      // the icon-to-label gap is the asset's margin on web
+      if (r[2] === 'asset_margin_right' && (m[`button${r[1]}_asset_alignment`] || 'left') === 'left') put(b + 'horizontal_gutter', v);
+    } else if ((r = k.match(/^buttons_container_(.+)$/))) put(`mobile_buttons_container_${r[1] === 'switch' ? 'buttons_enabled' : r[1]}`, v);
+    else if ((r = k.match(/^((?:(?:top|center|bottom)_)?text_label_\d)_(font_family|letter_spacing)$/))) {
+      const sfx = r[2] === 'font_family' ? 'font_selector' : 'letter_spacing';
+      put(`${r[1]}_ios_${sfx}`, v); put(`${r[1]}_android_${sfx}`, v);
+    } else if (k === 'runtime_font_family_font_selector') { put('runtime_font_family_ios_font_selector', v); put('runtime_font_family_android_font_selector', v); }
+    else if (k === 'runtime_letter_spacing') { put('runtime_ios_letter_spacing', v); put('runtime_android_letter_spacing', v); }
+    else if (k === 'image_border_radius') put('image_corner_radius', v);
+    else if (k === 'image_border_width') put('image_border_size', v);
+    else if (k === 'cell_border_width') put('cell_border_size', v);
+    // web Group Info (cell_info_mobile, web export): cell_* box keys and single font fields
+    if (m.title_text_font_family !== undefined) {
+      if ((r = k.match(/^cell_(padding_\w+|border_\w+|background_color)$/))) put(`group_info_${r[1]}`, v);
+      else if ((r = k.match(/^(title_text|button_text)_(font_family|font_size|line_height|letter_spacing)$/))) {
+        const s = r[2] === 'font_family' ? ['family_ios_font_selector', 'family_android_font_selector'] : [`ios_${r[2]}`, `android_${r[2]}`];
+        s.forEach(x => put(`${r[1]}_${x}`, v));
+      } else if (k === 'button_text_data_key') put('button_text_key', v);
+    }
+  }
+  return Object.assign(m, a);
+}
+
+function fontFor(name) {
+  name = name || '';
+  const w = /Black|Heavy/.test(name) ? 900 : /ExtraBold/.test(name) ? 800 : /Semi[Bb]old/.test(name) ? 600
+          : /Bold/.test(name) ? 700 : /Medium/.test(name) ? 500 : /Light/.test(name) ? 300 : 400;
+  let fam;
+  if (/^SF/.test(name)) fam = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif';
+  else if (/^Roboto/.test(name)) fam = 'Roboto, system-ui, Arial, sans-serif';
+  else if (/^Inter/.test(name)) fam = 'Inter, system-ui, sans-serif';
+  else if (/^DMSans/.test(name)) fam = '"DM Sans", system-ui, sans-serif';
+  else if (/^Ubuntu/.test(name)) fam = 'Ubuntu, system-ui, Arial, sans-serif';
+  else if ((window.FONT_MAP || {})[name.split('-')[0]]) fam = `"${window.FONT_MAP[name.split('-')[0]]}", system-ui, sans-serif`;
+  else fam = `"${name.split('-')[0] || 'system-ui'}", system-ui, sans-serif`;
+  return { fam, w };
+}
+const platKey = (p, ios, and) => state.platform === 'ios' ? `${p}_${ios}` : `${p}_${and}`;
+
+function aspect() {
+  const raw = s('image_aspect_ratio', '16x9');
+  // the free ratio option is "other" (an older "custom" value is read the same way)
+  const src = raw === 'custom' || raw === 'other' ? s('image_aspect_ratio_custom', '16x9') : raw;
+  const m = String(src).match(/([\d.]+)\s*[x:\/]\s*([\d.]+)/);
+  return m ? [parseFloat(m[1]), parseFloat(m[2])] : [16, 9];
+}
+
+function dataFor(p) {
+  const custom = s(`${p}_custom_data_key`).trim();
+  const key = custom || s(`${p}_data_key`, 'title');
+  const map = { title: $('dTitle').value, summary: $('dSummary').value, 'extensions.section': $('dSection').value };
+  // Unknown feed paths show their last segment, which is what the test feed holds (extensions.cast -> "cast")
+  return { key, text: key in map ? map[key] : key in SAMPLE_EXT ? SAMPLE_EXT[key] : key.split('.').pop() };
+}
+
+/* ---------- small builders ---------- */
+function el(tag, cls, css) { const e = document.createElement(tag); if (cls) e.className = cls; if (css) Object.assign(e.style, css); return e; }
+const px = v => `${v}px`;
+const ICONS = {
+  play: '<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
+  film: '<rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 3v18M3 7.5h4M3 12h18M3 16.5h4M17 3v18M17 7.5h4M17 16.5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  share: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  download: '<path d="M12 17V3M18 11l-6 6-6-6M19 21H5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  lock: '<rect x="5.5" y="10.5" width="13" height="9.5" rx="2" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  chevron: '<path d="M9.5 6.5 15 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  badge: '<circle cx="12" cy="12" r="9" fill="rgba(0,0,0,.45)" stroke="currentColor" stroke-width="1.5"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor"/>',
+};
+const svg = (name, w, h) => `<svg width="${w}" height="${h}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+const ACTIONS = {
+  navigation_action: { label: 'Watch now', icon: 'play' },
+  trailer_action: { label: 'Trailer', icon: 'film' },
+  local_storage_favourites_action: { label: 'Add to Favorites', icon: 'heart' },
+  native_share_action: { label: 'Share', icon: 'share' },
+  'offline-content-button': { label: 'Download', icon: 'download' },
+  // web Cell 3 action names
+  play: { label: 'Watch now', icon: 'play' }, favorite: { label: 'Add to Favorites', icon: 'heart' }, trailer: { label: 'Trailer', icon: 'film' },
+};
+const DEFAULT_ACTION = ['', 'navigation_action', 'trailer_action', 'local_storage_favourites_action'];
+
+function place(node, pos, m) {
+  node.style.position = 'absolute';
+  const parts = pos === 'center' ? ['center', 'center'] : String(pos || 'top_left').split('_');
+  const [v, h] = parts.length === 2 ? parts : ['center', parts[0]];
+  const tf = [];
+  if (v === 'top') node.style.top = px(m.t); else if (v === 'bottom') node.style.bottom = px(m.b); else { node.style.top = '50%'; tf.push('translateY(-50%)'); }
+  if (h === 'left') node.style.left = px(m.l); else if (h === 'right') node.style.right = px(m.r); else { node.style.left = '50%'; tf.push('translateX(-50%)'); }
+  if (tf.length) node.style.transform = tf.join(' ');
+}
+
+/* ---------- pieces ---------- */
+function makeLabel(p, tag, showing) {
+  const fam = has(`${p}_ios_font_family`) ? ['ios_font_family', 'android_font_family']
+    : has(`${p}_family_ios_font_selector`) ? ['family_ios_font_selector', 'family_android_font_selector'] : ['ios_font_selector', 'android_font_selector'];
+  const f = fontFor(s(platKey(p, fam[0], fam[1]), /_3$/.test(p) ? 'SFProText-Medium' : 'SFProText-Bold'));
+  // Cell 2 keeps size and line height per platform
+  const sizeK = has(`${p}_ios_font_size`) ? platKey(p, 'ios_font_size', 'android_font_size') : `${p}_font_size`;
+  const lhK = has(`${p}_ios_line_height`) ? platKey(p, 'ios_line_height', 'android_line_height') : `${p}_line_height`;
+  const d = dataFor(p);
+  const lines = Math.max(1, n(`${p}_number_of_lines`, 1));
+  const tt = s(`${p}_text_transform`, 'default');
+  const e = el('div', 'lbl', {
+    marginTop: px(n(`${p}_margin_top`)), marginRight: px(n(`${p}_margin_right`)),
+    marginBottom: px(n(`${p}_margin_bottom`)), marginLeft: px(n(`${p}_margin_left`)),
+    paddingTop: px(n(`${p}_padding_top`)), paddingRight: px(n(`${p}_padding_right`)),
+    paddingBottom: px(n(`${p}_padding_bottom`)), paddingLeft: px(n(`${p}_padding_left`)),
+    background: s(`${p}_background_color`, 'transparent'), borderRadius: px(n(`${p}_corner_radius`)),
+    color: s(`${p}_font_color`, '#fff'), fontFamily: f.fam, fontWeight: f.w,
+    fontSize: px(n(sizeK, 13)), lineHeight: px(n(lhK, 18)),
+    letterSpacing: px(n(platKey(p, 'ios_letter_spacing', 'android_letter_spacing'))),
+    textAlign: s(`${p}_text_alignment`, 'left'),
+    textTransform: tt === 'default' ? 'none' : tt,
+    WebkitLineClamp: String(lines),
+  });
+  e.textContent = d.text;
+  e.dataset.tag = tag;
+  if (!transparent(s(`${p}_background_color`))) {
+    const al = s(`${p}_text_alignment`, 'left');
+    e.style.alignSelf = al === 'center' ? 'center' : al === 'right' ? 'flex-end' : 'flex-start';
+  }
+  showing.push([tag.replace(/^(top|center|bottom) (\d)$/, '$1 label $2'), `${d.key} · ${n(sizeK, 13)}/${n(lhK, 18)}${({ 900: 'Black', 800: 'ExtraBold', 700: 'Bold', 600: 'SemiBold', 500: 'Medium', 300: 'Light' })[f.w] || 'Regular'} · ${s(`${p}_text_alignment`, 'left')} · ${lines} line${lines > 1 ? 's' : ''}`]);
+  return e;
+}
+
+function makeButtons(showing) {
+  const stack = s('mobile_buttons_container_stacking', 'horizontal');
+  const align = s('mobile_buttons_container_align', 'left');
+  const c = el('div', 'mbtns', {
+    flexDirection: stack === 'vertical' ? 'column' : 'row',
+    gap: px(stack === 'vertical' ? n('mobile_buttons_container_vertical_gutter', 8) : n('mobile_buttons_container_horizontal_gutter', 8)),
+    justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
+    alignItems: stack === 'vertical' ? (align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start') : 'center',
+    marginTop: px(n('mobile_buttons_container_margin_top')), marginRight: px(n('mobile_buttons_container_margin_right')),
+    marginBottom: px(n('mobile_buttons_container_margin_bottom')), marginLeft: px(n('mobile_buttons_container_margin_left')),
+  });
+  c.dataset.tag = 'buttons';
+  const names = [];
+  for (let i = 1; i <= 3; i++) {
+    const p = `mobile_button_${i}`;
+    if (!on(`${p}_button_enabled`, false)) continue;
+    const act = ACTIONS[s(`${p}_assign_action`, DEFAULT_ACTION[i])] || { label: 'Button', icon: 'play' };
+    if (act.unhooked) { names.push(`${i}: ${act.label} (not rendered, feature not hooked up)`); continue; }
+    const f = fontFor(s(platKey(p, 'ios_font_family', 'android_font_family'), 'Ubuntu-Bold'));
+    const showLabel = on(`${p}_label_enabled`, true), showIcon = on(`${p}_asset_enabled`, true);
+    const fixed = s(`${p}_display_mode`, 'dynamic') === 'fixed';
+    const bw = n(`${p}_border_size`);
+    const b = el('div', 'mbtn', {
+      background: s(`${p}_background_color`, 'rgba(62,62,62,1)'), color: s(`${p}_font_color`, 'rgba(239,239,239,1)'),
+      borderRadius: px(n(`${p}_corner_radius`, 8)), border: bw ? `${bw}px solid ${s(`${p}_border_color`, 'transparent')}` : '0',
+      paddingTop: px(n(`${p}_padding_top`, 14)), paddingRight: px(n(`${p}_padding_right`, showLabel ? 24 : 14)),
+      paddingBottom: px(n(`${p}_padding_bottom`, 14)), paddingLeft: px(n(`${p}_padding_left`, showLabel ? 16 : 14)),
+      marginTop: px(n(`${p}_margin_top`)), marginRight: px(n(`${p}_margin_right`)), marginBottom: px(n(`${p}_margin_bottom`)), marginLeft: px(n(`${p}_margin_left`)),
+      fontFamily: f.fam, fontWeight: f.w, fontSize: px(n(`${p}_font_size`, 15)), lineHeight: px(n(`${p}_line_height`, 24)),
+      letterSpacing: px(n(platKey(p, 'ios_letter_spacing', 'android_letter_spacing'), -0.2)),
+      gap: px(/^(top|bottom|above|below)$/.test(s(`${p}_asset_alignment`, 'left')) ? n(`${p}_vertical_gutter`, 8) : n(`${p}_horizontal_gutter`, 8)),
+      justifyContent: s(`${p}_contents_alignment`, 'center') === 'left' ? 'flex-start' : s(`${p}_contents_alignment`, 'center') === 'right' ? 'flex-end' : 'center',
+      alignItems: 'center',
+      width: fixed ? px(n(`${p}_width`, 140)) : 'auto',
+      ...(s(`${p}_display_mode`, 'dynamic') === 'fill' ? (stack === 'vertical' ? { alignSelf: 'stretch' } : { flex: '1 1 0' }) : {}),
+      flexDirection: ({ left: 'row', right: 'row-reverse', top: 'column', bottom: 'column-reverse', above: 'column', below: 'column-reverse' })[s(`${p}_asset_alignment`, 'left')] || 'row',
+    });
+    const tt = s(`${p}_text_transform`, 'default');
+    const assetName = ACTION_SET.manifest.plugins.find(x => x.action === s(`${p}_assign_action`) || x.web === s(`${p}_assign_action`))?.assets[0];
+    const flav = s(`${p}_action_asset_flavour`, 'flavour_1');
+    const real = showIcon && assetName && ACTION_PNG[assetName]?.[flav];
+    if (real) b.insertAdjacentHTML('beforeend', `<img src="${real}" width="${n(`${p}_asset_width`, 24)}" height="${n(`${p}_asset_height`, 24)}" alt="" style="flex:none">`);
+    else if (showIcon) b.insertAdjacentHTML('beforeend', svg(act.icon, n(`${p}_asset_width`, 24), n(`${p}_asset_height`, 24)));
+    if (showLabel) { const t = el('span', '', { textTransform: tt === 'default' ? 'none' : tt }); t.textContent = act.label; b.append(t); }
+    c.append(b);
+    names.push(`${i}: ${act.label}${showLabel ? '' : ' (icon only)'}${real ? ` (${assetName}, ${flav.replace('flavour_', 'flavour ')})` : ''}`);
+  }
+  if (!c.children.length) { if (names.length) showing.push(['buttons', names.join(', ')]); return null; }
+  showing.push(['buttons', `${names.join(', ')} · ${s('mobile_buttons_container_position', 'over_image').replace(/_/g, ' ')}`]);
+  return c;
+}
+
+function makeSecondary(showing) {
+  const fixed = s('secondary_image_display_mode', 'fixed') === 'fixed';
+  const w = fixed ? n('secondary_image_fixed_width', 128) : n('secondary_image_dynamic_width', 128);
+  if (!fixed && !has('secondary_image_dynamic_width')) notesExtra.push(['w', `<b>Secondary image display mode is "${s('secondary_image_display_mode') || 'empty'}"</b>. This cell only offers Fixed, so the image won't show on device.`]);
+  const h = fixed ? n('secondary_image_fixed_height', 72) : (state.secRatio ? w / state.secRatio : n('secondary_image_fixed_height', 72));
+  const align = s('secondary_image_align', 'left');
+  const e = el('div', 'sec', {
+    width: px(w), height: px(h), flex: 'none', borderRadius: px(n('secondary_image_corner_radius')),
+    background: 'repeating-linear-gradient(135deg,rgba(255,255,255,.18) 0 6px,rgba(255,255,255,.08) 6px 12px)',
+    marginTop: px(n('secondary_image_margin_top')), marginRight: px(n('secondary_image_margin_right')),
+    marginBottom: px(n('secondary_image_margin_bottom')), marginLeft: px(n('secondary_image_margin_left')),
+    alignSelf: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
+  });
+  e.dataset.tag = s('secondary_image_image_key', 'thumb_1') + (fixed ? '' : ' · dynamic');
+  // Fixed box: the image fits (contain) or fills (cover) it, anchored at the fit position.
+  const fitPos = (s('secondary_image_fit_position', 'center') === 'center' ? 'center' : s('secondary_image_fit_position').split('_').reverse().join(' '));
+  const sizing = s('secondary_image_image_sizing', 'fit') === 'fill' ? 'cover' : 'contain';
+  if (state.sec) Object.assign(e.style, { background: `url(${state.sec}) ${fixed ? fitPos : 'left center'} / ${fixed ? sizing : 'contain'} no-repeat` });
+  showing.push(['secondary img', `${s('secondary_image_image_key', 'thumb_1')} · ${fixed ? `fixed ${w}×${h}, ${s('secondary_image_image_sizing', 'fit')} at ${s('secondary_image_fit_position', 'center').replace(/_/g, ' ')}` : `dynamic · ${w}×${Math.round(h * 10) / 10}`} · ${s('secondary_image_position').replace(/_/g, ' ')}`]);
+  if (!fixed && !state.sec) notesExtra.push(['', 'Secondary image is dynamic, so its height comes from the image. Upload one under Sample feed item to see the real height; the stand-in uses the fixed height.']);
+  return e;
+}
+
+/* ---------- main render ---------- */
+// Web breakpoints: preview screen width and the Theme plugin's component padding
+const WEB_BP = { Mobile: { w: 393, pad: 20 }, Tablet: { w: 768, pad: 48 }, Desktop: { w: 1280, pad: 80 }, 'Large Desktop': { w: 1440, pad: 160 } };
+// "cells per view": the component fits N cells across the screen at each breakpoint
+function railItemWidth(lay) {
+  const per = lay.perView[state.bp || lay.breakpoint] || 1;
+  return (state.screenW - 2 * state.pad - (per - 1) * lay.gap) / per;
+}
+// Values the Theme plugin supplies when a cell leaves them blank (component padding left/right).
+const THEME = { Mobile: { padding: 20 }, Tablet: { padding: 48 } };
+
+// Group Info cell (cell_info_mobile): a header row above a component — badge, the feed's title, button.
+function renderInfo(showing, notes) {
+  const wrap = $('cellwrap'); wrap.innerHTML = ''; wrap.style.display = '';
+  $('component').style.paddingInline = '0px'; $('component').style.overflow = '';
+  const hs = heroPreset(PRESETS[+$('preset').value] || {})?.spec;
+  const dev = state.forceDevice || (hs ? TK.specDevice(hs) : (state.screenW > 600 ? 'Tablet' : 'Mobile')), W = state.screenW;
+  // web: the Theme padding follows the breakpoint the screen width falls in (20 / 48 / 80 / 160)
+  const theme = dev === 'Web' ? { padding: W < 640 ? 20 : W < 1024 ? 48 : W < 1344 ? 80 : 160, web: true } : THEME[dev];
+  const blank = k => !has(k) || String(state.map[k]).trim() === '';
+  const pv = side => blank(`group_info_padding_${side}`) ? (/left|right/.test(side) ? theme.padding : 0) : n(`group_info_padding_${side}`);
+  const fromTheme = ['left', 'right'].filter(sd => blank(`group_info_padding_${sd}`));
+  const bt = n('group_info_border_top_thickness'), bb = n('group_info_border_bottom_thickness');
+  const cell = el('div', 'cell', {
+    width: px(state.screenW), boxSizing: 'border-box', overflow: 'visible', display: 'flex', alignItems: 'center',
+    padding: `${pv('top')}px ${pv('right')}px ${pv('bottom')}px ${pv('left')}px`,
+    marginTop: px(n('group_info_margin_top')), marginBottom: px(n('group_info_margin_bottom')),
+    background: s('group_info_background_color', 'transparent'),
+    borderTop: bt ? `${bt}px solid ${s('group_info_border_top_color', 'transparent')}` : '0',
+    borderBottom: bb ? `${bb}px solid ${s('group_info_border_bottom_color', 'transparent')}` : '0',
+  });
+  cell.dataset.tag = 'group info';
+  const vpos = v => v === 'top' ? 'flex-start' : v === 'bottom' ? 'flex-end' : 'center';
+  if (on('badge_asset_switch')) {
+    const [rw, rh] = (s('asset_aspect_ratio', '1x1').match(/([\d.]+)x([\d.]+)/) || [0, 1, 1]).slice(1).map(Number);
+    const w = n('badge_asset_width', 44), h = n('badge_asset_height', w * rh / rw);
+    const bdg = el('div', 'sec', { width: px(w), height: px(h), flex: 'none', borderRadius: px(n('badge_asset_corner_radius')), alignSelf: vpos(s('badge_vertical_position', 'center')),
+      margin: `${n('badge_asset_margin_top')}px ${n('badge_asset_margin_right')}px ${n('badge_asset_margin_bottom')}px ${n('badge_asset_margin_left')}px`,
+      background: state.infoBadge ? `url(${state.infoBadge}) center / cover` : 'repeating-linear-gradient(135deg,rgba(255,255,255,.18) 0 6px,rgba(255,255,255,.08) 6px 12px)' });
+    bdg.dataset.tag = 'badge'; cell.append(bdg);
+    showing.push(['badge', `${w}×${Math.round(h)} · radius ${n('badge_asset_corner_radius')} · uploaded image`]);
+  }
+  if (on('title_text_switch', true)) {
+    const f = fontFor(s(platKey('title_text', 'family_ios_font_selector', 'family_android_font_selector'), 'SFProDisplay-Heavy'));
+    const size = n(platKey('title_text', 'ios_font_size', 'android_font_size'), 22), lh = n(platKey('title_text', 'ios_line_height', 'android_line_height'), 28);
+    const tt = s('title_text_transform', 'default');
+    const ti = el('div', 'lbl', { flex: '1 1 0', minWidth: '0', color: s('title_text_font_color', '#fff'), fontFamily: f.fam, fontWeight: f.w, fontSize: px(size), lineHeight: px(lh),
+      letterSpacing: px(n(platKey('title_text', 'ios_letter_spacing', 'android_letter_spacing'))), textAlign: s('title_text_alignment', 'left'),
+      textTransform: tt === 'default' ? 'none' : tt, WebkitLineClamp: String(Math.max(1, n('title_text_number_of_lines', 1))),
+      margin: `${n('title_text_margin_top')}px ${n('title_text_margin_right')}px ${n('title_text_margin_bottom')}px ${n('title_text_margin_left')}px` });
+    const key = s('title_text_custom_data_key').trim() || s('title_text_data_key', 'title');
+    ti.textContent = key === 'title' ? $('dFeedTitle').value : (SAMPLE_EXT[key] ?? key.split('.').pop());
+    ti.dataset.tag = 'title'; cell.append(ti);
+    showing.push(['title', `feed ${key} · ${size}/${lh} ${({ 900: 'Black', 800: 'ExtraBold', 700: 'Bold', 600: 'SemiBold', 500: 'Medium' })[f.w] || 'Regular'} · ${n('title_text_number_of_lines', 1)} line`]);
+  }
+  if (on('button_element_switch')) {
+    const bw = n('button_element_border_thickness');
+    const btn = el('div', 'mbtn', { flex: 'none', display: 'inline-flex', alignItems: 'center', alignSelf: vpos(s('button_element_vertical_position', 'center')),
+      background: s('button_element_background_color', 'transparent'), border: bw ? `${bw}px solid ${s('button_element_border_color', 'transparent')}` : '0',
+      borderRadius: px(n('button_element_corner_radius')),
+      padding: `${n('button_element_padding_top')}px ${n('button_element_padding_right')}px ${n('button_element_padding_bottom')}px ${n('button_element_padding_left')}px`,
+      margin: `${n('button_element_margin_top')}px ${n('button_element_margin_right')}px ${n('button_element_margin_bottom')}px ${n('button_element_margin_left')}px` });
+    if (on('button_text_switch')) {
+      const f = fontFor(s(platKey('button_text', 'family_ios_font_selector', 'family_android_font_selector'), 'SFProText-Semibold'));
+      const tx = el('span', '', { color: s('button_text_font_color', '#fff'), fontFamily: f.fam, fontWeight: f.w,
+        fontSize: px(n(platKey('button_text', 'ios_font_size', 'android_font_size'), 13)), lineHeight: px(n(platKey('button_text', 'ios_line_height', 'android_line_height'), 24)),
+        letterSpacing: px(n(platKey('button_text', 'ios_letter_spacing', 'android_letter_spacing'))),
+        margin: `${n('button_text_margin_top')}px ${n('button_text_margin_right')}px ${n('button_text_margin_bottom')}px ${n('button_text_margin_left')}px` });
+      const k = s('button_text_custom_data_key').trim();
+      tx.textContent = s('button_text_key') === 'other' ? (SAMPLE_EXT[k] ?? k) : k || 'View all';
+      btn.append(tx);
+    }
+    if (on('button_icon_switch')) {
+      const w = n('button_icon_width', 24), h = n('button_icon_height', 24);
+      const ic = el('span', '', { width: px(w), height: px(h), flex: 'none', color: s('button_text_font_color', '#fff') });
+      ic.innerHTML = state.infoIcon ? `<img src="${state.infoIcon}" width="${w}" height="${h}" alt="">` : svg('chevron', w, h);
+      btn.append(ic);
+    }
+    btn.dataset.tag = 'button'; cell.append(btn);
+    showing.push(['button', `${s('button_text_custom_data_key') || 'text'} · padding ${n('button_element_padding_top')} · radius ${n('button_element_corner_radius')}`]);
+  }
+  wrap.append(cell);
+  const h = cell.offsetHeight;
+  showing.unshift(['cell', `cell_info_mobile · ${state.screenW} × ${round(h)} · padding ${pv('top')}/${pv('right')}/${pv('bottom')}/${pv('left')}`]);
+  if (fromTheme.length) notes.push(['', `Padding ${fromTheme.join(' and ')} ${fromTheme.length > 1 ? 'are' : 'is'} blank, so ${fromTheme.length > 1 ? 'they come' : 'it comes'} from the Theme plugin (${theme.padding} on ${theme.web ? 'web at ' + W : theme === THEME.Tablet ? 'tablet' : 'mobile'}). The preview uses that value.`]);
+  $('dims').textContent = `group info ${state.screenW} × ${round(h)} pt`;
+  $('showing').innerHTML = showing.map(([k, v]) => `<li><span class="k">${k}</span><span class="v">${v}</span></li>`).join('');
+  if (!notes.length) notes.push(['', 'Nothing unusual in this config.']);
+  $('notes').innerHTML = notes.map(([c, x]) => `<li class="${c}">${x}</li>`).join('');
+  $('ident').textContent = `${state.json?.meta?.identifier || 'cell'} · ${state.json?.meta?.exported_on || ''}`;
+}
+
+// Button Cell (button_cell): one tab in the Tabs component. The tab bar is drawn with the sample labels:
+// the first selected, the second hovered when "Show the hover state" is on. The component sets each tab's size.
+const TAB_STATES = [['default', 'default', '', 'asset_switch', 'asset_default'], ['hover', 'hover', '_hover', 'asset_hover_switch', 'asset_hover'],
+  ['selected', 'selected', '_selected', 'asset_selected_switch', 'asset_selected'], ['selected_hover', 'selected_hover', '_selected_hover', 'asset_selected_hover_switch', 'asset_selected_hover']];
+function renderTabs(showing, notes) {
+  const wrap = $('cellwrap'); wrap.innerHTML = ''; wrap.style.display = '';
+  $('component').style.paddingInline = '0px'; $('component').style.overflow = '';
+  const hs = heroPreset(PRESETS[+$('preset').value] || {})?.spec, lay = hs?.layout || {};
+  const labels = lay.labels || ['Season 1', 'Season 2', 'Season 3', 'Details'];
+  const mode = $('tabMode').value || lay.mode || 'dynamic', gap = lay.gap ?? 24, pad = lay.padding ?? 20, W = state.screenW;
+  const bar = el('div', 'cell', { width: px(W), boxSizing: 'border-box', display: 'flex', alignItems: 'stretch', gap: px(gap), padding: `0 ${pad}px`, overflow: 'hidden' });
+  bar.dataset.tag = 'tabs';
+  const f = fontFor(s('title_font_family', 'Ubuntu-Medium'));
+  const bw = n('item_border_thickness'), ut = n('item_underline_thickness');
+  const fracW = (W - 2 * pad - gap * (labels.length - 1)) / labels.length;
+  const paint = (item, k) => {
+    const [st, , u, sw, up] = TAB_STATES[k];
+    item.style.background = s(`item_${st}_background_color`, 'transparent');
+    item.style.borderColor = s(`item_${st}_border_color`, 'transparent');
+    item._title.style.color = s(`title_${st}_font_color`, '#fff');
+    const dec = s(`title_text_decoration${u}`, 'none'); item._title.style.textDecoration = dec === 'none' ? 'none' : dec;
+    item._line.style.background = s(`item_underline_background_color${u}`, 'transparent');
+    const showAsset = on(sw) && (s(up) || s(`${up === 'asset_default' ? 'asset' : up}_image_key`));
+    item._asset.style.display = showAsset ? '' : 'none';
+    item._asset.style.background = s(up) ? `url(${s(up)}) center / contain no-repeat` : 'repeating-linear-gradient(135deg,rgba(255,255,255,.18) 0 4px,rgba(255,255,255,.08) 4px 8px)';
+  };
+  const items = labels.map((lab, i) => {
+    const item = el('div', 'tabitem', { position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', flex: 'none',
+      padding: `${n('item_padding_top')}px ${n('item_padding_right')}px ${n('item_padding_bottom')}px ${n('item_padding_left')}px`,
+      margin: `${n('item_margin_top')}px ${n('item_margin_right')}px ${n('item_margin_bottom')}px ${n('item_margin_left')}px`,
+      border: `${bw}px solid transparent`, borderRadius: px(n('item_border_radius')), overflow: 'hidden', cursor: 'pointer',
+      ...(mode === 'fixed' ? { width: px(lay.fixedWidth || 200) } : mode === 'fractional' ? { width: px(fracW) } : {}) });
+    const aw = n('asset_width', 20), ah = n('asset_height', 20);
+    const asset = el('span', '', { width: px(aw), height: px(ah), flex: 'none', borderRadius: '2px',
+      margin: `${n('asset_margin_top')}px ${n('asset_margin_right')}px ${n('asset_margin_bottom')}px ${n('asset_margin_left')}px`, order: s('asset_alignment', 'left') === 'right' ? '2' : '0' });
+    const tt = s('title_text_transform', 'default');
+    const title = el('span', 'lbl', { fontFamily: f.fam, fontWeight: f.w, fontSize: px(n('title_font_size', 14)), lineHeight: px(n('title_line_height', 20)),
+      letterSpacing: px(n('title_letter_spacing')), textTransform: tt === 'default' ? 'none' : tt, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: '0', order: '1' });
+    const key = s('title_custom_data_key').trim() || s('title_data_key', 'title');
+    title.textContent = key === 'title' ? lab : (SAMPLE_EXT[key] ?? lab);
+    const line = el('span', '', { position: 'absolute', left: '0', right: '0', bottom: '0', height: px(ut), borderRadius: px(n('item_underline_corner_radius')) });
+    item.append(asset, title, line); item._asset = asset; item._title = title; item._line = line;
+    const base = i === 0 ? 2 : (i === 1 && $('hoverOn').checked ? 1 : 0);
+    paint(item, base);
+    item.addEventListener('mouseenter', () => paint(item, i === 0 ? 3 : 1));
+    item.addEventListener('mouseleave', () => paint(item, base));
+    item.dataset.tag = ['default', 'hover', 'selected', 'selected + hover'][base];
+    bar.append(item); return item;
+  });
+  wrap.append(bar);
+  const h = bar.offsetHeight;
+  showing.push(['cell', `button_cell · tab ${Math.round(items[0].offsetWidth)} × ${round(items[0].offsetHeight)} · ${mode}${mode === 'fixed' ? ' ' + (lay.fixedWidth || 200) : mode === 'fractional' ? ` 1/${labels.length}` : ''}`]);
+  showing.push(['item', `padding ${n('item_padding_top')}/${n('item_padding_right')}/${n('item_padding_bottom')}/${n('item_padding_left')} · border ${bw} · radius ${n('item_border_radius')}`]);
+  showing.push(['title', `${key0()} · ${n('title_font_size')}/${n('title_line_height')} ${({ 900: 'Black', 800: 'ExtraBold', 700: 'Bold', 600: 'SemiBold', 500: 'Medium' })[f.w] || 'Regular'}`]);
+  showing.push(['underline', ut ? `${ut}px · radius ${n('item_underline_corner_radius')}` : 'off']);
+  showing.push(['asset', TAB_STATES.filter(x => on(x[3])).map(x => x[0].replace('_', ' + ')).join(', ') ? `${n('asset_width')}×${n('asset_height')} ${s('asset_alignment')} · ${TAB_STATES.filter(x => on(x[3])).map(x => x[0].replace('_', ' + ')).join(', ')}` : 'off']);
+  function key0() { return s('title_custom_data_key').trim() || s('title_data_key', 'title'); }
+  notes.push(['', `The Tabs component sets each tab's size (dynamic, fixed or fractional) and the space between tabs; the preview uses ${gap} between tabs and ${pad} side padding. Hover over a tab to see its hover state.`]);
+  if (TAB_STATES.some(x => on(x[3]))) notes.push(['', 'A static uploaded asset overrides the image key from the feed.']);
+  $('dims').textContent = `tabs ${W} × ${round(h)} pt`;
+  $('showing').innerHTML = showing.map(([k, v]) => `<li><span class="k">${k}</span><span class="v">${v}</span></li>`).join('');
+  $('notes').innerHTML = notes.map(([c, x]) => `<li class="${c}">${x}</li>`).join('');
+  $('ident').textContent = `${state.json?.meta?.identifier || 'cell'} · ${state.json?.meta?.exported_on || ''}`;
+}
+
+function render() {
+  const showing = [], notes = [];
+  notesExtra.length = 0;
+  if (state.json?.meta?.identifier === 'button_cell') {
+    $('screen').style.width = px(state.screenW); $('screen').style.background = state.appBg; $('device').style.zoom = state.zoom;
+    return renderTabs(showing, notes);
+  }
+  if (state.json?.meta?.identifier === 'cell_info_mobile') {
+    $('screen').style.width = px(state.screenW); $('screen').style.background = state.appBg; $('device').style.zoom = state.zoom;
+    return renderInfo(showing, notes);
+  }
+  // Cell 2 (image left, labels right) shares Cell 1's single label stack, so isC1 is true for both.
+  const isC2 = state.json?.meta?.identifier === 'cell_2_mobile' || has('image_width');
+  const isC1 = isC2 || has('text_label_1_switch') || state.json?.meta?.identifier === 'cell_1_mobile';
+  const wrap = $('cellwrap'); wrap.innerHTML = '';
+  // grid: columns of cells; list: one column of cells with a row gap
+  // grid: columns of cells; list: one column with a row gap; rail: one row of fixed-width items running off the edge
+  const lay = state.layout?.perView ? { ...state.layout, itemWidth: railItemWidth(state.layout) } : state.layout;
+  const L = lay?.type === 'grid' ? lay
+    : lay?.type === 'list' ? { ...lay, columns: 1, columnGap: 0 }
+    : lay?.type === 'rail' ? { ...lay, columns: Math.ceil((state.screenW - state.pad) / (lay.itemWidth + lay.gap)) + 1, columnGap: lay.gap, rowGap: 0 } : null;
+  const compW = L?.type === 'rail' ? L.itemWidth : (state.screenW - 2 * state.pad - (L ? (L.columns - 1) * L.columnGap : 0)) / (L ? L.columns : 1);
+  $('component').style.overflow = L?.type === 'rail' ? 'hidden' : '';
+  $('component').style.paddingInline = px(state.pad);
+  $('screen').style.width = px(state.screenW);
+  $('screen').style.background = state.appBg;
+  $('screen').style.setProperty('--appbg', state.appBg);
+  $('device').style.zoom = state.zoom;
+
+  const cm = { t: n('cell_margin_top'), r: n('cell_margin_right'), b: n('cell_margin_bottom'), l: n('cell_margin_left') };
+  const cp = { t: n('cell_padding_top'), r: n('cell_padding_right'), b: n('cell_padding_bottom'), l: n('cell_padding_left') };
+  const cellW = compW - cm.l - cm.r;
+  const radius = n('cell_corner_radius');
+  const shadowOn = n('cell_shadow_opacity') > 0 && !transparent(s('cell_shadow_color'));
+  const cell = el('div', 'cell', {
+    width: px(cellW), margin: `${cm.t}px ${cm.r}px ${cm.b}px ${cm.l}px`,
+    padding: `${cp.t}px ${cp.r}px ${cp.b}px ${cp.l}px`,
+    background: s('cell_background_color', 'transparent'), borderRadius: px(radius),
+    boxShadow: shadowOn ? `${n('cell_shadow_offset_width')}px ${n('cell_shadow_offset_height')}px ${n('cell_shadow_radius')}px ${s('cell_shadow_color')}` : 'none',
+  });
+  cell.dataset.tag = 'cell';
+  if ($('hoverOn')?.checked) cell.classList.add('hovering');
+
+  const im = { t: n('image_margin_top'), r: n('image_margin_right'), b: n('image_margin_bottom'), l: n('image_margin_left') };
+  // Cell 2: the image has a fixed width (image_width) and the labels take the rest of the row.
+  const imgW = isC2 ? n('image_width', 142) : cellW - cp.l - cp.r - im.l - im.r;
+  const [rw, rh] = aspect();
+  const imgH = imgW * rh / rw;
+  const ibs = n('image_border_size');
+  const box = el('div', 'imgbox', {
+    width: px(imgW), height: px(imgH), margin: `${im.t}px ${im.r}px ${im.b}px ${im.l}px`,
+    borderRadius: px(n('image_corner_radius')), background: s('image_placeholder_color', '#242936'),
+  });
+  const art = el('div', 'art');
+  // No artwork uploaded: show the cell's own image placeholder colour, as the app does before the image loads.
+  const artSrc = state.art || state.presetArt;
+  art.style.backgroundImage = artSrc ? `url(${artSrc})` : 'none';
+  if (!state.art && state.presetArt) notes.push(['', 'The artwork is a stand-in drawn from the Figma motif. Upload the real image under Sample feed item to replace it.']);
+  const dk = [...new Set(Object.values(DATA_COLORS))];
+  if (dk.length) showing.push(['feed colours', dk.map(k => `${k} = ${SAMPLE_EXT[k] ?? 'not in the sample feed'}`).join(' · ') + ` (${Object.keys(DATA_COLORS).length} colour fields read the feed)`]);
+  box.append(art);
+  if (state.ovl) { const o = el('div', 'ovl'); o.style.backgroundImage = `url(${state.ovl})`; box.append(o); }
+  else if (s('image_overlay_image')) {
+    notes.push(['', `The overlay image is hosted externally, so it isn't drawn here. Upload <code>${s('image_overlay_image').split('/').pop()}</code> under Sample feed item to see it.`]);
+  } else if (s('image_overlay')) {
+    const T = currentTokens;
+    const o = el('div', 'ovl'); o.style.backgroundImage = T
+      ? `linear-gradient(180deg, ${TK.rgba(T['Surface/base-10%'])} 25.014%, ${TK.rgba(T['Surface/base'])} 99.972%)`
+      : 'linear-gradient(180deg, rgba(18,18,18,0.1) 25.014%, rgba(18,18,18,1) 99.972%)';
+    box.append(o);
+    notes.push(['', `The overlay image is hosted externally, so the hero gradient (Surface/base-10% to Surface/base) stands in. Upload <code>${s('image_overlay').split('/').pop()}</code> to see the real one.`]);
+  }
+  showing.push(['image', `${s('image_key', 'image_base')} · ${rw}×${rh} · ${Math.round(imgW * 10) / 10} × ${Math.round(imgH * 10) / 10}`]);
+
+  // things that slot into the label stacks
+  const inserts = {};
+  const addInsert = (pos, node) => {
+    const m = String(pos).match(/^(above|below)_(?:(top|center|bottom)_)?text_label_(\d+)$/);
+    if (!m) return false;
+    (inserts[`${m[2] || 'c1'}_${m[3]}_${m[1]}`] ||= []).push(node); return true;
+  };
+
+  const containerOn = on('mobile_buttons_container_buttons_enabled', false);
+  const anyBtn = [1, 2, 3].some(i => on(`mobile_button_${i}_button_enabled`, false));
+  if (containerOn) {
+    const bc = makeButtons(showing);
+    if (bc) {
+      const pos = s('mobile_buttons_container_position', 'over_image');
+      if (pos === 'over_image') {
+        bc.style.margin = '0';
+        place(bc, s('mobile_buttons_container_over_image_position', 'bottom_left'), {
+          t: n('mobile_buttons_container_margin_top'), r: n('mobile_buttons_container_margin_right'),
+          b: n('mobile_buttons_container_margin_bottom'), l: n('mobile_buttons_container_margin_left') });
+        bc.style.zIndex = 9; box.append(bc);
+      } else if (!addInsert(pos, bc)) { notes.push(['w', `<b>Button position</b> <code>${pos}</code> isn't one this preview knows, so the buttons are drawn under the image.`]); cell.append(bc); }
+    } else notes.push(['w', '<b>Buttons container is on</b> but no individual button is enabled, so nothing shows.']);
+  } else if (anyBtn) {
+    notes.push(['', 'A button is enabled but the buttons container is off, so no buttons show. This matches the app.']);
+  }
+
+  if (on('secondary_image_switch')) {
+    const sec = makeSecondary(showing);
+    const spos = s('secondary_image_position', 'above_bottom_text_label_1');
+    if (spos === 'over_image') {
+      place(sec, s('secondary_image_image_position', 'bottom_left'), { t: n('secondary_image_margin_top'), r: n('secondary_image_margin_right'), b: n('secondary_image_margin_bottom'), l: n('secondary_image_margin_left') });
+      sec.style.margin = '0'; sec.style.zIndex = 8; box.append(sec);
+    } else if (!addInsert(spos, sec)) cell.append(sec);
+  }
+
+  let bottomBar = null;
+  // progress bar
+  const prog = Math.min(100, Math.max(0, +$('dProgress').value || 0));
+  if (on('progress_bar_switch') && prog === 0 && on('progress_bar_hide_unwatched', true)) {
+    notes.push(['', 'Progress bar is on but hidden, because this item has no watch progress and "hide unwatched" is set. Raise Progress % to see it.']);
+  } else if (on('progress_bar_switch')) {
+    const h = n('progress_bar_height', 5);
+    const track = el('div', '', { height: px(h), background: s('progress_bar_total_bar_color', 'rgba(255,255,255,.25)'), borderRadius: px(n('progress_bar_total_bar_corner_radius')), overflow: 'hidden', zIndex: 9 });
+    const fill = el('div', '', { height: '100%', width: `${prog}%`, background: s('progress_bar_progress_bar_color', '#fff'), borderRadius: px(n('progress_bar_progress_bar_corner_radius')) });
+    track.append(fill);
+    const pm = { t: n('progress_bar_margin_top'), r: n('progress_bar_margin_right'), b: n('progress_bar_margin_bottom'), l: n('progress_bar_margin_left') };
+    const ppos = s('progress_bar_position', 'on_top_of_image');
+    if (ppos === 'on_top_of_image') {
+      Object.assign(track.style, { position: 'absolute', left: px(pm.l), right: px(pm.r), bottom: px(pm.b) }); box.append(track);
+    } else {
+      track.style.margin = `${pm.t}px ${pm.r}px ${pm.b}px ${pm.l}px`; track.style.flex = 'none';
+      // above/below a text label slots into the label stack; bottom of cell runs under everything (full cell width)
+      if (!addInsert(ppos, track)) bottomBar = track;
+    }
+    showing.push(['progress bar', `${h}px · ${s('progress_bar_position').replace(/_/g, ' ')}`]);
+  }
+
+  // label zones
+  const seenKeys = {};
+  let maxLabel = 3;
+  if (isC1) {
+    const stack = el('div', 'stack1'); stack.dataset.tag = 'labels';
+    for (let i = 1; i <= (isC2 ? 4 : 3); i++) {
+      (inserts[`c1_${i}_above`] || []).forEach(x => stack.append(x));
+      if (on(`text_label_${i}_switch`)) {
+        stack.append(makeLabel(`text_label_${i}`, `label ${i}`, showing));
+        (seenKeys[dataFor(`text_label_${i}`).key] ||= []).push(`label ${i}`);
+      }
+      (inserts[`c1_${i}_below`] || []).forEach(x => stack.append(x));
+    }
+    if (stack.children.length) cell.append(stack);
+  }
+  (isC1 ? [] : ['top', 'center', 'bottom']).forEach(z => {
+    let count = 3;
+    Object.keys(state.map).forEach(k => { const m = k.match(new RegExp(`^${z}_text_label_(\\d+)_`)); if (m) count = Math.max(count, +m[1]); });
+    maxLabel = Math.max(maxLabel, count);
+    const zone = el('div', `zone zone-${z}`); zone.dataset.tag = z;
+    for (let i = 1; i <= count; i++) {
+      (inserts[`${z}_${i}_above`] || []).forEach(x => zone.append(x));
+      if (on(`${z}_text_label_${i}_switch`)) {
+        zone.append(makeLabel(`${z}_text_label_${i}`, `${z} ${i}`, showing));
+        const d = dataFor(`${z}_text_label_${i}`).key;
+        (seenKeys[d] ||= []).push(`${z} ${i}`);
+      }
+      (inserts[`${z}_${i}_below`] || []).forEach(x => zone.append(x));
+    }
+    if (zone.children.length) { cell.append(zone); }
+  });
+  Object.entries(seenKeys).forEach(([k, where]) => {
+    if (where.length > 1) notes.push(['w', `<b><code>${k}</code> appears ${where.length} times</b> (${where.join(', ')}). Turn off the copies you don't want.`]);
+  });
+  if (maxLabel > 3) notes.push(['w', `<b>Label ${maxLabel} keys found.</b> The preview draws them, but the app only renders labels 1 to 3, so they won't show on device.`]);
+
+  // runtime pill (bottom right of the image). Cell 1/3: runtime_font_size...; Cell 2: ios_runtime_font_size...
+  if (on('runtime_switch')) {
+    const pf = has('ios_runtime_font_size');
+    const rk = what => pf ? platKey('', `ios_runtime_${what}`, `android_runtime_${what}`).slice(1) : `runtime_${what}`;
+    const f = fontFor(s(platKey('runtime', 'font_family_ios_font_selector', 'font_family_android_font_selector'), 'SFProText-Medium'));
+    const size = n(rk('font_size'), 11), lh = n(rk('line_height'), 14);
+    const ls = n(pf ? rk('letter_spacing') : platKey('runtime', 'ios_letter_spacing', 'android_letter_spacing'));
+    const r = el('div', '', {
+      position: 'absolute', right: px(n('runtime_margin_right', 10)), bottom: px(n('runtime_margin_bottom', 10)), zIndex: 9,
+      background: s('runtime_background_color', 'rgba(0,0,0,.9)'), color: s('runtime_font_color', '#fff'),
+      borderRadius: px(n('runtime_corner_radius', 2)), fontFamily: f.fam, fontWeight: f.w, letterSpacing: px(ls),
+      fontSize: px(size), lineHeight: px(lh),
+      padding: `${n('runtime_padding_top', 1)}px ${n('runtime_padding_right', 4)}px ${n('runtime_padding_bottom', 1)}px ${n('runtime_padding_left', 4)}px`,
+    });
+    r.textContent = '32:46'; r.dataset.tag = 'runtime'; box.append(r);
+    showing.push(['runtime', `bottom right · ${size}/${lh} · sample duration 32:46 (the app shows the item's duration)`]);
+  }
+
+  if (bottomBar && !isC2) cell.append(bottomBar);
+
+  // badges and action
+  const badgeAssets = ['video_badge', 'channel_badge', 'program_badge', 'article_badge', 'link_badge', 'feed_badge', 'static_badge', 'custom_badge_1', 'custom_badge_2', 'custom_badge_3', 'custom_badge_4', 'custom_badge_5'];
+  if (on('content_badge_switch')) {
+    if (badgeAssets.some(k => s(k)) && !state.contentBadge) {
+      const g = el('div', 'glyph', { width: px(n('content_badge_width', 44)), height: px(n('content_badge_height', 44)), color: '#fff' });
+      g.innerHTML = svg('badge', n('content_badge_width', 44), n('content_badge_height', 44));
+      place(g, s('content_badge_position', 'center'), { t: n('content_badge_margin_top'), r: n('content_badge_margin_right'), b: n('content_badge_margin_bottom'), l: n('content_badge_margin_left') });
+      box.append(g); showing.push(['content badge', `${s('content_badge_position')} · stand-in icon`]);
+    } else if (state.contentBadge) {
+      // custom content badge (e.g. LIVE for content type "Live"): the sample item is treated as that type
+      const g = el('div', 'glyph', { width: px(n('content_badge_width', 44)), height: px(n('content_badge_height', 44)) });
+      g.innerHTML = `<img src="${state.contentBadge}" width="${n('content_badge_width', 44)}" height="${n('content_badge_height', 44)}" alt="">`;
+      place(g, s('content_badge_position', 'center'), { t: n('content_badge_margin_top'), r: n('content_badge_margin_right'), b: n('content_badge_margin_bottom'), l: n('content_badge_margin_left') });
+      box.append(g); showing.push(['content badge', `${s('content_badge_position').replace(/_/g, ' ')} · custom badge for content type "${s('content_type_custom_badge_1')}" (the sample item is shown as that type)`]);
+    } else if (on('content_badge_hover_switch') && state.hoverBadge) {
+      // hover only: no default badge image, the hover image shows on hover
+      const g = el('div', 'glyph hov', { width: px(n('content_badge_width', 44)), height: px(n('content_badge_height', 44)) });
+      g.innerHTML = `<img src="${state.hoverBadge}" width="${n('content_badge_width', 44)}" height="${n('content_badge_height', 44)}" alt="">`;
+      place(g, s('content_badge_position', 'center'), { t: n('content_badge_margin_top'), r: n('content_badge_margin_right'), b: n('content_badge_margin_bottom'), l: n('content_badge_margin_left') });
+      box.append(g); showing.push(['content badge', `${s('content_badge_position')} · hover only (static_badge_hover)`]);
+    } else notes.push(['', 'Content badge is on, but no badge images are set, so nothing draws.']);
+  }
+  // web: the image border (inside the image) shows its hover colour on hover
+  if (has('image_hover_border_color') && n('image_border_width') > 0) {
+    const bw = n('image_border_width'), r = n('image_border_radius', n('image_corner_radius'));
+    if (!transparent(s('image_border_color'))) { const d = el('div', 'hovb', { border: `${bw}px solid ${s('image_border_color')}`, borderRadius: px(r) }); box.append(d); }
+    if (!transparent(s('image_hover_border_color'))) {
+      box.append(el('div', 'hovb hov', { border: `${bw}px solid ${s('image_hover_border_color')}`, borderRadius: px(r) }));
+      showing.push(['hover', `${bw}px image border${on('content_badge_hover_switch') && state.hoverBadge ? ' and the play badge' : ''} · hover over the cell to see it`]);
+    }
+  }
+  if (on('lock_badge_switch')) {
+    const g = el('div', 'glyph', { width: px(n('lock_badge_width', 44)), height: px(n('lock_badge_height', 44)), color: '#fff' });
+    g.innerHTML = svg('lock', n('lock_badge_width', 44) * .6, n('lock_badge_height', 44) * .6);
+    place(g, s('lock_badge_position', 'top_left'), { t: n('lock_badge_margin_top'), r: n('lock_badge_margin_right'), b: n('lock_badge_margin_bottom'), l: n('lock_badge_margin_left') });
+    box.append(g); showing.push(['lock badge', `${s('lock_badge_position')} · driven by ${s('lock_badge_data_key')}`]);
+    notes.push(['', 'Lock badge is drawn here, but locked and unlocked content isn\'t hooked up in the app yet, so it won\'t show on device.']);
+  }
+  // "cell_right" (Cell 2) puts an element in its own column at the right of the row, centred on the cell.
+  const rightCol = [];
+  const pinOrRight = (g, pos, m) => {
+    if (isC2 && pos === 'cell_right') {
+      Object.assign(g.style, { position: 'relative', flex: 'none', alignSelf: 'center', margin: `${m.t}px ${m.r}px ${m.b}px ${m.l}px` });
+      rightCol.push(g);
+    } else { place(g, pos, m); box.append(g); }
+  };
+  const badgeKey = has('cell_badge') ? 'cell_badge' : 'cell_badge_default';
+  if (on('cell_badge_switch') && (s(badgeKey) || state.badge)) {
+    const g = el('div', 'glyph', { width: px(n('cell_badge_width', 24)), height: px(n('cell_badge_height', 24)), color: '#fff' });
+    if (state.badge) g.innerHTML = `<img src="${state.badge}" width="${n('cell_badge_width', 24)}" height="${n('cell_badge_height', 24)}" alt="">`;
+    else if (state.forceDevice && /^https?:/.test(s(badgeKey))) {
+      // screen preview: try the hosted badge, and leave the space empty if it can't load here
+      const im = el('img', '', { width: px(n('cell_badge_width', 24)), height: px(n('cell_badge_height', 24)) }); im.alt = '';
+      im.onerror = () => { im.style.visibility = 'hidden'; }; im.src = s(badgeKey); g.append(im);
+    }
+    else g.innerHTML = svg(isC2 ? 'chevron' : 'badge', n('cell_badge_width', 24), n('cell_badge_height', 24));
+    if (state.badge && !s(badgeKey)) notes.push(['', `Cell badge shows the generated image. Upload it to ${badgeKey} on the platform.`]);
+    pinOrRight(g, s('cell_badge_position', 'bottom_right'), { t: n('cell_badge_margin_top'), r: n('cell_badge_margin_right'), b: n('cell_badge_margin_bottom'), l: n('cell_badge_margin_left') });
+    showing.push(['cell badge', s('cell_badge_position').replace(/_/g, ' ')]);
+  }
+  if (on('action_switch')) {
+    const aw = n('action_width', 44), ah = n('action_height', 44);
+    const g = el('div', 'glyph', { width: px(aw), height: px(ah), color: '#fff' });
+    const offline = s('action_identifier') === 'offline-content-button';
+    if (state.action) g.innerHTML = `<img src="${state.action}" width="${aw}" height="${ah}" alt="">`;
+    else g.innerHTML = svg(offline ? 'download' : 'heart', aw * .55, ah * .55);
+    const af = PRESETS[+$('preset').value]?.actionField;
+    if (state.action && af) notes.push(['', `The action button shows the generated <code>${PRESETS[+$('preset').value]?.actionFile}</code>: upload it to ${af}.`]);
+    else if (state.action && !s('unselected_action_icon')) notes.push(['', `The action icon is the generated <code>${PRESETS[+$('preset').value]?.actionFile || 'action icon'}</code>. Upload it to Unselected action icon (and Selected action icon) on the platform.`]);
+    pinOrRight(g, s('action_position', 'top_right'), { t: n('action_margin_top'), r: n('action_margin_right'), b: n('action_margin_bottom'), l: n('action_margin_left') });
+    showing.push(['action', `${s('action_identifier')} · ${s('action_position').replace(/_/g, ' ')} · ${aw}×${ah}`]);
+  }
+
+  const ib = n('image_border_size');
+  if (ib > 0 && !transparent(s('image_border_color'))) {
+    const iw = el('div', 'imgwrap', { position: 'relative', margin: box.style.margin, width: box.style.width, flex: 'none' });
+    box.style.margin = '0';
+    const posn = s('image_border_position', 'inside');
+    const off = side => { const pad = n(`image_border_padding_${side}`); return posn === 'outside' ? -(pad + ib) : posn === 'center' ? -(pad + ib / 2) : pad; };
+    const bd = el('div', 'cellBorder', { top: px(off('top')), right: px(off('right')), bottom: px(off('bottom')), left: px(off('left')),
+      border: `${ib}px solid ${s('image_border_color')}`, borderRadius: px(Math.max(0, n('image_corner_radius') - off('top'))) });
+    iw.append(box, bd); cell.prepend(iw);
+    showing.push(['image border', `${ib}px ${posn} · ${n('image_border_padding_top')}pt padding`]);
+  } else cell.prepend(box);
+  if (isC1 && !radius) cell.style.overflow = 'visible';
+
+  // Cell 2 row: [image][labels][cell-right items], with optional top and bottom border lines.
+  let row2 = null;
+  if (isC2) {
+    const imgNode = cell.firstChild;
+    const labels = cell.querySelector('.stack1');
+    row2 = el('div', 'c2row', { display: 'flex', alignItems: 'center', position: 'relative' });
+    if (on('image_switch', true)) { imgNode.style.flex = 'none'; row2.append(imgNode); }
+    else {
+      imgNode.remove(); showing.splice(showing.findIndex(x => x[0] === 'image'), 1, ['image', 'off']);
+      if (im.r) {
+        row2.append(el('div', '', { width: px(im.r), flex: 'none' }));
+        notes.push(['w', `<b>The image is off, but its ${im.r}pt right margin still takes space</b> on the left of the cell (a known cell bug). Set image margin right to 0 for text-only cells.`]);
+      }
+    }
+    if (labels) { Object.assign(labels.style, { flex: '1 1 0', minWidth: '0' }); row2.append(labels); }
+    else row2.append(el('div', '', { flex: '1 1 0' }));
+    rightCol.forEach(g => row2.append(g));
+    [...cell.children].forEach(c => { if (!c.classList.contains('cellBorder')) c.remove(); });
+    const line = side => {
+      if (!on(`cell_border_${side}_switch`)) return null;
+      const k = `cell_border_${side}`;
+      showing.push([`${side} border`, `${n(`${k}_thickness`, 1)}px · margins ${n(`${k}_margin_top`)}/${n(`${k}_margin_right`)}/${n(`${k}_margin_bottom`)}/${n(`${k}_margin_left`)}`]);
+      return el('div', '', { height: px(n(`${k}_thickness`, 1)), background: s(`${k}_color`, 'transparent'),
+        margin: `${n(`${k}_margin_top`)}px ${n(`${k}_margin_right`)}px ${n(`${k}_margin_bottom`)}px ${n(`${k}_margin_left`)}px` });
+    };
+    const top = line('top'), bottom = line('bottom');
+    cell.prepend(...[top, row2, bottomBar, bottom].filter(Boolean));
+  }
+
+  // border drawn above the image so it reads like the device
+  const bs = n('cell_border_size');
+  if (bs > 0 && !transparent(s('cell_border_color'))) {
+    const inside = s('cell_border_position', 'inside') === 'inside';
+    const bd = el('div', 'cellBorder', { inset: inside ? '0' : px(-bs), border: `${bs}px solid ${s('cell_border_color')}`, borderRadius: px(inside ? radius : radius + bs) });
+    cell.append(bd);
+    if (!inside) cell.style.overflow = 'visible';
+  }
+  wrap.append(cell);
+  // Cell 2: labels shorter than the image centre on it; taller labels anchor to the top with the image.
+  if (row2) {
+    const lab = row2.querySelector('.stack1');
+    const tall = on('image_switch', true) && lab && lab.offsetHeight > imgH + im.t + im.b;
+    row2.style.alignItems = tall ? 'flex-start' : 'center';
+    rightCol.forEach(g => { g.style.alignSelf = 'center'; });
+    if (lab) showing.push(['row', on('image_switch', true) ? (tall ? 'labels taller than the image, so both anchor to the top' : 'labels centred on the image') : 'no image, labels span the cell']);
+  }
+  // A grid shows the same cell in every slot, at the component's column width and gaps; a list shows three rows.
+  Object.assign(wrap.style, L ? { display: 'grid', gridTemplateColumns: `repeat(${L.columns}, ${round(compW)}px)`, columnGap: px(L.columnGap), rowGap: px(L.rowGap) } : { display: '', gridTemplateColumns: '', columnGap: '', rowGap: '' });
+  if (L) for (let k = 1; k < (L.type === 'list' ? 3 : L.type === 'rail' ? L.columns : L.columns * 2); k++) wrap.append(cell.cloneNode(true));
+  const cellH = isC1 ? cell.offsetHeight : cell_h(cp, im, imgH);
+  showing.unshift(['cell', `${state.json?.meta?.identifier || ''} · ${round(cellW)} × ${round(cellH)}${isC1 ? ' (grows with content)' : ''} · radius ${radius}${bs ? ` · ${bs}px border` : ''}`]);
+  $('dims').textContent = `cell ${round(cellW)} × ${round(cellH)} pt · component ${state.screenW} − ${state.pad}×2${L ? (L.type === 'list' ? ` · list, ${L.rowGap} row gap` : L.type === 'rail' ? ` · rail, ${L.itemWidth} wide items, ${L.gap} gap` : ` · ${L.columns}-column grid, ${L.columnGap} column gap, ${L.rowGap} row gap`) : ''}`;
+
+  // key coverage
+  const styleKeys = (state.json?.config?.styles || []).map(e => e.key);
+  // the reference set is the mobile Cell 3; the web Cell 3 has its own keys
+  const missing = isC1 || state.json?.meta?.identifier === 'cell_3_v2' ? [] : [...REF_KEYS].filter(k => !styleKeys.includes(k));
+  if (missing.length) {
+    const groups = {};
+    missing.forEach(k => { const g = k.replace(/_(\d+)_.*/, '_$1').replace(/^(mobile_buttons_container).*/, '$1'); groups[g] = (groups[g] || 0) + 1; });
+    notes.push(['', `${missing.length} style keys from the full set aren't in this file (${Object.keys(groups).slice(0, 5).join(', ')}${Object.keys(groups).length > 5 ? '…' : ''}). The preview uses defaults for them.`]);
+  }
+
+  $('showing').innerHTML = showing.map(([k, v]) => `<li><span class="k">${k}</span><span class="v">${v}</span></li>`).join('');
+  notes.push(...notesExtra);
+  const curP = PRESETS[+$('preset').value];
+  if (curP && heroPreset(curP) && curP.dropped?.length)
+    notes.push(['w', `<b>Left out: ${curP.dropped.join(', ')}.</b> With this header the cell needs more text labels than its ${heroPreset(curP).spec.stack?.slots || 3} slots, so the lowest-priority element goes first.`]);
+  if (PRESETS[+$('preset').value] && heroPreset(PRESETS[+$('preset').value]))
+    lastContrast.filter(r => !r.pass).forEach(r => notes.push(['w', `<b>${r.label} contrast is ${r.ratio.toFixed(2)}:1</b>, below the ${r.min}:1 AA minimum even with ${r.chosen}. Pick an accent that's lighter or darker.`]));
+  if (!notes.length) notes.push(['', 'Nothing unusual in this config.']);
+  $('notes').innerHTML = notes.map(([c, t]) => `<li class="${c}">${t}</li>`).join('');
+  $('ident').textContent = `${state.json?.meta?.identifier || 'cell'} · ${state.json?.meta?.exported_on || ''}`;
+}
+const round = v => Math.round(v * 10) / 10;
+const cell_h = (cp, im, imgH) => cp.t + cp.b + im.t + im.b + imgH;
+
+/* ---------- loading ---------- */
+function loadJson(obj) {
+  if (!obj?.config?.styles) throw new Error('This file has no config.styles list. Export the cell style from the cell builder and try again.');
+  state.json = obj; state.map = toMap(obj); $('err').hidden = true; render();
+}
+function tryText(text) {
+  try { loadJson(JSON.parse(text)); }
+  catch (e) { $('err').textContent = e instanceof SyntaxError ? `That isn't valid JSON: ${e.message}` : e.message; $('err').hidden = false; }
+}
+
+PRESETS.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name; $('preset').append(o); });
+$('preset').value = '1';
+const showPreset = i => {
+  const p = PRESETS[i];
+  state.ovl = p.overlay || null; state.badge = p.badge || null; state.action = p.action || null; state.hoverBadge = p.hoverBadge || null; state.contentBadge = p.contentBadge || null; state.presetArt = p.art || null; state.sec = p.sec || null; state.secRatio = null;
+  state.layout = (typeof heroPreset === 'function' && heroPreset(p)?.spec.layout) || null;
+  if (state.layout?.padding !== undefined) { state.pad = state.layout.padding; $('pad').value = state.pad; }
+  if (p.pad !== undefined) { state.pad = p.pad; $('pad').value = p.pad; }
+  // screen width: the cell's own (Tablet 1133), else Mobile 393
+  const hs = typeof heroPreset === 'function' && heroPreset(p)?.spec;
+  // collections with their own look (ITVX) set the screen colour; the rest use the brand's Surface/base
+  if (hs) { state.appBg = hs.appBg || state.tokenBg || state.appBg; $('appbg').value = state.appBg; }
+  $('webRow').hidden = !hs?.layout?.perView;
+  $('tabRow').hidden = hs?.layout?.type !== 'tabs';
+  if (hs?.layout?.type === 'tabs' && !$('tabMode').dataset.touched) $('tabMode').value = hs.layout.mode || 'dynamic';
+  if (hs?.layout?.perView) { const b = WEB_BP[$('bp').value] || WEB_BP.Desktop; state.bp = $('bp').value; hs.screen = b.w; state.pad = b.pad; $('pad').value = b.pad; }
+  if (hs) {
+    state.screenW = hs.screen || (TK.specDevice(hs) === 'Tablet' ? 1133 : 393); $('screenW').value = state.screenW;
+    // wide screens open zoomed out so the whole cell fits the stage
+    const z = state.screenW > 1200 ? 0.5 : state.screenW > 600 ? 0.75 : 1;
+    if (state.zoom !== z) { state.zoom = z; $('zoom').value = String(z); }
+  }
+  $('json').value = JSON.stringify(p.json); loadJson(p.json);
+};
+$('preset').addEventListener('change', e => showPreset(+e.target.value));
+$('apply').addEventListener('click', () => tryText($('json').value));
+$('file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader(); r.onload = () => { $('json').value = r.result; tryText(r.result); }; r.readAsText(f);
+});
+const readImg = (input, key) => input.addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) { state[key] = null; render(); return; }
+  const r = new FileReader(); r.onload = () => { state[key] = r.result; render(); }; r.readAsDataURL(f);
+});
+readImg($('artFile'), 'art'); readImg($('ovlFile'), 'ovl');
+$('secFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) { state.sec = null; state.secRatio = null; render(); return; }
+  const r = new FileReader();
+  r.onload = () => { const im = new Image(); im.onload = () => { state.sec = r.result; state.secRatio = im.naturalWidth / im.naturalHeight; render(); }; im.src = r.result; };
+  r.readAsDataURL(f);
+});
+
+const setPlat = p => { state.platform = p; $('pIos').setAttribute('aria-pressed', p === 'ios'); $('pAnd').setAttribute('aria-pressed', p === 'android'); render(); };
+$('pIos').addEventListener('click', () => setPlat('ios'));
+$('pAnd').addEventListener('click', () => setPlat('android'));
+$('screenW').addEventListener('input', e => { state.screenW = Math.max(240, +e.target.value || 393); render(); });
+$('pad').addEventListener('input', e => { state.pad = Math.max(0, +e.target.value || 0); render(); });
+$('zoom').addEventListener('change', e => { state.zoom = +e.target.value; render(); });
+$('hoverOn').addEventListener('change', () => render());
+$('bp').addEventListener('change', () => showPreset(+$('preset').value));
+$('tabMode').addEventListener('change', () => { $('tabMode').dataset.touched = '1'; render(); });
+$('appbg').addEventListener('input', e => { state.appBg = e.target.value || '#000'; render(); });
+$('outline').addEventListener('change', e => { state.outline = e.target.checked; $('screen').classList.toggle('outline', state.outline); });
+// Sample feed edits redraw the cell, and the gallery too when it's showing.
+let feedTimer = null;
+const feedChanged = () => {
+  render();
+  clearTimeout(feedTimer);
+  feedTimer = setTimeout(() => { if (typeof renderGallery === 'function' && !$('gallery').hidden) renderGallery(); }, 250);
+};
+['dFeedTitle', 'dTitle', 'dSummary', 'dSection', 'dProgress'].forEach(id => $(id).addEventListener('input', feedChanged));
+// extension fields the cells use (extensions.meta, extensions.cast...), editable like title and summary
+Object.keys(SAMPLE_EXT).sort().forEach((k, i) => {
+  const f = el('div', 'field');
+  const lab = el('label'); lab.htmlFor = `ext${i}`; lab.textContent = k;
+  const inp = el('input'); inp.type = 'text'; inp.id = `ext${i}`; inp.value = SAMPLE_EXT[k];
+  inp.addEventListener('input', () => { SAMPLE_EXT[k] = inp.value; feedChanged(); });
+  f.append(lab, inp); $('extFields').append(f);
+});
+
+/* control tabs */
+(() => {
+  const tabs = [...document.querySelectorAll('.tabs [role=tab]')];
+  const show = (tab, focus) => {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (focus) tab.focus();
+    try { localStorage.setItem('cellPreview.tab', tab.id); } catch (e) {}
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => show(t));
+    t.addEventListener('keydown', e => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (step) { e.preventDefault(); show(tabs[(i + step + tabs.length) % tabs.length], true); }
+      if (e.key === 'Home') { e.preventDefault(); show(tabs[0], true); }
+      if (e.key === 'End') { e.preventDefault(); show(tabs[tabs.length - 1], true); }
+    });
+  });
+  let saved = null; try { saved = localStorage.getItem('cellPreview.tab'); } catch (e) {}
+  const start = tabs.find(t => t.id === saved); if (start) show(start);
+})();
+
+/* ---------- design tokens ---------- */
+const BUILTIN_COLS = __TOKENS__;
+const TOKEN_CELLS = __CELLS__;
+const BADGE_ICONS = __ICONS__;
+const ACTION_SET = __ACTIONS__;   // { manifest, icons } from actions/
+const TK = (() => {
+__TOKENLIB__
+  return { resolveTokens, modesOf, buildCell, overlaySpec, overlayPixels, badgeSpec, badgePixels, rgba, actionAssets, assetPixels, flavourFor, tokenColor, specDevice, specTags, specScale, specFormat, overlaySvg, actionSvgFile, badgeSvg, specCollection, pillPixels };
+})();
+const NS = (() => {
+__NEUTRALLIB__
+  return { neutralScale, colorScale, RAMP_STYLES, STEPS };
+})();
+const clone = o => JSON.parse(JSON.stringify(o));
+let tokenCols = clone(BUILTIN_COLS);
+var currentTokens = null;
+var deviceTokens = {}, tokensFor = () => currentTokens;
+const cellTokens = spec => tokensFor(TK.specScale(spec));
+var lastContrast = [];
+var ACTION_PNG = {}, ACTION_LIST = [];
+let savedModes = {};          // "Collection/Mode" -> { source, from, updatedAt }
+let draft = null;             // { name, json } previewed but not saved
+let tokenDb = null, canWrite = true, downloads = null;
+const docId = (c, m) => `${c}__${m}`.replace(/[^A-Za-z0-9_\-.~:@+]/g, '-');
+
+/* brand settings, saved per brand mode on its token record: buttons, labels, buttonCorners */
+const BRAND_SETTINGS = {
+  buttons: { def: 'accent', label: 'Primary buttons' },
+  labels: { def: 'sentence', label: 'Button labels' },
+  buttonCorners: { def: 'round', label: 'Button corners' },
+};
+const localSettings = {};   // choices for brands that can't be saved (no store, or a preview)
+const brandSetting = (name, key) => localSettings[name]?.[key] || savedModes[`Brand/${name}`]?.[key] || BRAND_SETTINGS[key].def;
+const brandSettings = name => Object.fromEntries(Object.keys(BRAND_SETTINGS).map(k => [k, brandSetting(name, k)]));
+const buttonStyleFor = name => brandSetting(name, 'buttons');
+function showButtonStyle() {
+  const s = brandSettings($('tBrand').value);
+  document.querySelectorAll('[data-setting]').forEach(g => g.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === s[g.dataset.setting])));
+  $('bsHint').textContent = (s.buttons === 'neutral'
+    ? 'Primary buttons use on-surface-1 with base content; the accent moves to the progress bar and the CTA tag. '
+    : 'Primary buttons use the brand accent. ')
+    + (s.labels === 'uppercase' ? 'Labels are uppercase with a 20pt icon. ' : 'Labels are sentence case with a 24pt icon. ')
+    + ({ round: 'Corners use M.', pill: 'Corners are fully rounded.', sharp: 'Corners are square.' })[s.buttonCorners]
+    + ' Icon-only buttons stay round.';
+}
+async function setBrandSetting(key, val) {
+  const name = $('tBrand').value;
+  const rec = savedModes[`Brand/${name}`];
+  const canSave = tokenDb && canWrite && !(draft && draft.name === name);
+  if (canSave) {
+    try {
+      const ref = tokenDb.collection('tokens').doc(docId('Brand', name));
+      if (rec) await ref.update({ [key]: val });
+      else await ref.set({ collection: 'Brand', mode: name, source: 'figma', updatedAt: new Date().toISOString(), json: activeCols().Brand[name], ...brandSettings(name), [key]: val });
+      if (localSettings[name]) delete localSettings[name][key];
+    } catch (e) { (localSettings[name] ||= {})[key] = val; $('bsHint').textContent = `Couldn't save this for ${name} (${e.message}), so it applies for this visit only.`; }
+  } else (localSettings[name] ||= {})[key] = val;
+  if (rec) rec[key] = val;
+  applyTokens(); reloadCurrent();
+}
+document.querySelectorAll('[data-setting]').forEach(g => g.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => setBrandSetting(g.dataset.setting, b.dataset.v))));
+const hexOf = c => '#' + [c.r, c.g, c.b].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+function activeCols() {
+  if (!draft) return tokenCols;
+  return { ...tokenCols, Brand: { ...tokenCols.Brand, [draft.name]: draft.json } };
+}
+const heroPreset = p => TOKEN_CELLS.find(({ spec }) => p.spec === spec.name);
+
+const overlayCache = {};
+function overlayURL(o) {
+  const key = JSON.stringify(o.stops || o.layers) + o.width + 'x' + o.height;
+  if (overlayCache[key]) return overlayCache[key];
+  const c = document.createElement('canvas'); c.width = o.width; c.height = o.height;
+  c.getContext('2d').putImageData(new ImageData(TK.overlayPixels(o.width, o.height, o.stops, o.layers), o.width, o.height), 0, 0);
+  return (overlayCache[key] = c.toDataURL('image/png'));
+}
+
+function applyTokens() {
+  showButtonStyle();
+  try {
+    // Colours are the same for every device; each cell takes its own device's type scale.
+    const opts = { brand: $('tBrand').value, ...brandSettings($('tBrand').value) };
+    deviceTokens = {};
+    tokensFor = device => (deviceTokens[device] ||= TK.resolveTokens(activeCols(), { ...opts, device }));
+    const tokens = tokensFor('Mobile');
+    currentTokens = tokens;
+    state.appBg = hexOf(tokens['Surface/base']); state.tokenBg = state.appBg; $('appbg').value = state.appBg;
+    TOKEN_CELLS.forEach(({ spec, base }) => {
+      const p = PRESETS.find(x => x.spec === spec.name);
+      if (!p) return;
+      const tokens = tokensFor(TK.specScale(spec));
+      const built = TK.buildCell(base, spec, tokens, { header: $('header').value, content: $('contentType').value, actions: ACTION_SET.manifest });
+      p.json = built.json;
+      p.dropped = built.dropped || [];
+      if (spec.overlay && TK.specFormat(spec) === 'svg') {
+        // web: SVG overlay the same shape as the image
+        const o = TK.overlaySpec(spec, tokens);
+        p.overlay = 'data:image/svg+xml;base64,' + btoa(TK.overlaySvg({ ...o, svgHeight: spec.overlay.svgHeight })); p.overlayFile = o.file;
+      } else if (spec.overlay) { p.overlay = overlayURL(TK.overlaySpec(spec, tokens)); p.overlayFile = TK.overlaySpec(spec, tokens).file; }
+      const bs = TK.badgeSpec(spec, tokens, BADGE_ICONS);
+      p.hoverBadge = null; p.contentBadge = null; p.badgeField = null;
+      if (bs && bs.static) { p.badge = spec.badge.dataUrl; p.badgeFile = bs.file; p.badgeField = spec.badge.field || null; p.badgeUrl = spec.badge.dataUrl; }
+      else if (bs && TK.specFormat(spec) === 'svg') {
+        const url = 'data:image/svg+xml;base64,' + btoa(TK.badgeSvg(bs));
+        if (spec.badge.state === 'hover') { p.hoverBadge = url; p.badge = null; } else p.badge = url;
+        p.badgeFile = bs.file; p.badgeField = spec.badge.field; p.badgeUrl = url;
+      } else if (bs && bs.shape === 'pill') {
+        // label badge (e.g. LIVE) used as a custom content badge
+        const c = document.createElement('canvas'); c.width = bs.w; c.height = bs.h;
+        c.getContext('2d').putImageData(new ImageData(TK.pillPixels(bs), bs.w, bs.h), 0, 0);
+        p.contentBadge = c.toDataURL('image/png'); p.badge = null;
+        p.badgeFile = bs.file; p.badgeField = spec.badge.field; p.badgeUrl = p.contentBadge;
+      } else if (bs) {
+        const c = document.createElement('canvas'); c.width = c.height = bs.size;
+        c.getContext('2d').putImageData(new ImageData(TK.badgePixels(bs.size, bs.bg, bs.icon, bs.iconColor, bs.iconPx), bs.size, bs.size), 0, 0);
+        p.badge = c.toDataURL('image/png'); p.badgeFile = bs.file;
+      } else { p.badge = null; }
+      const as = TK.badgeSpec(spec, tokens, BADGE_ICONS, 'action');
+      if (as && as.static) { p.action = spec.action.dataUrl; p.actionFile = as.file; p.actionField = spec.action.field || null; }
+      else if (as && TK.specFormat(spec) === 'svg') {
+        p.action = 'data:image/svg+xml;base64,' + btoa(TK.badgeSvg(as)); p.actionFile = as.file; p.actionField = spec.action.field || null;
+      } else if (as) {
+        p.actionField = null;
+        const c = document.createElement('canvas'); c.width = c.height = as.size;
+        c.getContext('2d').putImageData(new ImageData(TK.badgePixels(as.size, as.bg, as.icon, as.iconColor, as.iconPx), as.size, as.size), 0, 0);
+        p.action = c.toDataURL('image/png'); p.actionFile = as.file;
+      } else { p.action = null; }
+      // extra images outside the cell JSON (e.g. the component's mute button)
+      p.extras = (spec.extras || []).map(ex => {
+        const es = TK.badgeSpec({ name: spec.name, extra: ex }, tokens, BADGE_ICONS, 'extra');
+        if (es.static) return { name: es.file, url: ex.dataUrl, field: ex.field };
+        if (TK.specFormat(spec) === 'svg') return { name: es.file, url: 'data:image/svg+xml;base64,' + btoa(TK.badgeSvg(es)), field: ex.field };
+        const c = document.createElement('canvas'); c.width = c.height = es.size;
+        c.getContext('2d').putImageData(new ImageData(TK.badgePixels(es.size, es.bg, es.icon, es.iconColor, es.iconPx), es.size, es.size), 0, 0);
+        return { name: es.file, url: c.toDataURL('image/png'), field: ex.field };
+      });
+      p.output = built.output;
+    });
+    $('tHint').textContent = `Cells are built from ${tokens.__modes.brand}, each with its own device's type scale · ${tokens.__modes.buttons} buttons, ${tokens.__modes.labels} labels, ${tokens.__modes.buttonCorners} corners${draft && $('tBrand').value === draft.name ? ' (preview, not saved)' : ''}.`;
+    $('tContrast').innerHTML = (tokens.__contrast || []).map(r => {
+      const fg = tokens[r.token], bg = tokens[r.on];
+      const extra = r.others.map(o => `${o.label[0].toUpperCase() + o.label.slice(1)} state: ${o.ratio.toFixed(1)}:1${o.ratio < r.min ? ', below AA' : ''}`).join('. ');
+      const why = r.switched ? `Switched to ${r.chosen} because ${r.first.token} is only ${r.first.ratio.toFixed(1)}:1.` : `Uses ${r.chosen}.`;
+      const fl = r.token === 'Surface/primary-on-surface' ? TK.flavourFor(fg, tokens, ACTION_SET.manifest) : null;
+      const flv = fl ? ` Button icons use ${ACTION_SET.manifest.flavours[fl].label} (${ACTION_SET.manifest.flavours[fl].token}) to match.` : '';
+      return `<li class="${r.pass ? 'ok' : 'bad'}"><span class="pair" style="background:${TK.rgba(bg)};color:${TK.rgba(fg)}">Aa</span>`
+        + `<span class="ct"><b>${r.label}</b> ${r.ratio.toFixed(2)}:1 ${r.pass ? 'passes AA' : `is below AA (${r.min}:1)`}<br>${why}${extra ? ` ${extra}.` : ''}${flv}</span></li>`;
+    }).join('');
+    lastContrast = tokens.__contrast || [];
+    ACTION_PNG = {}; ACTION_LIST = TK.actionAssets(ACTION_SET.manifest, tokens, ACTION_SET.icons);
+    ACTION_LIST.forEach(a => {
+      const c = document.createElement('canvas'); c.width = c.height = a.size;
+      c.getContext('2d').putImageData(new ImageData(TK.assetPixels(a), a.size, a.size), 0, 0);
+      a.url = c.toDataURL('image/png');
+      (ACTION_PNG[a.name] ||= {})[a.flavour] = a.url;
+    });
+    $('surfaceSw').innerHTML = Object.keys(tokens).filter(k => k.startsWith('Surface/')).map(k => {
+      const c = tokens[k];
+      return `<li><span class="dot" style="background:${TK.rgba(c)}"></span><span class="nm" title="${k}">${k.slice(8)}</span></li>`;
+    }).join('');
+  } catch (e) { $('tHint').textContent = `Couldn't apply the tokens: ${e.message}`; }
+}
+
+// Re-render the current example with fresh token output, keeping the sample feed as it is.
+
+function reloadCurrent() {
+  const p = PRESETS[+$('preset').value];
+  if (!p || !heroPreset(p)) return;
+  state.ovl = p.overlay || null; state.badge = p.badge || null; state.action = p.action || null; state.hoverBadge = p.hoverBadge || null; state.contentBadge = p.contentBadge || null; state.presetArt = p.art || null; state.sec = p.sec || null; state.secRatio = null;
+  $('json').value = JSON.stringify(p.json);
+  loadJson(p.json);
+}
+
+function fillSelect(sel, values, label = v => v) {
+  const keep = sel.value;
+  sel.innerHTML = '';
+  values.forEach(v => sel.append(new Option(label(v), v)));
+  if (values.includes(keep)) sel.value = keep;
+}
+
+function refreshTokenUI() {
+  const cols = activeCols();
+  fillSelect($('tBrand'), TK.modesOf(cols, 'Brand'), m => {
+    const s = savedModes[`Brand/${m}`];
+    return draft && m === draft.name ? `${m} (preview)` : s?.source === 'generated' ? `${m} (generated)` : m;
+  });
+  $('gBrand').replaceChildren(...[...$('tBrand').options].map(o => new Option(o.textContent, o.value)));
+  $('gBrand').value = $('tBrand').value;
+  const sel = savedModes[`Brand/${$('tBrand').value}`];
+  $('nRemove').hidden = !(sel?.source === 'generated' && tokenDb && canWrite);
+  const saved = Object.values(savedModes);
+  const latest = saved.map(s => s.updatedAt).filter(Boolean).sort().pop();
+  $('tSource').textContent = !tokenDb
+    ? "Using the Figma export built into this page. Saving isn't available in this view, so changes last for this visit."
+    : saved.length
+      ? `Tokens are saved in this page${latest ? `, last updated ${new Date(latest).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : ''}.`
+      : 'Using the Figma export built into this page. Upload new exports to replace it.';
+  $('tokFiles').disabled = !!tokenDb && !canWrite;
+  $('nSave').disabled = !tokenDb || !canWrite;
+  $('nSave').title = !tokenDb ? "Saving isn't available in this view" : !canWrite ? 'You can view this page but not change its tokens' : '';
+}
+
+function tokensChanged() { refreshTokenUI(); applyTokens(); reloadCurrent(); }
+['tBrand', 'header', 'contentType'].forEach(id => $(id).addEventListener('change', tokensChanged));
+function updateContentType() {
+  const hp = heroPreset(PRESETS[+$('preset').value] || {});
+  const has = !!hp?.spec.content;
+  $('contentType').disabled = !has; $('contentHint').hidden = has;
+  $('header').disabled = !hp?.spec.header;
+}
+$('preset').addEventListener('change', updateContentType);
+
+/* brand mode builder: neutral + accent scales */
+function readHex(id) {
+  let h = $(id).value.trim();
+  if (/^[0-9a-f]{6}$/i.test(h) || /^[0-9a-f]{3}$/i.test(h)) h = '#' + h;
+  if (/^#[0-9a-f]{3}$/i.test(h)) h = '#' + h.slice(1).split('').map(c => c + c).join('');
+  return /^#[0-9a-f]{6}$/i.test(h) ? h.toUpperCase() : null;
+}
+Object.entries(NS.RAMP_STYLES).forEach(([k, v]) => $('aStyle').append(new Option(v.label, k)));
+let currentRamps = null;
+const rampRows = scale => NS.STEPS.map(s =>
+  `<li title="oklch(${(scale[s].l * 100).toFixed(1)}% ${scale[s].c.toFixed(3)} ${scale[s].h.toFixed(0)})"><span class="chip" style="background:${scale[s].hex}"></span><span class="st">${s}</span><span class="hx">${scale[s].hex}</span></li>`).join('');
+function renderRamps() {
+  const nh = readHex('nHex'), ah = readHex('aHex');
+  const msgs = [];
+  if (!nh) msgs.push('Enter the neutral as a 6-digit hex, like #151325.');
+  if (!ah) msgs.push('Enter the accent as a 6-digit hex, like #804BFB.');
+  currentRamps = null;
+  if (nh) { $('nPick').value = nh.toLowerCase(); const r = NS.neutralScale(nh); $('nRamp').innerHTML = rampRows(r.scale); msgs.push(...r.warnings.map(w => `Neutral: ${w}`)); }
+  if (ah) { $('aPick').value = ah.toLowerCase(); const r = NS.colorScale(ah, $('aStyle').value); $('aRamp').innerHTML = rampRows(r.scale); msgs.push(...r.warnings.map(w => `Accent: ${w}`)); }
+  if (nh && ah) currentRamps = { neutral: NS.neutralScale(nh).scale, accent: NS.colorScale(ah, $('aStyle').value).scale, nh, ah, style: $('aStyle').value };
+  $('nPreview').disabled = !currentRamps;
+  $('nMsg').textContent = msgs.join(' ');
+}
+[['nHex', 'nPick'], ['aHex', 'aPick']].forEach(([text, pick]) => {
+  $(text).addEventListener('input', renderRamps);
+  $(pick).addEventListener('input', e => { $(text).value = e.target.value.toUpperCase(); renderRamps(); });
+});
+$('aStyle').addEventListener('change', renderRamps);
+
+function brandFromRamps(r) {
+  const src = tokenCols.Brand['BASE'] || Object.values(tokenCols.Brand)[0];
+  const json = clone(src);
+  const setColor = (tok, hx, alpha = 1) => {
+    const h = hx.slice(1);
+    tok.$value = { colorSpace: 'srgb', components: [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255), alpha, hex: hx };
+    if (tok.$extensions) delete tok.$extensions['com.figma.aliasData'];
+  };
+  for (const group of ['neutral', 'accent']) {
+    NS.STEPS.forEach(s => setColor(json[group][String(s)], r[group][s].hex));
+    Object.entries(json[group]).forEach(([k, tok]) => { const m = k.match(/^(\d+) (\d+)%$/); if (m) setColor(tok, r[group][m[1]].hex, Number(m[2]) / 100); });
+  }
+  json.$extensions = { ...(json.$extensions || {}), 'cellPreview.neutralFrom': r.nh, 'cellPreview.accentFrom': r.ah, 'cellPreview.accentCurve': r.style };
+  return json;
+}
+const isFigmaMode = name => !!BUILTIN_COLS.Brand?.[name] || savedModes[`Brand/${name}`]?.source === 'figma';
+
+$('nPreview').addEventListener('click', () => {
+  if (!currentRamps) return;
+  let name = $('nName').value.trim() || 'New brand';
+  if (isFigmaMode(name)) name += ' (preview)';
+  draft = { name, json: brandFromRamps(currentRamps) };
+  refreshTokenUI(); $('tBrand').value = name; tokensChanged();
+  const c = (currentTokens?.__contrast || [])[0];
+  $('nMsg').textContent = `Previewing ${name} on the Hero cells. Save it to keep it.`
+    + (c ? ` Button label: ${c.chosen} at ${c.ratio.toFixed(1)}:1${c.pass ? '' : ', below AA'}.` : '');
+});
+
+$('nSave').addEventListener('click', async () => {
+  const name = $('nName').value.trim();
+  if (!currentRamps) return;
+  if (!name) { $('nMsg').textContent = 'Give the brand mode a name first.'; return; }
+  if (isFigmaMode(name)) { $('nMsg').textContent = `${name} comes from your Figma export. Pick a new name so it isn't overwritten.`; return; }
+  if (!tokenDb) return;
+  $('nSave').disabled = true;
+  try {
+    await tokenDb.collection('tokens').doc(docId('Brand', name)).set({
+      collection: 'Brand', mode: name, source: 'generated', from: currentRamps.nh, accent: currentRamps.ah, accentCurve: currentRamps.style, ...brandSettings(name),
+      updatedAt: new Date().toISOString(), json: brandFromRamps(currentRamps),
+    });
+    draft = null;
+    $('nMsg').textContent = `Saved ${name}. It's in the Brand menu.`;
+    refreshTokenUI(); $('tBrand').value = name; tokensChanged();
+  } catch (e) {
+    $('nMsg').textContent = e.code === 'quota_exceeded' ? "This page's token store is full. Remove a brand mode you no longer need, then save again."
+      : e.code === 'invalid_argument' ? "This brand mode couldn't be saved. You may only have view access to this page." : `Couldn't save: ${e.message}`;
+    if (e.code === 'invalid_argument') { canWrite = false; }
+  } finally { refreshTokenUI(); }
+});
+
+// Selecting a saved generated mode loads its colours back into the builder.
+$('tBrand').addEventListener('change', () => {
+  const s = savedModes[`Brand/${$('tBrand').value}`];
+  if (s?.source !== 'generated') return;
+  $('nName').value = $('tBrand').value;
+  if (s.from) $('nHex').value = s.from;
+  if (s.accent) $('aHex').value = s.accent;
+  if (s.accentCurve && NS.RAMP_STYLES[s.accentCurve]) $('aStyle').value = s.accentCurve;
+  renderRamps();
+});
+
+let removeArmed = null;
+$('nRemove').addEventListener('click', async () => {
+  const name = $('tBrand').value;
+  if (removeArmed !== name) {
+    removeArmed = name; $('nRemove').textContent = `Click again to remove ${name}`;
+    setTimeout(() => { if (removeArmed === name) { removeArmed = null; $('nRemove').textContent = 'Remove this brand mode'; } }, 4000);
+    return;
+  }
+  removeArmed = null; $('nRemove').textContent = 'Remove this brand mode';
+  try { await tokenDb.collection('tokens').doc(docId('Brand', name)).delete(); $('nMsg').textContent = `Removed ${name}.`; }
+  catch (e) { $('nMsg').textContent = `Couldn't remove ${name}: ${e.message}`; }
+});
+
+/* Figma export upload: .zip per collection, or loose .tokens.json files */
+function topKeys(json) { return new Set(Object.keys(json).filter(k => !k.startsWith('$'))); }
+function detectCollection(json, hint) {
+  const keys = topKeys(json);
+  let best = null, score = 0;
+  for (const [c, modes] of Object.entries(tokenCols)) {
+    const ref = topKeys(Object.values(modes)[0] || {});
+    const inter = [...keys].filter(k => ref.has(k)).length;
+    const s = inter / (new Set([...keys, ...ref]).size || 1);
+    if (s > score) { score = s; best = c; }
+  }
+  if (score >= 0.5) return best;
+  const h = (hint || '').replace(/\.zip$/i, '').replace(/[_-]+/g, ' ').trim();
+  const byName = Object.keys(tokenCols).find(c => c.toLowerCase() === h.toLowerCase());
+  return byName || (h || null);
+}
+async function readUploads(files) {
+  const out = [];
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name)) {
+      if (!window.JSZip) throw new Error(`Couldn't open ${f.name} here. Unzip it and choose the .tokens.json files instead.`);
+      const zip = await JSZip.loadAsync(f);
+      for (const entry of Object.values(zip.files)) {
+        if (entry.dir || !/\.tokens\.json$/i.test(entry.name)) continue;
+        out.push({ mode: entry.name.split('/').pop().replace(/\.tokens\.json$/i, ''), json: JSON.parse(await entry.async('string')), hint: f.name });
+      }
+    } else if (/\.json$/i.test(f.name)) {
+      out.push({ mode: f.name.replace(/\.tokens\.json$/i, '').replace(/\.json$/i, ''), json: JSON.parse(await f.text()), hint: '' });
+    }
+  }
+  return out;
+}
+$('tokFiles').addEventListener('change', async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  $('tokMsg').textContent = 'Reading the exports…';
+  try {
+    const found = await readUploads(files);
+    if (!found.length) { $('tokMsg').textContent = 'No .tokens.json files found. Export the collections from Figma and choose the zips or the files inside.'; return; }
+    const placed = [], skipped = [];
+    for (const f of found) {
+      const col = detectCollection(f.json, f.hint);
+      if (!col) { skipped.push(f.mode); continue; }
+      f.mode = f.json.$extensions?.['com.figma.modeName'] || f.mode;
+      (tokenCols[col] ||= {})[f.mode] = f.json;
+      placed.push({ col, mode: f.mode, json: f.json });
+    }
+    tokensChanged();
+    let saved = 0;
+    if (tokenDb && canWrite) {
+      for (const p of placed) {
+        await tokenDb.collection('tokens').doc(docId(p.col, p.mode)).set({ collection: p.col, mode: p.mode, source: 'figma', updatedAt: new Date().toISOString(), json: p.json });
+        saved++;
+      }
+    }
+    $('tokMsg').textContent = `Updated ${placed.map(p => `${p.col} · ${p.mode}`).join(', ')}.`
+      + (tokenDb && canWrite ? '' : " They apply for this visit only, because saving isn't available here.")
+      + (skipped.length ? ` Couldn't tell which collection ${skipped.join(', ')} belongs to, so it was skipped.` : '');
+  } catch (err) {
+    $('tokMsg').textContent = err.code === 'invalid_argument' ? "The tokens couldn't be saved. A file may be over the 256 KB limit, or you may only have view access."
+      : err.code === 'quota_exceeded' ? "This page's token store is full." : err.message;
+  }
+});
+
+/* export */
+const copyFallback = (text, msg) => { $('json').value = text; $('json').select(); $('copyMsg').textContent = msg; };
+$('copy').addEventListener('click', () => {
+  const text = JSON.stringify(state.json);
+  const blocked = 'Copy was blocked here, so the JSON is selected in the box above. Press Ctrl+C or ⌘C.';
+  try { navigator.clipboard.writeText(text).then(() => { $('copyMsg').textContent = 'Copied. Paste it into a .json file to import.'; }, () => copyFallback(text, blocked)); }
+  catch (e) { copyFallback(text, blocked); }
+});
+function exportName() {
+  const p = PRESETS[+$('preset').value];
+  if (p?.output) return p.output;
+  const id = state.json?.meta?.identifier || 'cell';
+  return `cell_style_${(p?.name || 'Cell').replace(/\(.*?\)/g, '').replace(/[^A-Za-z0-9]+/g, '')}_${id}.json`;
+}
+async function save(filename, data) {
+  try { await downloads.save({ filename, data }); $('copyMsg').textContent = `Saved ${filename}.`; }
+  catch (e) { $('copyMsg').textContent = e.code === 'declined' ? '' : e.code === 'rate_limited' ? 'A save is already waiting for you to confirm.' : `Couldn't save the file: ${e.message}`; }
+}
+$('dlJson').addEventListener('click', () => save(exportName(), JSON.stringify(state.json)));
+$('dlPng').addEventListener('click', () => {
+  if (!state.ovl) return;
+  const bin = atob(state.ovl.split(',')[1]); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const p = PRESETS[+$('preset').value];
+  save(p?.overlayFile || 'overlay@1x.png', bytes);
+});
+$('dlBadge').addEventListener('click', () => {
+  if (!state.badge) return;
+  const bin = atob(state.badge.split(',')[1]); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  save(PRESETS[+$('preset').value]?.badgeFile || 'cell-badge@1x.png', bytes);
+});
+$('dlAction').addEventListener('click', () => {
+  if (!state.action) return;
+  const bin = atob(state.action.split(',')[1]); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  save(PRESETS[+$('preset').value]?.actionFile || 'action@3x.png', bytes);
+});
+function updateExportButtons() {
+  $('dlAction').hidden = !downloads || !state.action;
+  $('dlJson').hidden = !downloads;
+  $('dlPng').hidden = !downloads || !state.ovl;
+  $('dlBadge').hidden = !downloads || !state.badge;
+}
+const _render = render;
+render = function () { _render(); updateExportButtons(); };
+
+/* saved tokens */
+(async () => {
+  if (!window.claude?.use || window.CELL_ENGINE_MODE) return;
+  const [db, user, dl] = await Promise.all(['db', 'user', 'downloads'].map(n => window.claude.use(n).catch(() => null)));
+  downloads = dl; updateExportButtons();
+  if (!$('gallery').hidden) renderGallery();
+  if (user) { try { if ((await user.can('data.write')) === false) canWrite = false; } catch (e) {} }
+  if (!db) { refreshTokenUI(); return; }
+  tokenDb = db;
+  refreshTokenUI();
+  db.collection('tokens').onSnapshot(snap => {
+    tokenCols = clone(BUILTIN_COLS); savedModes = {};
+    snap.docs.forEach(d => {
+      const v = d.data();
+      if (!v || !v.collection || !v.mode || !v.json) return;
+      (tokenCols[v.collection] ||= {})[v.mode] = v.json;
+      savedModes[`${v.collection}/${v.mode}`] = { source: v.source, from: v.from, updatedAt: v.updatedAt, buttons: v.buttons, labels: v.labels, buttonCorners: v.buttonCorners };
+    });
+    tokensChanged();
+  }, err => { tokenDb = null; refreshTokenUI(); });
+})();
+
+/* ---------- gallery ---------- */
+// One card per token-built cell: a live thumbnail, its header and content toggles, and a download
+// of the chosen variant as a folder (JSON plus the assets it uses). Download all exports every variant.
+const gSel = {};                       // spec name -> { header, content }
+const cleanName = n => n.replace(/\s*\((.*?)\)\s*/g, ' ').trim();
+let gDevice = 'all';
+try { gDevice = localStorage.getItem('cellPreview.gDevice') || 'all'; } catch (e) {}
+let gColl = 'BASE UI';
+try { gColl = localStorage.getItem('cellPreview.gColl') || 'BASE UI'; } catch (e) {}
+const COLLECTIONS = [...new Set(TOKEN_CELLS.map(({ spec }) => TK.specCollection(spec)))];
+if (!COLLECTIONS.includes(gColl)) gColl = COLLECTIONS[0];
+$('gColl').innerHTML = COLLECTIONS.map(c => `<option>${c}</option>`).join('');
+$('gColl').value = gColl;
+$('gColl').addEventListener('change', () => { gColl = $('gColl').value; try { localStorage.setItem('cellPreview.gColl', gColl); } catch (e) {} renderGallery(); });
+const galleryCells = () => PRESETS.map((p, i) => ({ p, i, hp: heroPreset(p) }))
+  .filter(x => x.hp && TK.specCollection(x.hp.spec) === gColl && (gDevice === 'all' || TK.specTags(x.hp.spec).includes(gDevice)));
+const variantsOf = spec => {
+  const hs = spec.header ? Object.keys(spec.header) : [null], cs = spec.content ? Object.keys(spec.content) : [null];
+  return hs.flatMap(h => cs.map(c => ({ header: h, content: c })));
+};
+
+// Renders one variant through the editor's renderer, then copies the screen into the card.
+function snapshot(entry, sel) {
+  const { p, i, hp } = entry;
+  const saved = p.json;
+  p.json = TK.buildCell(hp.base, hp.spec, cellTokens(hp.spec), { ...sel, actions: ACTION_SET.manifest }).json;
+  showPreset(i);
+  const screen = $('screen').cloneNode(true);
+  const h = $('screen').offsetHeight - ($('dims').offsetHeight + 10) - 60;
+  p.json = saved;
+  screen.removeAttribute('id');
+  screen.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+  // cells with a hover state show it on the first cell, so the card shows what comes with the cell
+  const first = screen.querySelector('.cell');
+  if (first?.querySelector('.hov')) first.classList.add('hovering');
+  screen.querySelectorAll('.cell').forEach(c => c !== first && c.classList.remove('hovering'));
+  screen.querySelector('.dims')?.remove();
+  screen.lastElementChild?.style.height === '60px' && screen.lastElementChild.remove();
+  return { screen, h };
+}
+
+function thumbInto(card, entry) {
+  const box = card.querySelector('.gthumb');
+  const { screen, h } = snapshot(entry, gSel[entry.hp.spec.name]);
+  const w = state.screenW, avail = Math.max(160, box.clientWidth - 28 || 242), k = Math.min(1, avail / w);
+  screen.style.width = px(w); screen.style.transform = `scale(${k})`;
+  const frame = el('div', 'gscale', { width: px(w * k), height: px(h * k), background: state.appBg });
+  frame.append(screen);
+  box.replaceChildren(frame);
+}
+
+// Cells that differ only by breakpoint or device (Hero V2 + Hero V2 Tablet, Web Hero V2 Mobile ... Large Desktop)
+// share one card, with a Breakpoint toggle; the card's download carries every breakpoint.
+const BP_RE = /\s+(Mobile|Tablet|Desktop|Large Desktop)$/;
+const familyOf = entry => cleanName(entry.p.name).replace(BP_RE, '');
+const bpLabel = spec => (spec.breakpoint || TK.specDevice(spec)).replace(' and ', ' + ');
+const BP_ORDER = ['Mobile', 'Tablet', 'Desktop', 'Large Desktop'];
+const bpRank = spec => { const b = spec.breakpoint || TK.specDevice(spec); const k = BP_ORDER.findIndex(x => b.startsWith(x)); return k < 0 ? 9 : k; };
+const gBp = {};                        // family -> chosen member spec name
+function galleryFamilies() {
+  const fams = new Map();
+  for (const e of galleryCells()) { const f = familyOf(e); if (!fams.has(f)) fams.set(f, []); fams.get(f).push(e); }
+  return [...fams].map(([name, members]) => ({ name, members: members.sort((a, b) => bpRank(a.hp.spec) - bpRank(b.hp.spec)) }));
+}
+const isWide = spec => TK.specDevice(spec) === 'Tablet' || (spec.screen || 0) > 600;
+
+function renderGallery() {
+  if (!currentTokens) return;
+  $('gBrand').value = $('tBrand').value;
+  const keep = +$('preset').value;
+  const fams = galleryFamilies();
+  const total = fams.reduce((n, f) => n + f.members.length, 0);
+  const m = currentTokens.__modes;
+  $('gDevice').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === gDevice));
+  $('gHint').textContent = `${gColl}: ${fams.length} cell${fams.length === 1 ? '' : 's'} (${total} ${gDevice === 'all' ? '' : gDevice + ' '}cell style${total === 1 ? '' : 's'} across breakpoints) built from ${m.brand} with ${m.buttons} primary buttons, ${m.labels} labels and ${m.buttonCorners} corners, each in its own breakpoint's type scale. Button choices are set per brand under Design tokens in the Editor. A card's download has a folder per breakpoint with the cell JSON and the images it uses.`;
+  const current = fam => fam.members.find(e => e.hp.spec.name === gBp[fam.name]) || fam.members[0];
+  $('gCards').replaceChildren(...fams.map(fam => {
+    const sel = (gSel[fam.name] ||= { header: null, content: null });
+    const card = el('article', fam.members.some(e => isWide(e.hp.spec)) ? 'gcard wide' : 'gcard');
+    card.innerHTML = `<div class="gthumb"></div><div class="gbody">
+      <h3 class="gname"></h3>
+      <div class="gmeta"></div>
+      <div class="gtogs"></div>
+      <div class="gfoot"><span class="hint gfile"></span><button class="btn gkeys" type="button">Data keys</button><button class="btn gdl" type="button">Download</button></div></div>`;
+    card.querySelector('.gname').textContent = fam.name;
+    const togs = card.querySelector('.gtogs');
+    // the variant of the shown member: the family's choice when that member has it, else its first
+    const variantFor = entry => {
+      const { spec } = entry.hp, pick = (kind, list) => list ? (list[sel[kind]] ? sel[kind] : Object.keys(list)[0]) : null;
+      return { header: pick('header', spec.header), content: pick('content', spec.content) };
+    };
+    const refresh = () => {
+      const entry = current(fam), { spec } = entry.hp;
+      card.querySelector('.gmeta').innerHTML = `${TK.specTags(spec).map(tg => `<span class="gchip tag">${tg}</span>`).join('')}<span class="gchip">${entry.hp.base.meta.identifier}</span>${spec.figma ? `<span class="gchip">Figma ${spec.figma}</span>` : ''}`;
+      gSel[spec.name] = variantFor(entry);
+      const edited = fam.members.filter(e => DK[e.hp.spec.name] && Object.keys(DK[e.hp.spec.name]).length).length;
+      if (edited) { const c = el('span', 'gchip keys'); c.textContent = 'data keys edited'; c.title = 'Custom data keys are saved for this cell and used in its download'; card.querySelector('.gmeta').append(c); }
+      thumbInto(card, entry);
+      const files = fam.members.reduce((n, e) => {
+        const v = variantFor(e), b = TK.buildCell(e.hp.base, e.hp.spec, cellTokens(e.hp.spec), { ...v, actions: ACTION_SET.manifest }).buttons;
+        return n + 1 + ['overlay', 'badge', 'action'].filter(k => e.p[k]).length + new Set(b.filter(x => x.iconOn).flatMap(x => x.assets)).size * 2;
+      }, 0);
+      card.querySelector('.gfile').textContent = `${fam.members.length > 1 ? `${fam.members.length} breakpoints, ` : ''}${files} file${files > 1 ? 's' : ''}`;
+    };
+    const toggle = (kind, title, choices, current, onPick) => {
+      if (choices.length < 2) return;   // a single choice isn't a toggle
+      const g = el('div', 'gtog');
+      const lab = el('span', 'flabel'); lab.textContent = title; lab.id = `g-${kind}-${fam.name.replace(/\W+/g, '-')}`;
+      const seg = el('div', 'seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-labelledby', lab.id);
+      choices.forEach(([k, text]) => {
+        const b = el('button'); b.type = 'button'; b.textContent = text;
+        b.setAttribute('aria-pressed', current === k);
+        b.addEventListener('click', () => {
+          onPick(k);
+          seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+          const back = +$('preset').value; refresh(); showPreset(back);
+        });
+        seg.append(b);
+      });
+      g.append(lab, seg); togs.append(g);
+    };
+    const first = current(fam).hp.spec;
+    if (fam.members.length > 1) toggle('bp', 'Breakpoint', fam.members.map(e => [e.hp.spec.name, bpLabel(e.hp.spec)]), first.name, k => { gBp[fam.name] = k; });
+    if (first.header) toggle('header', 'Header', Object.entries(first.header).map(([k, v]) => [k, v.label || k]), variantFor(current(fam)).header, k => { sel.header = k; });
+    if (first.content) toggle('content', 'Content type', Object.entries(first.content).map(([k, v]) => [k, v.label || k]), variantFor(current(fam)).content, k => { sel.content = k; });
+    card._refresh = refresh;
+    const kb = card.querySelector('.gfoot .gkeys');
+    kb.setAttribute('aria-label', `Edit data keys for ${fam.name}`);
+    kb.addEventListener('click', () => openDataKeys(current(fam).i));
+    const dl = card.querySelector('.gfoot .gdl');
+    dl.setAttribute('aria-label', `Download ${fam.name}${fam.members.length > 1 ? ', all breakpoints' : ''}`);
+    dl.disabled = !downloads;
+    dl.addEventListener('click', () => downloadCells(fam.members.map(e => ({ entry: e, variants: [variantFor(e)] })),
+      `${fam.name.replace(/[\\/:*?"<>|]+/g, '-')}.zip`.replace(/\s+/g, '-'), { allAssets: false }));
+    return card;
+  }));
+  // thumbnails need the cards laid out to know their width
+  [...$('gCards').children].forEach(card => card._refresh());
+  $('gAll').disabled = !downloads;
+  if (!downloads) $('gMsg').textContent = 'Downloads are available in the published page.';
+  showPreset(keep);
+}
+
+const folderName = entry => cleanName(entry.p.name).replace(/[\\/:*?"<>|]+/g, '-');
+const dataBytes = url => { const b = atob(url.split(',')[1]); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+
+// Which upload field each generated image belongs in, read from the cell's own keys.
+function assetFiles(entry) {
+  const { p, hp } = entry, keys = new Set([...hp.base.config.styles, ...hp.base.config.assets].map(e => e.key));
+  const out = [];
+  if (p.overlay) out.push({ name: p.overlayFile, data: dataBytes(p.overlay), field: keys.has('image_overlay_image') ? 'image_overlay_image' : 'image_overlay' });
+  if (p.badgeField && p.badgeUrl) out.push({ name: p.badgeFile, data: dataBytes(p.badgeUrl), field: p.badgeField });
+  else if (p.badge) out.push({ name: p.badgeFile, data: dataBytes(p.badge), field: keys.has('cell_badge') ? 'cell_badge (and selected_cell_badge)' : 'cell_badge_default (and cell_badge_selected)' });
+  if (p.action) out.push({ name: p.actionFile, data: dataBytes(p.action), field: p.actionField || 'unselected_action_icon (and selected_action_icon)' });
+  for (const ex of p.extras || []) out.push({ name: ex.name, data: dataBytes(ex.url), field: ex.field });
+  return out;
+}
+
+/* ---------- thumbnails ---------- */
+// 500 x 280 @2x (1000 x 560 px) PNG per cell version, for the platform's cell style picker:
+// the cell on a dark screen panel (Surface/base), centred, with a gap above and below, on a
+// transparent background. Drawn with html2canvas, loaded the first time it's needed.
+const THUMB = { w: 1000, h: 560, gapY: 48, gapX: 40, panelPad: 16, panelRadius: 24 };
+let h2cLoading = null;
+function loadHtml2canvas() {
+  if (window.html2canvas) return Promise.resolve(window.html2canvas);
+  return (h2cLoading ||= new Promise((ok, fail) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    sc.onload = () => ok(window.html2canvas); sc.onerror = () => { h2cLoading = null; fail(new Error("The thumbnail library didn't load.")); };
+    document.head.append(sc);
+  }));
+}
+// html2canvas can't draw repeating gradients, so the striped image placeholders are painted onto a canvas first
+function stripesToImages(root, scale) {
+  for (const n of [root, ...root.querySelectorAll('*')]) {
+    if (!/repeating-linear-gradient/.test(n.style.backgroundImage || n.style.background || '')) continue;
+    const w = n.offsetWidth, h = n.offsetHeight;
+    if (!w || !h) continue;
+    const c = document.createElement('canvas'); c.width = Math.ceil(w * scale); c.height = Math.ceil(h * scale);
+    const g = c.getContext('2d'); g.scale(scale, scale);
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(255,255,255,.18)';
+    const step = 12 * Math.SQRT2, band = 6 * Math.SQRT2;
+    for (let c1 = 0; c1 < w + h + step; c1 += step) {
+      g.beginPath(); g.moveTo(c1, 0); g.lineTo(c1 + band, 0); g.lineTo(c1 + band - h, h); g.lineTo(c1 - h, h); g.closePath(); g.fill();
+    }
+    n.style.backgroundImage = `url(${c.toDataURL('image/png')})`;
+    n.style.backgroundSize = '100% 100%'; n.style.backgroundRepeat = 'no-repeat'; n.style.backgroundPosition = 'center';
+  }
+}
+async function thumbnailFor(entry, variant) {
+  const h2c = await loadHtml2canvas();
+  const { p, i, hp } = entry, saved = p.json;
+  p.json = TK.buildCell(hp.base, hp.spec, cellTokens(hp.spec), { ...variant, actions: ACTION_SET.manifest }).json;
+  showPreset(i);
+  p.json = saved;
+  const cell = $('cellwrap').querySelector('.cell');
+  const w = cell.offsetWidth, hgt = cell.offsetHeight, pad = THUMB.panelPad;
+  // a copy on the page for html2canvas to draw; it stays invisible here and is only shown in html2canvas's own copy of the page
+  const stage = el('div', '', { position: 'fixed', left: '0', top: '0', zIndex: '-1', pointerEvents: 'none', opacity: '0' });
+  stage.dataset.thumbStage = '1';
+  const panel = el('div', '', { padding: px(pad), background: state.appBg, borderRadius: px(THUMB.panelRadius), width: px(w + pad * 2), boxSizing: 'border-box' });
+  const copy = cell.cloneNode(true); copy.style.margin = '0'; copy.classList.remove('hovering');   // thumbnails show the default state
+  panel.append(copy); stage.append(panel); document.body.append(stage);
+  try {
+    const scale = Math.min(4, Math.max(2, (THUMB.h - THUMB.gapY * 2) / (hgt + pad * 2) * 1.5));
+    stripesToImages(copy, scale);
+    const shot = await h2c(panel, { backgroundColor: null, scale, logging: false, useCORS: true,
+      onclone: doc => { const s = doc.querySelector('[data-thumb-stage]'); if (s) s.style.opacity = '1'; } });
+    const out = document.createElement('canvas'); out.width = THUMB.w; out.height = THUMB.h;
+    const k = Math.min((THUMB.w - THUMB.gapX * 2) / shot.width, (THUMB.h - THUMB.gapY * 2) / shot.height);
+    const dw = shot.width * k, dh = shot.height * k;
+    const g = out.getContext('2d'); g.imageSmoothingQuality = 'high';
+    g.drawImage(shot, (THUMB.w - dw) / 2, (THUMB.h - dh) / 2, dw, dh);
+    return dataBytes(out.toDataURL('image/png'));
+  } finally { stage.remove(); }
+}
+
+async function downloadCells(list, zipName, opts = {}) {
+  if (!downloads || !window.JSZip) { $('gMsg').textContent = !window.JSZip ? "The zip library didn't load, so folders can't be built here." : 'Downloads are available in the published page.'; return; }
+  const zip = new JSZip(), m = currentTokens.__modes;
+  const anyAssets = new Set(), keepPreset = +$('preset').value;
+  let thumbErr = null;
+  $('gMsg').textContent = 'Building the folder and thumbnails…';
+  for (const { entry, variants } of list) {
+    const used = new Set();
+    const dir = list.length > 1 ? zip.folder(folderName(entry)) : zip.folder(folderName(entry));
+    const sp = entry.hp.spec;
+    const lines = sp.appBg ? [`${cleanName(entry.p.name)} - ${entry.hp.base.meta.identifier}`, `${sp.collection}: matched to the screenshots with literal colours and DM Sans (no BASE tokens). ${sp.about || ''}`, ''] : [`${cleanName(entry.p.name)} - ${entry.hp.base.meta.identifier}`, `Built from ${m.brand}, ${TK.specScale(entry.hp.spec)} type scale, for ${entry.hp.spec.breakpoint ? `the Web ${entry.hp.spec.breakpoint} breakpoint` : TK.specTags(entry.hp.spec).join(' and ')}, ${m.buttons} primary buttons, ${m.labels} labels, ${m.buttonCorners} corners${entry.hp.spec.figma ? `, Figma node ${entry.hp.spec.figma}` : ''}`, ''];
+    for (const v of variants) {
+      const built = TK.buildCell(entry.hp.base, entry.hp.spec, cellTokens(entry.hp.spec), { ...v, actions: ACTION_SET.manifest });
+      built.buttons.filter(b => b.iconOn).forEach(b => b.assets.forEach(a => used.add(a)));
+      dir.file(built.output, JSON.stringify(built.json));
+      const tag = [v.header && (entry.hp.spec.header[v.header].label || v.header), v.content && (entry.hp.spec.content[v.content].label || v.content)].filter(Boolean).join(', ');
+      lines.push(`${built.output}${tag ? `  (${tag})` : ''}: import into the cell builder`);
+      // Web: the cell import skips font fields, so list the ones in use to set by hand after importing
+      if (TK.specFormat(entry.hp.spec) === 'svg') {
+        const all = [...built.json.config.styles, ...built.json.config.assets], val = k => all.find(e => e.key === k)?.value;
+        const used = all.filter(e => e.type === 'web_font_selector').filter(e => {
+          const lbl = e.key.match(/^((?:(?:top|center|bottom)_)?text_label_\d)_font_family$/);
+          if (lbl) return val(`${lbl[1]}_switch`) === true;
+          const btn = e.key.match(/^button(\d)_font_family(_2)?$/);
+          if (btn) return val(`button${btn[1]}_switch`) === true && val(btn[2] ? `button${btn[1]}_enable_button_label_2` : `button${btn[1]}_enable_label_1`) === true;
+          const info = e.key.match(/^(title_text|button_text|title)_font_family$/);
+          if (info) return val(`${info[1]}_switch`) === true;
+          return e.key.startsWith('runtime') && val('runtime_switch') === true;
+        });
+        if (used.length) lines.push('  Fonts to set after importing (the cell import skips font fields):', ...used.map(e => `    ${e.key.replace(/_font_family.*|_font_selector/, '').replace(/_/g, ' ')}: ${e.value}`));
+      }
+      try {
+        const thumb = `thumbnails/${built.output.replace(/\.json$/, '')}@2x.png`;
+        dir.file(thumb, await thumbnailFor(entry, v));
+        lines.push(`  ${thumb}: thumbnail for the cell style (500 x 280 @2x)`);
+      } catch (e) { thumbErr = e.message; }
+    }
+    for (const a of assetFiles(entry)) { dir.file(a.name, a.data); lines.push(`${a.name}: upload to ${a.field}`); }
+    if (used.size) {
+      lines.push('', 'action assets/ (upload to each action plugin, under Custom configuration fields):');
+      const svgOut = TK.specFormat(entry.hp.spec) === 'svg';
+      for (const a of ACTION_LIST.filter(x => used.has(x.name))) {
+        const f = svgOut ? TK.actionSvgFile(a, ACTION_SET.manifest) : null;
+        if (f) dir.file(`action assets/${f.file}`, f.svg); else dir.file(`action assets/${a.file}`, dataBytes(a.url));
+        anyAssets.add(a.name);
+        lines.push(`  ${f ? f.file : a.file}: ${a.plugin} > ${svgOut ? 'Web' : 'Mobile'} button asset - ${a.flavourLabel}${/-active$/.test(a.name) ? ' (active state)' : ''}`);
+      }
+    }
+    if ((entry.hp.spec.annotations || []).length) lines.push('', 'Changes to fit the cell framework:', ...entry.hp.spec.annotations.map(x => `  - ${x}`));
+    dir.file('README.txt', lines.join('\n') + '\n');
+  }
+  showPreset(keepPreset);
+  // Download all also carries every action asset, so plugins not used by these cells are covered too.
+  if (list.length > 1 && opts.allAssets !== false) {
+    if (list.some(({ entry }) => TK.specFormat(entry.hp.spec) !== 'svg')) for (const a of ACTION_LIST) zip.file(`action assets/${a.file}`, dataBytes(a.url));
+    if (list.some(({ entry }) => TK.specFormat(entry.hp.spec) === 'svg'))
+      for (const a of ACTION_LIST) { const f = TK.actionSvgFile(a, ACTION_SET.manifest); zip.file(`action assets/${f.file}`, f.svg); }
+  }
+  const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+  try {
+    await downloads.save({ filename: zipName, data: bytes });
+    $('gMsg').textContent = `Saved ${zipName}.${thumbErr ? ` Thumbnails were left out: ${thumbErr}` : ''}`;
+  } catch (e) {
+    $('gMsg').textContent = e.code === 'declined' ? '' : e.code === 'rate_limited' ? 'A save is already waiting for you to confirm.' : `Couldn't save the file: ${e.message}`;
+  }
+}
+
+$('gDevice').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  gDevice = b.dataset.v;
+  try { localStorage.setItem('cellPreview.gDevice', gDevice); } catch (e) {}
+  renderGallery();
+}));
+$('gBrand').addEventListener('change', () => {
+  $('tBrand').value = $('gBrand').value;
+  $('tBrand').dispatchEvent(new Event('change'));   // same path as the editor's menu: tokens, cells, gallery
+});
+$('gAll').addEventListener('click', () => {
+  const m = currentTokens.__modes;
+  downloadCells(galleryCells().map(entry => ({ entry, variants: variantsOf(entry.hp.spec) })), `cells-${gColl}-${m.brand}${gDevice === 'all' ? '' : `-${gDevice}`}${m.buttons !== 'accent' ? `-${m.buttons}-buttons` : ''}${m.labels !== 'sentence' ? `-${m.labels}` : ''}${m.buttonCorners !== 'round' ? `-${m.buttonCorners}` : ''}.zip`.replace(/\s+/g, '-'));
+});
+
+/* ---------- screens ---------- */
+// Whole screens from a layout.json + cell_styles.json: each component drawn with the editor's renderer, using the
+// component's own settings (padding, columns, cell width, cells per view). Blank paddings come from the theme.
+const LAYOUTS = __LAYOUTS__;
+const FEEDS = __FEEDS__;
+let feedKey = Object.keys(FEEDS)[0] || null;
+const mediaSrc = (entry, key) => { for (const g of entry?.media_group || []) for (const m of g.media_item || []) if (m.key === key && m.src) return m.src; return null; };
+const SAMPLE_TITLES = ['Project Hail Mary', 'The Long Night', 'Northern Lights', 'Final Call', 'Harbour', 'Signal Lost', 'Low Tide', 'Wild Coast'];
+let scrKey = Object.keys(LAYOUTS)[0] || null;
+const blankNum = v => v === '' || v === null || v === undefined || isNaN(parseFloat(v));
+function styleToExport(cs) {
+  const styles = [], assets = [];
+  for (const [sec, v] of Object.entries(cs.configuration || {})) {
+    const bucket = sec === 'assets' ? assets : styles;
+    if (Array.isArray(v)) v.forEach(e => e && e.key && bucket.push(e));
+    else if (v && typeof v === 'object') for (const [k, val] of Object.entries(v)) bucket.push({ key: k, value: val });
+  }
+  return { meta: { identifier: cs.plugin_identifier }, config: { styles, assets } };
+}
+// Draws one cell at a given width through the editor's renderer and returns a copy of it.
+function cellNode(json, width, device, idx, groupTitle, entry) {
+  const keep = ['json', 'map', 'screenW', 'pad', 'layout', 'ovl', 'badge', 'action', 'hoverBadge', 'contentBadge', 'presetArt', 'art', 'sec', 'zoom'].reduce((o, k) => (o[k] = state[k], o), {});
+  const t0 = $('dTitle').value, f0 = $('dFeedTitle').value, s0 = $('dSummary').value, h0 = $('hoverOn').checked, o0 = $('outline').checked;
+  const ext0 = { ...SAMPLE_EXT };
+  Object.assign(state, { json, map: toMap(json), screenW: width, pad: 0, layout: null, ovl: null, badge: null, action: null, hoverBadge: null, contentBadge: null,
+    presetArt: null, art: null, zoom: 1, forceDevice: device });
+  $('dTitle').value = SAMPLE_TITLES[idx % SAMPLE_TITLES.length]; if (groupTitle) $('dFeedTitle').value = groupTitle;
+  // a feed entry fills the cell: title, summary, extensions, and the images its image keys ask for
+  if (entry) {
+    $('dTitle').value = entry.title || ''; $('dSummary').value = entry.summary || '';
+    for (const [k, v] of Object.entries(entry.extensions || {})) if (v !== null && typeof v !== 'object') SAMPLE_EXT[`extensions.${k}`] = String(v);
+    state.art = mediaSrc(entry, state.map.image_key || 'image_base');
+    state.sec = mediaSrc(entry, state.map.secondary_image_image_key || 'thumb_1');
+  }
+  $('hoverOn').checked = false; $('outline').checked = false;
+  try {
+    render();
+    const c = $('cellwrap').querySelector('.cell');
+    const node = c ? c.cloneNode(true) : el('div');
+    node.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+    node.querySelectorAll('[data-tag]').forEach(e => e.removeAttribute('data-tag'));
+    node.classList.remove('hovering');
+    // hosted images that can't load here are hidden rather than shown as broken (the copy loses the original's handler)
+    node.querySelectorAll('img').forEach(im => { if (/^https?:/.test(im.getAttribute('src') || '')) { im.style.visibility = 'hidden'; im.onload = () => { im.style.visibility = ''; }; im.src = im.getAttribute('src'); } });
+    return node;
+  } catch (e) {
+    const d = el('div', '', { color: '#ff8080', font: '12px monospace', padding: '8px', width: px(width), boxSizing: 'border-box' }); d.textContent = `This cell didn't draw: ${e.message}`; return d;
+  } finally {
+    Object.assign(state, keep); state.forceDevice = null;
+    $('dTitle').value = t0; $('dFeedTitle').value = f0; $('dSummary').value = s0; $('hoverOn').checked = h0; $('outline').checked = o0;
+    for (const k of Object.keys(SAMPLE_EXT)) if (!(k in ext0)) delete SAMPLE_EXT[k];
+    Object.assign(SAMPLE_EXT, ext0);
+  }
+}
+function renderScreens() {
+  const L = LAYOUTS[scrKey];
+  $('sLayout').innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+  if (!L) { $('sHint').textContent = 'Load a layout.json and its cell_styles.json to preview its screens.'; return; }
+  $('sLayout').value = scrKey;
+  const screens = L.layout.screens.filter(s => (s.ui_components || []).length).sort((a, b) => (a.position || 0) - (b.position || 0));
+  const prev = $('sScreen').value;
+  $('sScreen').innerHTML = screens.map(s => `<option value="${s.id}">${s.name}${s.home ? ' (home)' : ''}</option>`).join('');
+  if (screens.some(s => s.id === prev)) $('sScreen').value = prev;
+  const screen = screens.find(s => s.id === $('sScreen').value) || screens[0];
+  if (!screen) return;
+  const W = L.width, H = L.height, dev = L.device, theme = THEME[dev] || THEME.Mobile, defGap = Math.max(0, +$('sGap').value || 0);
+  const keepPreset = +$('preset').value;
+  const legend = [], missing = new Set();
+  let idx = 0;
+  const box = $('sScreenBox'); box.replaceChildren();
+  box.style.width = px(W); box.style.height = px(H);
+  box.style.background = screen.styles?.screen_background_color || state.appBg;
+  // nav bar (logo or title) and bottom tabs from the layout's navigations
+  const navs = Object.values(L.layout.navigations || {});
+  const bar = navs.find(n => n.category === 'nav_bar'), tabs = navs.find(n => n.category === 'menu');
+  if (bar && bar.styles?.navbar_enabled !== false) {
+    const st = bar.styles || {}, a = bar.assets || {};
+    const nav = el('div', 'snav', { height: px(44 + (+st.navbar_padding_top || 8) + (+st.navbar_padding_bottom || 8) + (dev === 'Mobile' ? 47 : 24)), paddingTop: px(dev === 'Mobile' ? 47 : 24),
+      background: st.background_color || '#111', color: st.title_color || '#efefef' });
+    const titleEl = () => { const s0 = el('span', '', { font: `600 17px/20px -apple-system, system-ui, sans-serif`, color: st.title_color || '#efefef' }); s0.textContent = screen.name; return s0; };
+    if (a.app_logo && st.presentation_style !== 'title') {
+      // a hosted logo can't load here: fall back to the screen title
+      const img = el('img', '', { height: px(+a.logo_asset_height || 32), width: 'auto' }); img.alt = '';
+      img.onerror = () => img.replaceWith(titleEl()); img.src = a.app_logo; nav.append(img);
+    } else nav.append(titleEl());
+    box.append(nav);
+  }
+  const scroll = el('div', 'sscroll'); box.append(scroll);
+  const padOf = (st, side, pre = 'component') => { const v = st[`${pre}_padding_${side}`]; return blankNum(v) ? (/left|right/.test(side) ? theme.padding : 0) : +v; };
+  const marOf = (st, side, pre = 'component') => { const v = st[`${pre}_margin_${side}`]; return blankNum(v) ? null : +v; };
+  const cellFor = (st) => {
+    const id = st.cell_plugin_configuration_id, cs = id && L.cellStyles[id];
+    if (!cs) { if (id) missing.add(id); return null; }
+    return styleToExport(cs);
+  };
+  const tag = (node, label) => { legend.push(label); node.dataset.label = `${legend.length}. ${label}`; return legend.length; };
+  const F = feedKey && FEEDS[feedKey] ? FEEDS[feedKey].feed : null, entries = F?.entry || [];
+  const ent = k => entries.length ? entries[k % entries.length] : null;
+  $('sFeed').innerHTML = Object.entries(FEEDS).map(([k, v]) => `<option value="${k}">${v.label} (${v.feed.entry.length})</option>`).join('');
+  if (feedKey) $('sFeed').value = feedKey;
+  const drawComp = (c, parent, groupTitle) => {
+    const st = c.styles || {}, type = c.component_type, wrap = el('div', 'scomp');
+    const pl = padOf(st, 'left'), pr = padOf(st, 'right'), pt = padOf(st, 'top'), pb = padOf(st, 'bottom');
+    const mb = marOf(st, 'bottom'), mt = marOf(st, 'top');
+    Object.assign(wrap.style, { padding: `${pt}px ${pr}px ${pb}px ${pl}px`, marginTop: px(mt ?? 0), marginBottom: px(mb ?? (type === 'group-info-qb' ? 0 : defGap)),
+      background: st.component_background_color || 'transparent', borderRadius: px(+st.component_corner_radius || 0) });
+    const inner = W - pl - pr;
+    const json = type === 'group-qb' ? null : cellFor(st);
+    const ident = json?.meta?.identifier || '';
+    const csName = st.cell_plugin_configuration_id ? st.cell_plugin_configuration_id.slice(0, 8) : '';
+    if (type === 'group-qb') {
+      Object.assign(wrap.style, { padding: ['top', 'right', 'bottom', 'left'].map(sd => px(+st[`group_padding_${sd}`] || 0)).join(' '), marginBottom: px(+st.group_margin_bottom || defGap), background: st.group_background_color || 'transparent' });
+      const title = c.name && c.name !== 'Group Component' ? c.name : 'Continue Watching';
+      (c.ui_components || []).forEach(ch => drawComp(ch, wrap, title));
+      tag(wrap, `Group "${c.name}"`);
+      parent.append(wrap); return;
+    }
+    if (!json) { const d = el('div', '', { color: '#ff8080', font: '12px monospace', padding: '8px 20px' }); d.textContent = `${c.name}: cell style ${csName || '(none)'} isn't in cell_styles.json`; wrap.append(d); parent.append(wrap); return; }
+    let desc = '';
+    if (type === 'group-info-qb') {
+      // the Group Info cell takes the full width and its own (theme) side padding
+      wrap.style.padding = '0';
+      wrap.append(cellNode(json, W, dev, idx++, groupTitle)); desc = `Group Info · ${ident}`;
+    } else if (type === 'hero-qb') {
+      wrap.append(cellNode(json, inner, dev, idx++, null, ent(0))); desc = `Hero · ${ident} · ${Math.round(inner)} wide`;
+    } else if (type === 'grid-qb') {
+      const cols = +st.component_columns || 2, g = blankNum(st.component_gutter_horizontal) ? 16 : +st.component_gutter_horizontal, gv = blankNum(st.component_gutter_vertical) ? 16 : +st.component_gutter_vertical;
+      const w = (inner - g * (cols - 1)) / cols, grid = el('div', 'sgrid', { gridTemplateColumns: `repeat(${cols}, ${px(w)})`, columnGap: px(g), rowGap: px(gv) });
+      for (let k = 0; k < cols * 2; k++) grid.append(cellNode(json, w, dev, idx++, null, ent(k)));
+      wrap.append(grid); desc = `Grid · ${cols} columns · ${ident} · ${Math.round(w)} wide`;
+    } else if (type === 'list-qb') {
+      const gv = blankNum(st.component_gutter_vertical) ? 16 : +st.component_gutter_vertical, list = el('div', 'sgrid', { rowGap: px(gv) });
+      for (let k = 0; k < 3; k++) list.append(cellNode(json, inner, dev, idx++, null, ent(k)));
+      wrap.append(list); desc = `List · ${ident}`;
+    } else if (type === 'horizontal_list_qb') {
+      const g = blankNum(st.component_gutter_horizontal) ? 16 : +st.component_gutter_horizontal, per = +st.horizontal_list_cells_per_view || 2, peek = blankNum(st.horizontal_list_next_offset) ? 20 : +st.horizontal_list_next_offset;
+      const scaled = st.horizontal_list_scaled_switch === true || st.horizontal_list_scaled_switch === 'true';
+      const w = scaled ? (W - pl - peek - g * (per - 1) - g) / per : (+st.horizontal_list_cell_width || 240);
+      wrap.style.paddingRight = '0';
+      const rail = el('div', 'srail', { gap: px(g) });
+      const n = Math.min(8, Math.ceil((W - pl) / (w + g)) + 1);
+      for (let k = 0; k < n; k++) rail.append(cellNode(json, w, dev, idx++, null, ent(k)));
+      wrap.append(rail); desc = `Horizontal list · ${scaled ? `${per} per view, ${peek} peek` : `${Math.round(w)} wide`} · ${ident} · ${Math.round(w)} wide`;
+    } else {
+      const d = el('div', '', { color: 'var(--muted)', font: '12px monospace', padding: '8px 20px' }); d.textContent = `${c.name} (${type}) isn't drawn in this preview`; wrap.append(d); desc = type;
+    }
+    tag(wrap, `${c.name} · ${desc} · cell ${csName}`);
+    parent.append(wrap);
+  };
+  for (const c of screen.ui_components) drawComp(c, scroll);
+  if (tabs && (tabs.nav_items || []).length) {
+    const st = tabs.styles || {}, tb = el('div', 'stabs', { background: st.bar_background_color || '#0d111d', borderTop: +st.top_border_width ? `${st.top_border_width}px solid ${st.top_border_color}` : '0' });
+    for (const it of [...tabs.nav_items].sort((a, b) => (a.position || 0) - (b.position || 0))) {
+      const on = it.data?.target === screen.id;
+      const s0 = el('span', '', { color: on ? (st.title_active_font_color || '#04cf99') : (st.title_default_font_color || '#898e9f') });
+      s0.innerHTML = `<i></i>${it.title || ''}`;
+      if (it.data?.target && screens.some(s => s.id === it.data.target)) s0.addEventListener('click', () => { $('sScreen').value = it.data.target; renderScreens(); });
+      tb.append(s0);
+    }
+    box.append(tb);
+  }
+  const z = Math.min(1, 900 / W);
+  $('sDevice').style.zoom = z;
+  $('sLegend').innerHTML = legend.map((l, k) => `<li><b>${k + 1}</b><span>${l.replace(/</g, '&lt;')}</span></li>`).join('');
+  $('sHint').textContent = `${L.label} layout ${L.layout.id ? L.layout.id.slice(0, 8) : ''} · ${screen.name}: ${screen.ui_components.length} components, drawn ${W} wide with ${currentTokens?.__modes?.brand || 'the'} fonts. Blank side padding uses the theme (${theme.padding}); blank gaps between components use the value above, and grids, lists and rails use 16 when their gutter is blank. Every component reads the chosen feed from its first entry, as they all point at the same feed in this layout; images load from the feed's hosts. Hover a component to see which cell style it uses.`;
+  $('sMsg').textContent = missing.size ? `Missing from cell_styles.json: ${[...missing].map(m => m.slice(0, 8)).join(', ')}.` : '';
+  showPreset(keepPreset);
+}
+$('sLayout').addEventListener('change', () => { scrKey = $('sLayout').value; $('sScreen').value = ''; renderScreens(); });
+$('sScreen').addEventListener('change', () => renderScreens());
+$('sGap').addEventListener('change', () => renderScreens());
+$('sFeed').addEventListener('change', () => { feedKey = $('sFeed').value; renderScreens(); });
+const readJsonFile = f => f.text().then(t => JSON.parse(t));
+$('sLayoutFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const lay = await readJsonFile(f);
+    if (!Array.isArray(lay.screens)) throw new Error('That file has no screens list.');
+    const tablet = /tablet/i.test(f.name);
+    const key = `own-${Date.now()}`;
+    LAYOUTS[key] = { label: `${f.name}${tablet ? '' : ''}`, device: tablet ? 'Tablet' : 'Mobile', width: tablet ? 1133 : 393, height: tablet ? 744 : 852, layout: lay, cellStyles: (LAYOUTS[scrKey] || {}).cellStyles || {} };
+    scrKey = key; $('sScreen').value = ''; $('sMsg').textContent = `Loaded ${f.name}. Load its cell_styles.json too if the cells come from another layout.`; renderScreens();
+  } catch (err) { $('sMsg').textContent = `Couldn't read ${f.name}: ${err.message}`; }
+  e.target.value = '';
+});
+$('sStylesFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f || !LAYOUTS[scrKey]) return;
+  try { const cs = await readJsonFile(f); LAYOUTS[scrKey].cellStyles = cs; renderScreens(); $('sMsg').textContent = `Using ${f.name} for the ${LAYOUTS[scrKey].label} layout.` + ($('sMsg').textContent.startsWith('Missing') ? ' ' + $('sMsg').textContent : ''); }
+  catch (err) { $('sMsg').textContent = `Couldn't read ${f.name}: ${err.message}`; }
+  e.target.value = '';
+});
+
+function setView(v) {
+  const g = v === 'gallery', sc = v === 'screens', off = g || sc;
+  $('gallery').hidden = !g; $('screens').hidden = !sc; $('editor').classList.toggle('offstage', off);
+  $('ident').hidden = off;
+  if (off) { $('editor').setAttribute('inert', ''); $('editor').setAttribute('aria-hidden', 'true'); } else { $('editor').removeAttribute('inert'); $('editor').removeAttribute('aria-hidden'); }
+  $('vGallery').setAttribute('aria-pressed', g); $('vScreens').setAttribute('aria-pressed', sc); $('vEditor').setAttribute('aria-pressed', !off);
+  try { localStorage.setItem('cellPreview.view', v); } catch (e) {}
+  if (g) renderGallery();
+  if (sc) renderScreens();
+}
+$('vEditor').addEventListener('click', () => setView('editor'));
+$('vGallery').addEventListener('click', () => setView('gallery'));
+$('vScreens').addEventListener('click', () => setView('screens'));
+{
+  const _apply = applyTokens;
+  applyTokens = function () { _apply(); if (!$('gallery').hidden) renderGallery(); if (!$('screens').hidden) renderScreens(); };
+}
+
+/* ---------- data keys ---------- */
+// Content data keys per cell style: every text label's feed key and every image key. Changes are saved per
+// cell style (spec name) and applied to every JSON the page builds for it (editor, gallery thumbnails,
+// downloads, Screens), so an import into the platform reads whatever feed the app has.
+// Saved in the page's shared database when it's available (everyone with the page sees them), else in this browser.
+const DK_LS = 'cellPreview.dataKeys';
+let DK = {};
+try { DK = JSON.parse(localStorage.getItem(DK_LS) || '{}') || {}; } catch (e) { DK = {}; }
+let dkDb = null;
+const LABEL_KEY_RE = /^((?:(top|center|bottom)_)?text_label_(\d+)|title_text|title)_data_key$/;
+const IMAGE_KEYS = [['image_key', 'Image', 'image_switch'], ['secondary_image_image_key', 'Secondary image', 'secondary_image_switch'],
+  ['asset_image_key', 'Asset image', null], ['asset_hover_image_key', 'Asset image (hover)', null],
+  ['asset_selected_image_key', 'Asset image (selected)', null], ['asset_selected_hover_image_key', 'Asset image (selected, hover)', null]];
+function applyDataKeys(json, keys) {
+  if (!keys || !json?.config) return json;
+  for (const sec of Object.values(json.config)) if (Array.isArray(sec)) for (const e of sec) if (e && Object.prototype.hasOwnProperty.call(keys, e.key)) e.value = keys[e.key];
+  return json;
+}
+{
+  const _buildCell = TK.buildCell;
+  TK.buildCellPlain = _buildCell;
+  TK.buildCell = (base, spec, ...rest) => {
+    const r = _buildCell(base, spec, ...rest);
+    if (spec && DK[spec.name] && Object.keys(DK[spec.name]).length) r.json = applyDataKeys(JSON.parse(JSON.stringify(r.json)), DK[spec.name]);
+    return r;
+  };
+}
+// The fields a cell JSON offers: one per text label (data_key + custom_data_key read as one feed key) and one per image key.
+function keyFields(json) {
+  const m = toMap(json), out = [];
+  const isOn = (k, d = true) => k in m ? (m[k] === true || m[k] === 'true') : d;
+  for (const k of Object.keys(m)) {
+    const r = k.match(LABEL_KEY_RE); if (!r) continue;
+    const prefix = r[1], zone = r[2], n = r[3];
+    const name = prefix === 'title' ? 'Title' : prefix === 'title_text' ? 'Title text' : `${zone ? zone[0].toUpperCase() + zone.slice(1) + ' label' : 'Label'} ${n}`;
+    const ck = `${prefix}_custom_data_key`, hasCustom = ck in m;
+    const custom = hasCustom ? String(m[ck] ?? '').trim() : '';
+    out.push({ kind: 'text', name, prefix, dk: k, ck, hasCustom, value: custom || String(m[k] ?? 'title'), on: isOn(`${prefix}_switch`), order: (zone ? ['top', 'center', 'bottom'].indexOf(zone) + 1 : 0) * 10 + (+n || 0) });
+  }
+  out.sort((a, b) => a.order - b.order);
+  for (const [k, name, sw] of IMAGE_KEYS) if (k in m) out.push({ kind: 'image', name, k, value: String(m[k] ?? ''), on: sw ? isOn(sw, k === 'image_key') : true });
+  return out;
+}
+const fieldKeys = f => f.kind === 'text' ? [f.dk, ...(f.hasCustom ? [f.ck] : [])] : [f.k];
+function changesFor(f, raw) {
+  const v = String(raw || '').trim();
+  if (f.kind === 'image') return { [f.k]: v || 'image_base' };
+  const key = v || 'title';
+  if (!f.hasCustom) return { [f.dk]: key };
+  return key === 'title' || key === 'summary' ? { [f.dk]: key, [f.ck]: '' } : { [f.dk]: 'other', [f.ck]: key };
+}
+// The cell style behind the editor, when the editor shows that cell's own build (not pasted JSON).
+function currentSpecCell() {
+  const p = PRESETS[+$('preset').value], hp = p && heroPreset(p);
+  return hp && state.json === p.json ? { p, hp } : null;
+}
+function defaultsFor(hp) {
+  const tokens = tokensFor(TK.specScale(hp.spec));
+  return toMap(TK.buildCellPlain(hp.base, hp.spec, tokens, { header: $('header').value, content: $('contentType').value, actions: ACTION_SET.manifest }).json);
+}
+const dkDocId = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function saveDK(name, keys) {
+  if (keys && Object.keys(keys).length) DK[name] = keys; else delete DK[name];
+  try { localStorage.setItem(DK_LS, JSON.stringify(DK)); } catch (e) {}
+  if (dkDb && canWrite) {
+    const doc = dkDb.collection('dataKeys').doc(dkDocId(name));
+    (DK[name] ? doc.set({ spec: name, keys: DK[name], updatedAt: Date.now() }) : doc.delete()).catch(err => {
+      if (err?.code === 'not_granted' || err?.code === 'permission_denied' || err?.code === 'invalid_argument') canWrite = false;
+      $('kHint').textContent = "These keys couldn't be saved for everyone, so they're kept in this browser only.";
+    });
+  }
+}
+function commitKey(f, raw) {
+  const changes = changesFor(f, raw);
+  const cur = currentSpecCell();
+  applyDataKeys(state.json, changes);
+  if (cur) {
+    const def = defaultsFor(cur.hp), o = { ...(DK[cur.hp.spec.name] || {}) };
+    for (const [k, v] of Object.entries(changes)) { if (String(def[k] ?? '') === String(v)) delete o[k]; else o[k] = v; }
+    saveDK(cur.hp.spec.name, o);
+  }
+  $('json').value = JSON.stringify(state.json);
+  loadJson(state.json);
+}
+function resetKeys(keys) {
+  const cur = currentSpecCell(); if (!cur) return;
+  const def = defaultsFor(cur.hp), o = { ...(DK[cur.hp.spec.name] || {}) }, back = {};
+  for (const k of keys) { delete o[k]; if (k in def) back[k] = def[k]; }
+  applyDataKeys(state.json, back); saveDK(cur.hp.spec.name, o);
+  $('json').value = JSON.stringify(state.json); loadJson(state.json);
+}
+function fillKeyLists() {
+  const text = new Set(['title', 'summary', ...Object.keys(SAMPLE_EXT)]);
+  const img = new Set(['image_base', 'thumb_1', 'thumb_2', 'thumb_3', 'key_art', 'poster', 'poster_16x9', 'still', 'logo', 'rank_image']);
+  PRESETS.forEach(p => keyFields(p.json || {}).forEach(f => (f.kind === 'text' ? text : img).add(f.value)));
+  $('kTextKeys').innerHTML = [...text].filter(Boolean).sort().map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
+  $('kImageKeys').innerHTML = [...img].filter(Boolean).sort().map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
+}
+function renderKeys() {
+  // only while the panel is on screen: the gallery renders every cell through the editor
+  if (!state.json || $('tp-keys').hidden || $('editor').classList.contains('offstage')) return;
+  const cur = currentSpecCell(), fields = keyFields(state.json);
+  const saved = cur ? (DK[cur.hp.spec.name] || {}) : {};
+  const def = cur ? defaultsFor(cur.hp) : null;
+  const where = !cur ? 'Changes apply to the JSON loaded here; download it from Export.'
+    : `Saved for ${cleanName(cur.p.name)} and used whenever it's built: this preview, the gallery download, its thumbnail and Screens. `
+      + (dkDb && canWrite ? 'Shared with everyone who opens this page.' : dkDb ? 'You can try keys here, but only editors can save them for everyone, so they stay in this browser.' : 'Kept in this browser.');
+  $('kHint').textContent = `Text labels read title, summary, or any feed path (extensions.genre). Images read a media_item key (image_base, thumb_1). ${where}`;
+  const row = f => {
+    const id = `k-${f.kind}-${(f.dk || f.k)}`;
+    const keys = fieldKeys(f), changed = cur && keys.some(k => k in saved);
+    const w = el('div', 'kf' + (changed ? ' changed' : '') + (f.on ? '' : ' off'));
+    const lab = el('label'); lab.htmlFor = id;
+    const nm = el('span'); nm.textContent = f.name; const code = el('span', 'kcode'); code.textContent = f.kind === 'text' ? `${f.prefix}_data_key` + (f.hasCustom ? ' / custom' : '') : f.k;
+    lab.append(nm, code);
+    const inp = el('input'); inp.type = 'text'; inp.id = id; inp.value = f.value; inp.spellcheck = false; inp.autocomplete = 'off';
+    inp.setAttribute('list', f.kind === 'text' ? 'kTextKeys' : 'kImageKeys');
+    if (def) { const dv = f.kind === 'text' ? (String(def[f.ck] ?? '').trim() || String(def[f.dk] ?? 'title')) : String(def[f.k] ?? ''); inp.placeholder = dv; inp.title = `Cell default: ${dv}`; }
+    const go = () => { if (inp.value.trim() !== f.value) commitKey(f, inp.value); };
+    inp.addEventListener('change', go);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    w.append(lab, inp);
+    if (changed) { const b = el('button', 'btn kreset'); b.type = 'button'; b.textContent = 'Reset'; b.setAttribute('aria-label', `Reset ${f.name} to the cell's default`); b.addEventListener('click', () => resetKeys(keys)); w.append(b); }
+    else w.append(el('span'));
+    return w;
+  };
+  const group = (title, list) => { if (!list.length) return null; const g = el('div', 'kgroup'); const h = el('h3'); h.textContent = title; g.append(h, ...list.map(row)); return g; };
+  const onText = fields.filter(f => f.kind === 'text' && f.on), onImg = fields.filter(f => f.kind === 'image' && f.on), off = fields.filter(f => !f.on);
+  const parts = [group('Text labels', onText), group('Images', onImg)].filter(Boolean);
+  if (off.length) {
+    const d = el('details', 'koff'); const sm = el('summary'); sm.textContent = `${off.length} switched off in this cell`;
+    d.append(sm, ...[group('Text labels (off)', off.filter(f => f.kind === 'text')), group('Images (off)', off.filter(f => f.kind === 'image'))].filter(Boolean));
+    parts.push(d);
+  }
+  if (!fields.length) { const p = el('p', 'hint'); p.textContent = 'This cell has no text label or image data keys.'; parts.push(p); }
+  $('kFields').replaceChildren(...parts);
+  $('kResetAll').hidden = !(cur && Object.keys(saved).length);
+}
+$('tab-keys').addEventListener('click', () => renderKeys());
+$('kResetAll').addEventListener('click', () => { const cur = currentSpecCell(); if (cur) resetKeys(Object.keys(DK[cur.hp.spec.name] || {})); });
+{
+  const _lj = loadJson;
+  loadJson = function (obj) { _lj(obj); try { renderKeys(); } catch (e) {} };
+}
+function openDataKeys(i) {
+  setView('editor');
+  $('preset').value = String(i); showPreset(i);
+  $('tab-keys').click();
+  renderKeys();
+}
+// shared copy: the page's database, when this view has one
+(async () => {
+  if (!window.claude?.use || window.CELL_ENGINE_MODE) return;
+  const db = await window.claude.use('db').catch(() => null);
+  if (!db) return;
+  dkDb = db;
+  db.collection('dataKeys').onSnapshot(snap => {
+    const next = {};
+    snap.docs.forEach(d => { const v = d.data(); if (v && typeof v.spec === 'string' && v.keys && typeof v.keys === 'object') next[v.spec] = v.keys; });
+    DK = next;
+    try { localStorage.setItem(DK_LS, JSON.stringify(DK)); } catch (e) {}
+    applyTokens(); reloadCurrent(); renderKeys();
+  }, () => { dkDb = null; renderKeys(); });
+})();
+
+/* ---------- engine API ---------- */
+// Used by Zapp Cell Style Studio, which loads this page in a hidden frame: build a cell JSON from a spec,
+// render any cell JSON at device size, and snapshot it as an image. The preview's own UI doesn't use it.
+window.CellEngine = {
+  version: 1,
+  buildCell(base, spec) {
+    const tokens = tokensFor(TK.specScale(spec));
+    const built = TK.buildCell(base, spec, tokens, { actions: ACTION_SET.manifest });
+    let overlay = null;
+    if (spec.overlay) { const o = TK.overlaySpec(spec, tokens); overlay = { file: o.file, dataUrl: overlayURL(o) }; }
+    return { json: built.json, output: built.output, dropped: built.dropped || [], overlay, buttons: built.buttons || [] };
+  },
+  registerFont(prefix, family) { (window.FONT_MAP ||= {})[prefix] = family; },
+  // Draws a cell. opts: screenW, pad, appBg, layout, overlay (data URL), title, summary, ext ({'extensions.x': 'text'}), platform
+  render(json, opts = {}) {
+    Object.assign(state, { screenW: opts.screenW || 393, pad: opts.pad ?? 0, layout: opts.layout || null, appBg: opts.appBg || '#121212',
+      ovl: opts.overlay || null, badge: opts.badge || null, action: opts.action || null, hoverBadge: null, contentBadge: null,
+      presetArt: null, art: opts.art || null, sec: opts.sec || null, zoom: 1, platform: opts.platform || 'ios' });
+    $('screenW').value = state.screenW; $('pad').value = state.pad; $('appbg').value = state.appBg;
+    $('dTitle').value = opts.title ?? 'Content Title'; $('dSummary').value = opts.summary ?? 'Two rock-bottom drivers transport a wealthy teen to rehab, but their simple job spirals into chaos.';
+    for (const [k, v] of Object.entries(opts.ext || {})) SAMPLE_EXT[k] = String(v);
+    $('hoverOn').checked = false; $('outline').checked = false;
+    $('json').value = JSON.stringify(json); loadJson(json);
+    const cell = $('cellwrap').querySelector('.cell');
+    return { width: cell ? cell.offsetWidth : 0, height: cell ? cell.offsetHeight : 0,
+      notes: [...document.querySelectorAll('#notes li, #notes p')].map(n => n.textContent.trim()).filter(Boolean),
+      showing: [...document.querySelectorAll('#showing tr, #showing li')].map(n => n.textContent.replace(/\s+/g, ' ').trim()) };
+  },
+  // Image of the last rendered cell on its app background. thumb=true gives the 1000x560 platform thumbnail.
+  async snapshot({ scale = 2, thumb = false, pad = 16 } = {}) {
+    const h2c = await loadHtml2canvas();
+    const cell = $('cellwrap').querySelector('.cell');
+    const w = cell.offsetWidth, hgt = cell.offsetHeight;
+    const stage = el('div', '', { position: 'fixed', left: '0', top: '0', zIndex: '-1', pointerEvents: 'none', opacity: '0' });
+    stage.dataset.thumbStage = '1';
+    const panel = el('div', '', { padding: px(pad), background: state.appBg, borderRadius: px(thumb ? THUMB.panelRadius : 0), width: px(w + pad * 2), boxSizing: 'border-box' });
+    const copy = cell.cloneNode(true); copy.style.margin = '0'; copy.classList.remove('hovering');
+    panel.append(copy); stage.append(panel); document.body.append(stage);
+    try {
+      const sc = thumb ? Math.min(4, Math.max(2, (THUMB.h - THUMB.gapY * 2) / (hgt + pad * 2) * 1.5)) : scale;
+      stripesToImages(copy, sc);
+      const shot = await h2c(panel, { backgroundColor: null, scale: sc, logging: false, useCORS: true,
+        onclone: doc => { const s = doc.querySelector('[data-thumb-stage]'); if (s) s.style.opacity = '1'; } });
+      if (!thumb) return shot.toDataURL('image/png');
+      const out = document.createElement('canvas'); out.width = THUMB.w; out.height = THUMB.h;
+      const k = Math.min((THUMB.w - THUMB.gapX * 2) / shot.width, (THUMB.h - THUMB.gapY * 2) / shot.height);
+      const g = out.getContext('2d'); g.imageSmoothingQuality = 'high';
+      g.drawImage(shot, (THUMB.w - shot.width * k) / 2, (THUMB.h - shot.height * k) / 2, shot.width * k, shot.height * k);
+      return out.toDataURL('image/png');
+    } finally { stage.remove(); }
+  },
+  actions: () => ACTION_SET.manifest,
+};
+
+renderRamps();
+refreshTokenUI();
+applyTokens();
+fillKeyLists();
+showPreset(0);
+updateContentType();
+try { const v0 = localStorage.getItem('cellPreview.view'); if (v0 === 'gallery' || v0 === 'screens') setView(v0); } catch (e) {}
+</script>

@@ -1,0 +1,93 @@
+{
+  "note": "Worked examples from a reviewed build (a streaming app, phone, 393pt wide, dark slate theme). They show the expected detail and how decisions are written.",
+  "cells": [
+    {
+      "name": "Poster Tile", "screen": "Home", "purpose": "Portrait 2:3 poster for rails and grids, with an optional tag.",
+      "bbox": { "x": 0.35, "y": 0.24, "w": 0.29, "h": 0.20 },
+      "plugin": "cell_3", "status": "as_designed",
+      "layout": { "type": "rail", "itemWidth": 112, "gap": 8, "padding": 20 }, "appBackground": "#172B3B",
+      "cell": { "background": "rgba(0,0,0,0)", "radius": 2, "padding": [0, 0, 0, 0], "border": null },
+      "image": { "key": "thumb_2", "ratio": "2x3", "radius": 2, "border": null, "margin": [0, 0, 0, 0], "placeholder": "#203A4B" },
+      "overlay": null, "secondaryImage": null, "zone": "bottom",
+      "labels": [
+        { "role": "tag", "dataKey": "extensions.tag", "sample": "RECENTLY ADDED",
+          "font": { "family": "DM Sans", "weight": 500, "size": 9, "lineHeight": 12, "letterSpacing": 0.6 },
+          "color": "#172B3B", "background": "#E6F06E", "padding": [1, 4, 1, 4], "radius": 2,
+          "align": "center", "lines": 1, "uppercase": true, "margin": [0, 6, 5, 6] }
+      ],
+      "buttons": null, "progress": null, "runtime": null,
+      "decisions": [
+        { "type": "works", "text": "2:3 poster with the tag as a label with a background; it hides when the feed has no tag." },
+        { "type": "works", "text": "One style serves every rail and grid; the component sets the width." }
+      ]
+    },
+    {
+      "name": "News Tile", "screen": "Home", "purpose": "News rail: 16:9 thumbnail with a duration pill, then a bold time-ago line and a headline.",
+      "bbox": { "x": 0.04, "y": 0.51, "w": 0.48, "h": 0.17 },
+      "plugin": "cell_1", "status": "adapted",
+      "layout": { "type": "rail", "itemWidth": 172, "gap": 8, "padding": 20 }, "appBackground": "#172B3B",
+      "cell": { "background": "rgba(0,0,0,0)", "radius": 0, "padding": [0, 0, 0, 0], "border": null },
+      "image": { "key": "image_base", "ratio": "16x9", "radius": 2, "border": null, "margin": [0, 0, 10, 0], "placeholder": "#203A4B" },
+      "overlay": null, "secondaryImage": null,
+      "labels": [
+        { "role": "time", "dataKey": "extensions.published", "sample": "1 hour ago",
+          "font": { "family": "DM Sans", "weight": 700, "size": 14, "lineHeight": 19, "letterSpacing": 0 }, "color": "#FFFFFF",
+          "background": null, "padding": [0, 0, 0, 0], "radius": 0, "align": "left", "lines": 1, "uppercase": false, "margin": [0, 0, 0, 0] },
+        { "role": "headline", "dataKey": "title", "sample": "The latest headlines as the Duchess of Sussex pulls out of a speech",
+          "font": { "family": "DM Sans", "weight": 400, "size": 14, "lineHeight": 19, "letterSpacing": 0 }, "color": "#FFFFFF",
+          "background": null, "padding": [0, 0, 0, 0], "radius": 0, "align": "left", "lines": 3, "uppercase": false, "margin": [0, 0, 0, 0] }
+      ],
+      "buttons": null, "progress": null,
+      "runtime": { "background": "rgba(17,34,46,0.85)", "color": "#FFFFFF", "font": { "family": "DM Sans", "weight": 500, "size": 11, "lineHeight": 14, "letterSpacing": 0 }, "radius": 3, "padding": [1, 5, 1, 5], "margin": [0, 6, 6, 0] },
+      "decisions": [
+        { "type": "works", "text": "16:9 thumbnail with a styled duration pill, a time-ago line and a 3-line headline." },
+        { "type": "changed", "item": "Duration pill position", "text": "The runtime pill always sits bottom right; the design shows it top right." },
+        { "type": "changed", "item": "Two labels, not one line", "text": "The bold time and regular headline run on in one line in the design; a label has one weight, so they are two labels." },
+        { "type": "alternative", "text": "Use a content badge if the pill must be top right." }
+      ]
+    },
+    {
+      "name": "Live Channel Row", "screen": "Live", "purpose": "Collapsed channel row: channel logo, the programme on now, a progress bar and the time left.",
+      "bbox": { "x": 0.0, "y": 0.39, "w": 1.0, "h": 0.11 },
+      "plugin": "cell_2", "status": "adapted",
+      "layout": { "type": "list", "rowGap": 0, "padding": 0 }, "appBackground": "#172B3B",
+      "cell": { "background": "#172B3B", "radius": 0, "padding": [20, 20, 0, 20], "border": null, "dividerTop": null,
+                "dividerBottom": { "thickness": 1, "color": "#4B6F80", "margin": [20, 0, 0, 0] } },
+      "image": null, "overlay": null,
+      "secondaryImage": { "key": "thumb_1", "width": 80, "height": 18, "align": "left", "beforeLabel": 1, "margin": [0, 0, 16, 0], "fit": "bottom_left" },
+      "labels": [
+        { "role": "title", "dataKey": "title", "sample": "The Real Housewives Of Rhode Island (S1)",
+          "font": { "family": "DM Sans", "weight": 400, "size": 15, "lineHeight": 19, "letterSpacing": 0 }, "color": "#FFFFFF",
+          "background": null, "padding": [0, 0, 0, 0], "radius": 0, "align": "left", "lines": 1, "uppercase": false, "margin": [0, 0, 8, 0] },
+        { "role": "time-left", "dataKey": "extensions.time-left", "sample": "2m left",
+          "font": { "family": "DM Sans", "weight": 700, "size": 15, "lineHeight": 19, "letterSpacing": 0 }, "color": "#A0FCBB",
+          "background": null, "padding": [0, 0, 0, 0], "radius": 0, "align": "right", "lines": 1, "uppercase": false, "margin": [0, 0, 0, 0] }
+      ],
+      "buttons": null,
+      "progress": { "position": "bottom_of_cell", "height": 4, "color": "#A0FCBB", "track": "#2E4B5C", "radius": 2, "margin": [6, 92, 0, 0] },
+      "runtime": null,
+      "decisions": [
+        { "type": "works", "text": "Channel logo, programme title and time left, with the progress bar at the bottom of the cell." },
+        { "type": "changed", "item": "Time left above the bar", "text": "A label and the progress bar can't share a line, so \"2m left\" is right-aligned on the line above and the bar leaves room on the right." },
+        { "type": "changed", "item": "No expand/collapse chevron", "text": "Cells can't expand or collapse, so the chevron would do nothing." },
+        { "type": "alternative", "text": "The feed needs to supply progress for the programme on now." }
+      ]
+    },
+    {
+      "name": "Section Header", "screen": "Home", "purpose": "Rail header: bold title and a View All link.",
+      "bbox": { "x": 0.0, "y": 0.19, "w": 1.0, "h": 0.045 },
+      "plugin": "cell_info", "status": "as_designed",
+      "layout": { "type": "single", "padding": 0 }, "appBackground": "#172B3B",
+      "cell": { "background": "rgba(0,0,0,0)", "radius": 0, "padding": [20, 20, 12, 20], "border": null },
+      "image": null, "labels": [],
+      "header": {
+        "title": { "role": "title", "dataKey": "title", "sample": "Our Top Picks",
+                   "font": { "family": "DM Sans", "weight": 700, "size": 18, "lineHeight": 23, "letterSpacing": -0.2 }, "color": "#FFFFFF", "align": "left", "lines": 1, "uppercase": false },
+        "button": { "text": "View All", "font": { "family": "DM Sans", "weight": 500, "size": 16, "lineHeight": 20, "letterSpacing": 0 }, "color": "#EBF66F" }
+      },
+      "decisions": [
+        { "type": "works", "text": "Feed title as the header, with View All as a text-only header button." }
+      ]
+    }
+  ]
+}
