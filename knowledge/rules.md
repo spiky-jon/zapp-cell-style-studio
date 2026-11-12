@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 10 · phone and tablet · cell plugins 16.0.0-alpha
+Version 11 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -147,6 +147,9 @@ Choosing:
 
 - Up to **3 buttons** per cell, stacked horizontally or vertically, aligned left or centre, positioned relative
   to the labels or over the image.
+- Buttons work in every cell type, **including a text-only Cell 2**: e.g. a detail block with a row of three
+  icon-above-label buttons (Trailer, Share, Download) above the synopsis, cast and director labels, all in one
+  cell. (Confirmed on device.)
 - Each button runs an **action plugin**: navigation (open / play), favourites (my list), share, downloads,
   trailer.
 - **Labels and icons come from the action plugin**, set once for the whole app, and **the label can be changed
