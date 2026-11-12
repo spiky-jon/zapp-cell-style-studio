@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 6 · phone and tablet · cell plugins 16.0.0-alpha
+Version 7 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -58,6 +58,10 @@ Choosing:
 - No gradient fills on text.
 - Per label: alignment (left, centre, right), number of lines (truncates with …), uppercase transform, margins.
 - Each label reads a **data key**: `title`, `summary`, or any feed path such as `extensions.genre`.
+- **An empty value removes its label**, with its margins, padding and background: the labels below move up and no
+  gap is left. So a tag or meta line that only some items have needs no special handling. (Confirmed on device.)
+- Lines are a **maximum**: longer text is cut off with "…". Set each label's lines to what the design needs, not
+  more, because the lines also decide the cell's height in rails (see section 7).
 - When content needs more than 3 lines (e.g. a show hero: genre, title, synopsis, next episode, buttons; or an
   expanded live panel: logo, title, time, description, "up next"), **split it across two cells** placed as two
   components that read the same feed (see Priorities). Never leave a line out instead. Record this as a
@@ -77,6 +81,8 @@ Choosing:
 
 ## 3. Images
 
+- When an item has **no image**, the image area stays (in the placeholder colour) and badges still show on it;
+  the cell's shape doesn't change. (Confirmed on device.)
 - One **main image** per cell, from a feed media key: `image_base` (landscape key art), `thumb_1` (title logo),
   `thumb_2` (poster), `thumb_3` (still). Aspect ratio from presets (16x9, 4x3, 1x1, 3x4, 2x3, 9x16) or a custom
   `WxH`. Corner radius, a border (width, colour) and a placeholder colour are available.
@@ -97,8 +103,16 @@ Choosing:
 
 - **Duration / runtime pill**: always **bottom right** of the image (background, colour, font, radius, padding,
   margins). A design with it elsewhere → keep bottom right and record the change; alternative: a content badge.
-- **Content badges** sit on the image (play buttons, LIVE pills, promo badges). A cell with no image can't show
-  them.
+- **Content badges** sit on the image and are chosen by the item's **type**: up to five type names (e.g. video,
+  show, movie), each with its own badge image, shown in one position (centre, a corner) at one size. Useful in a
+  mixed feed (a play icon on videos, a TV icon on shows). Every item of that type shows the same badge.
+- A badge that depends on the viewer (NEXT EPISODE, "new for you", watched) **can't** come from content badges:
+  the type also decides where a tap goes (video opens the player, show or movie opens the screen mapped to that
+  type), so changing an item's type to get a badge would break navigation. Record it as `changed` and suggest the
+  feed supplies it as text (a tag label) or artwork instead.
+- **Lock badge**: a locked or unlocked image (top left, fixed size) driven by a feed field (e.g. `extensions.free`)
+  for paid content.
+- A cell with no image area at all (Cell 2 text only) can't show content or lock badges.
 - **Cell badge**: one static image the studio draws and ships in the download, at **any width and height**,
   placed in a corner or the centre of the image (Cell 2 also in its right-hand column), fine-tuned with margins.
   Because it is an image, draw the design's shape exactly: a square green play block stays a **square**, a round
@@ -162,6 +176,10 @@ Choosing:
 - Describe each screen as components top to bottom (single, rail, list, grid) so the studio can mock it up, with
   the text each item shows on that screen (the feed decides it in the app, but the mock-up should read like the
   design: "Search" for the page title, "All Shows", "Comedy"... for the rows).
+- **Rail height is the tallest possible cell**: every item in a rail is as tall as the deepest cell could be (the
+  image, every label at its maximum lines, buttons), even when the text is shorter. Shorter items keep their text
+  at the top and the cell's background fills the rest. So extra lines on a label make every tile taller: match
+  the design's lines exactly. (Confirmed on device.)
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
 - **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them
