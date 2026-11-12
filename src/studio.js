@@ -859,6 +859,16 @@ return { icons: out, specs };`;
     const fig = assets.some(a => S.figmaIcons[a.role]), lib = assets.some(a => !S.figmaIcons[a.role]), name = ICONS.libraries[S.icons.library]?.name || S.icons.library;
     return fig && lib ? `from the Figma file, others from ${name}` : fig ? 'from the Figma file' : name;
   };
+  // the component settings that make the screen match the design (Zapp's horizontal list, list and grid plugins)
+  function componentLines(c) {
+    const L = c.spec?.layout || {}, d = c.desc.layout || {};
+    if (L.type === 'rail') return [L.cellsPerView ? `Horizontal list, scaled: cells per view ${L.cellsPerView}, next cell offset ${L.peek} (cells about ${L.itemWidth}pt wide on a ${c.spec.screen}pt screen)` : `Horizontal list: scaling off, cell width ${L.itemWidth}`,
+      `gutter horizontal ${L.gap}`, `padding left and right ${L.padding}${L.padding === 20 ? ' (the theme default)' : ''}`];
+    if (L.type === 'list') return [`List: gutter vertical ${num(L.rowGap)}${num(L.rowGap) === 0 ? ' (set it: the theme default is 12)' : ''}`, `padding left and right ${num(L.padding)}${num(L.padding) === 20 ? ' (the theme default)' : ''}`];
+    if (d.type === 'grid') return [`Grid: columns ${d.columns || 2}`, `gutters ${num(d.gap, 12)}`, `padding left and right ${num(d.padding, 20)}`];
+    if (num(d.padding) !== 20 && d.padding != null) return [`padding left and right ${num(d.padding)} (the theme default is 20)`];
+    return [];
+  }
   function readme(c) {
     const d = c.desc, lines = [`${d.name} - ${c.json?.meta?.identifier || d.plugin}`, `${collection()} · built by Zapp Cell Style Studio (rules ${K.version})`, '', d.purpose || '', '',
       `${c.output}: import into the cell builder`, `thumbnails/${c.output.replace('.json', '@2x.png')}: thumbnail for the cell style (500 x 280 @2x)`];
@@ -873,7 +883,7 @@ return { icons: out, specs };`;
     if (sec('works').length) lines.push('', 'What works:', ...sec('works').map(x => `  - ${x.text}`));
     if (sec('changed').length) lines.push('', 'Changes to fit the cell framework:', ...sec('changed').map(x => `  - ${x.item ? x.item + ': ' : ''}${x.text}`));
     if (sec('alternative').length) lines.push('', 'Suggested approach:', ...sec('alternative').map(x => `  - ${x.text}`));
-    if (c.spec?.layout?.type === 'rail') lines.push('', `Component: horizontal list, item width ${c.spec.layout.itemWidth}, gap ${c.spec.layout.gap}.`);
+    const cl = componentLines(c); if (cl.length) lines.push('', 'Component settings (on the component that uses this cell style):', ...cl.map(x => `  - ${x}`));
     return lines.join('\n') + '\n';
   }
   // every font face the cells name: { ps, family, weight, face (uploaded file) | null, status }
@@ -1017,7 +1027,7 @@ return { icons: out, specs };`;
       const sec = (t, title) => { const xs = (c.desc.decisions || []).filter(x => x.type === t); if (!xs.length) return; text(title, 11, { bold: true, after: 2 });
         xs.forEach(x => text(`•  ${x.item ? x.item + '. ' : ''}${x.text}`, 9.5, { after: 1.6 })); y += 2; };
       sec('works', 'What works'); sec('changed', 'What changed and why'); sec('alternative', 'Suggested approach');
-      if (c.spec?.layout?.type === 'rail') text(`Component: horizontal list, item width ${c.spec.layout.itemWidth}pt.`, 8.5, { color: muted });
+      const cl = componentLines(c); if (cl.length) text(`Component: ${cl.join('; ')}.`, 8.5, { color: muted });
     }
     const pages = pdf.getNumberOfPages();
     for (let i = 1; i <= pages; i++) { pdf.setPage(i); pdf.setFontSize(7.5); pdf.setTextColor(...muted); pdf.text(`${collection()} · Zapp Cell Style Studio`, M, 292); pdf.text(`${i} / ${pages}`, W - M, 292, { align: 'right' }); }

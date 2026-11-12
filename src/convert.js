@@ -127,7 +127,13 @@
 
     // layout -> preview layout
     const lay = d.layout || {};
-    if (lay.type === 'rail') spec.layout = { type: 'rail', itemWidth: num(lay.itemWidth, 160), gap: num(lay.gap, 8), padding: num(lay.padding, 20) };
+    if (lay.type === 'rail') {
+      // the horizontal list sizes its cells to fit "cells per view" plus a peek of the next cell (its default, scaled mode);
+      // a fixed cell width is the other mode. Defaults are the base theme's (padding 20, gutter 12) and the plugin's (2 per view, offset 20).
+      const gap = num(lay.gap, 12), pad = num(lay.padding, 20), per = num(lay.cellsPerView, 0), peek = num(lay.peek, 20);
+      const itemWidth = per > 0 ? Math.round((screen - pad * 2 - (peek + gap - pad) - gap * (per - 1)) / per) : num(lay.itemWidth, 160);
+      spec.layout = { type: 'rail', itemWidth, gap, padding: pad, ...(per > 0 ? { cellsPerView: per, peek } : {}) };
+    }
     else if (lay.type === 'list') spec.layout = { type: 'list', rowGap: num(lay.rowGap, 0), padding: num(lay.padding, 0) };
     else spec.layout = { padding: num(lay.padding, 0) };
 

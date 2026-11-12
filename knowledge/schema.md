@@ -18,8 +18,11 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       "bbox": { "x": 0.05, "y": 0.30, "w": 0.28, "h": 0.20 }, // one clear example in THIS image, fractions of the image (0-1)
       "plugin": "cell_3",                     // cell_1 | cell_2 | cell_3 | cell_info  (see rules)
       "status": "as_designed",                // as_designed | adapted | workaround
-      "layout": { "type": "rail", "itemWidth": 112, "gap": 8, "padding": 20 },
-      //   rail: horizontal list (itemWidth = the cell's width) · list: vertical list (rowGap) · single: one full-width cell
+      "layout": { "type": "rail", "cellsPerView": 3, "peek": 20, "gap": 8, "padding": 20 },  // or "itemWidth": 112 for a fixed cell width
+      //   rail: horizontal list. Default (scaled): "cellsPerView" = whole cells across the screen (may be fractional, e.g. 2.5)
+      //   and "peek" = the next cell offset; the cell width is worked out from the screen width. Use "itemWidth" only when the
+      //   design clearly uses a fixed width. gap = gutter between cells, padding = side padding.
+      //   list: vertical list (rowGap = vertical gutter) · grid: columns, gap · single: one full-width cell
       "appBackground": "#172B3B",             // the screen colour behind the cell
       "cell": {
         "background": "rgba(0,0,0,0)", "radius": 0, "padding": [0, 0, 0, 0],

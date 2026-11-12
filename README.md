@@ -76,6 +76,12 @@ and `dist/engine.js` as supporting files, and these capabilities:
   "mcp": { "servers": [{ "server": "Figma", "tools": ["create_session", "get_metadata", "get_screenshot", "use_figma"] }] } }
 ```
 
+## Framework sources
+
+The rules on screens, components and spacing come from the Zapp framework itself (QuickBrick:
+`plugins/horizontal-list-qb`, `quick-brick-grid`, `quick-brick-list`, `quick-brick-base-theme` manifests and the
+horizontal list's width calculation). Check there before guessing how a component behaves.
+
 ## Scope
 
 Version 1: mobile (phone and tablet), Cell 1, Cell 2, Cell 3 and Group Info. Colours and type are taken from the

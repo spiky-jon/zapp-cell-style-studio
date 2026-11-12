@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 14 · phone and tablet · cell plugins 16.0.0-alpha
+Version 15 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -195,6 +195,20 @@ Choosing:
   - **Grid**: each row is as tall as its deepest item's actual content, so rows can differ.
   - **List**: each cell is its own height.
   - **Cell 3** is sized by its image ratio, so text over the image never changes its height in any component.
+- **Screens are built as Screen → Components → Cells.** Each component (horizontal list, grid, list, hero) shows one
+  cell style, chosen on the component. Spacing between and around cells is set on the component, falling back
+  to the theme when left empty. Theme defaults, phone (tablet in brackets):
+  - Screen padding: top 25 (30), bottom 50 (70), sides 0.
+  - Component padding: sides 20 (52), top and bottom 0. Component margin: bottom 20 (20), the space between
+    components.
+  - Gutters: 12 (16), between cells in a row (horizontal) and between rows or list items (vertical).
+- **Horizontal list (rail)**: by default the cells are **scaled** to fit a number of **cells per view** plus a
+  **next cell offset** (the peek of the next cell; defaults 2 and 20), so cell width follows the screen width.
+  The other mode is a **fixed cell width** (default 200). It can snap to start, centre or end, and has optional
+  **page indicators** (dots: size, colours, alignment, margins), auto-scroll and looping. So carousel dots are a
+  component setting, not part of the cell.
+- **Grid**: a number of columns (default 2) with horizontal and vertical gutters. **List**: a vertical gutter
+  (theme default 12; set it to 0 for rows that touch, see "List rows" above).
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
 - **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them
