@@ -24,7 +24,7 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       "cell": {
         "background": "rgba(0,0,0,0)", "radius": 0, "padding": [0, 0, 0, 0],
         "border": null,                       // or { "width": 1, "color": "rgba(255,255,255,0.14)" }
-        "dividerTop": null,                   // cell_2 only: { "thickness": 1, "color": "#4B6F80", "margin": [20, 0, 0, 0] }
+        "dividerTop": null,                   // cell_2 only: { "thickness": 1, "color": "#4B6F80", "margin": [20, 0, 0, 0] } (its own margins, inside the cell padding)
         "dividerBottom": null
       },
       "image": {                              // null when the cell has no picture (cell_2 and cell_info only)
