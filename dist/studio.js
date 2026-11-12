@@ -825,6 +825,8 @@ return { icons: out, specs };`;
     });
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
+  // the Zapp component each placement becomes
+  const zappComponent = i => findCell(i.cell)?.desc.plugin === 'cell_info' ? 'Group Info (in a Group)' : ({ rail: 'Horizontal List', list: 'List', grid: `Grid${i.columns ? `, ${i.columns} columns` : ''}` })[i.component] || 'Hero';
   function drawMock(itemImgs) {
     const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
     if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>Find cells from your designs; each screen is rebuilt here from its cells.</span></div>`; return; }
@@ -840,7 +842,7 @@ return { icons: out, specs };`;
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
           <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
             <div class="inner" style="width:${W}px;transform:scale(${k})">${blocks.map(b => b.html).join('')}</div></div></div>
-          <div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(i.component || 'single')}${i.count ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
+          <div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(zappComponent(i))}${i.count && (i.component || 'single') !== 'single' ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
             ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
             ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
             <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>

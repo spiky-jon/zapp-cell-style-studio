@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 16 · phone and tablet · cell plugins 16.0.0-alpha
+Version 17 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -221,6 +221,17 @@ Choosing:
   - Component padding: sides 20 (52), top and bottom 0. Component margin: bottom 20 (20), the space between
     components.
   - Gutters: 12 (16), between cells in a row (horizontal) and between rows or list items (vertical).
+- **How the studio's components map to Zapp components** (as in a Zapp layout):
+  - `single` → **Hero**: its cells stack vertically at full width (not a carousel). Used for heroes and for the
+    blocks of a detail screen; set its side padding to 0 for edge-to-edge artwork.
+  - `rail` → **Horizontal List**; a swipeable hero carousel is a Horizontal List with 1 cell per view and page
+    indicators.
+  - `list` → **List**; `grid` → **Grid**.
+  - A header above a rail or grid → a **Group** (which carries the feed) containing **Group Info** (the header
+    cell style) and the rail or grid (no feed of its own).
+  - Each component points at one cell style, and the same cell style is often reused by several components.
+- **Detail screens** are chosen by the item's type: the layout maps each type (e.g. movie, tv-show) to a screen,
+  and that screen's components show the tapped item (see "type" under badges).
 - **Horizontal list (rail)**: by default the cells are **scaled** to fit a number of **cells per view** plus a
   **next cell offset** (the peek of the next cell; defaults 2 and 20), so cell width follows the screen width.
   The other mode is a **fixed cell width** (default 200). It can snap to start, centre or end, and has optional
