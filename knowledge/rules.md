@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 8 · phone and tablet · cell plugins 16.0.0-alpha
+Version 9 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -103,6 +103,10 @@ Choosing:
 
 - **Duration / runtime pill**: always **bottom right** of the image (background, colour, font, radius, padding,
   margins). A design with it elsewhere → keep bottom right and record the change; alternative: a content badge.
+- The pill shows the feed's `extensions.duration` (in seconds) as minutes and seconds with leading zeros (163 →
+  "02:43", 1280 → "21:20"). Items without a duration show no pill. It can't show other text ("45 min", "1h 20m"):
+  a design that formats it differently → keep the pill and record the change, or use a label that reads a
+  feed field with the text already formatted. (Confirmed on device.)
 - **Content badges** sit on the image and are chosen by the item's **type**: up to five type names (e.g. video,
   show, movie), each with its own badge image, shown in one position (centre, a corner) at one size. Useful in a
   mixed feed (a play icon on videos, a TV icon on shows). Every item of that type shows the same badge.
