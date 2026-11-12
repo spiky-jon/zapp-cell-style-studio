@@ -9,8 +9,6 @@
   const S = { screens: [], cells: [], sel: null, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false,
     fonts: { uploads: {}, picks: [] }, figmaIcons: {} };
   const ICONS = K.icons;
-  // the manual version (no Claude) plugs its editors in here; see src/manual.js
-  const MANUAL = window.STUDIO_MANUAL || null;
   let engine = null, sample = null, downloads = null, mcp = null, figmaSession = null, imgMax = 1;
   const uid = () => Math.random().toString(36).slice(2, 9);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -254,7 +252,7 @@
     return new Promise(ok => {
       img.onload = () => {
         device = device || $('device').value; screenW = screenW || Math.max(240, +$('screenW').value || (device === 'tablet' ? 1133 : 393));
-        const scr = { id: id || uid(), name: name.replace(/\.(png|jpe?g|webp)$/i, ''), blob, url, img, w: img.naturalWidth, h: img.naturalHeight, device, screenW, source, meta, state: 'new', layout: layout || (MANUAL ? [] : undefined) };
+        const scr = { id: id || uid(), name: name.replace(/\.(png|jpe?g|webp)$/i, ''), blob, url, img, w: img.naturalWidth, h: img.naturalHeight, device, screenW, source, meta, state: 'new', layout };
         S.screens.push(scr); renderScreens(); ok(scr);
       };
       img.onerror = () => { toast(`${name} isn't an image the browser can read.`); ok(null); };
@@ -649,7 +647,6 @@ return { icons: out, specs };`;
       <div class="t"><b>${esc(c.desc.name)}</b><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span></div></button>`).join('');
     $('grid').querySelectorAll('.card').forEach(b => b.onclick = () => { S.sel = b.dataset.id; renderAll(); $('stage').scrollIntoView({ block: 'nearest' }); });
     renderStage(); renderInspector(); renderFontPanel();
-    if (MANUAL) MANUAL.changed();
   }
   function decisionsHtml(d) {
     const icon = { works: '✓', changed: '!', alternative: '→' };
@@ -671,8 +668,7 @@ return { icons: out, specs };`;
   function renderInspector() {
     const c = S.cells.find(x => x.id === S.sel);
     const box = $('insp');
-    if (!c) { box.innerHTML = `<div class="sec"><span class="hint">${MANUAL ? 'Add a cell to start: pick a screen, draw a box round the cell, and choose a starting point.' : 'Select a cell to see what works, what changed and why.'}</span></div>`; return; }
-    if (MANUAL) return MANUAL.inspector(c, box);
+    if (!c) { box.innerHTML = `<div class="sec"><span class="hint">Select a cell to see what works, what changed and why.</span></div>`; return; }
     const d = c.desc;
     const labels = d.plugin === 'cell_info' ? (d.header?.title ? [d.header.title] : []) : (d.labels || []);
     box.innerHTML = `
@@ -825,8 +821,8 @@ return { icons: out, specs };`;
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
   function drawMock(itemImgs) {
-    const box = $('mock'), done = S.screens.filter(s => MANUAL || (s.layout || []).length);
-    if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>${MANUAL ? 'Add screenshots on the Designs tab; each screen is rebuilt here from the cells you place on it.' : 'Find cells from your designs; each screen is rebuilt here from its cells.'}</span></div>`; return; }
+    const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
+    if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>Find cells from your designs; each screen is rebuilt here from its cells.</span></div>`; return; }
     box.innerHTML = done.map(scr => {
       const W = scr.screenW, tablet = scr.device === 'tablet', disp = tablet ? 560 : 300, k = disp / W, H = scr.h * W / scr.w;
       const first = findCell((scr.layout.find(i => findCell(i.cell)) || {}).cell);
@@ -839,10 +835,10 @@ return { icons: out, specs };`;
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
           <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
             <div class="inner" style="width:${W}px;transform:scale(${k})">${blocks.map(b => b.html).join('')}</div></div></div>
-          ${MANUAL ? MANUAL.mockSide(scr) : `<div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(i.component || 'single')}${i.count ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
+          <div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(i.component || 'single')}${i.count ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
             ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
             ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
-            <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>`}
+            <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>
         </div></section>`;
     }).join('');
   }
@@ -1024,23 +1020,11 @@ return { icons: out, specs };`;
   }
   $('dlReport').addEventListener('click', reportPdf);
 
-  /* ---------- what the manual version can reach ---------- */
-  const API = { S, K, C, ICONS, BASES, $, esc, uid, toast, STATUS, TYPE, collection, buildCell, renderAll, renderStage, renderInspector, renderScreens,
-    renderMock, renderIconPanel, renderFontPanel, show, cropOf, addScreen, addFontFiles, fontsIn, findCell, downloadZip, decisionsHtml, b64,
-    save: (f, d) => save(f, d), get downloads() { return downloads; } };
-
   /* ---------- start ---------- */
   (async () => {
     renderScreens();
     try { engine = await bootEngine(); } catch (e) { $('stage').innerHTML = `<div class="err">${esc(e.message)} Reload the page to try again.</div>`; return; }
     renderIconPanel(); renderAll();
-    if (MANUAL) {
-      window.claude?.use && window.claude.use('downloads').then(d => { downloads = d; MANUAL.downloadsReady(!!d); }).catch(() => MANUAL.downloadsReady(false));
-      if (!window.claude?.use) MANUAL.downloadsReady(false);
-      $('dlAll').disabled = $('dlReport').disabled = false;
-      await MANUAL.init(API);
-      return;
-    }
     if (window.claude?.use) {
       const [smp, dl, m] = await Promise.all(['sample', 'downloads', 'mcp'].map(n => window.claude.use(n).catch(() => null)));
       sample = smp; downloads = dl; mcp = m;

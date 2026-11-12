@@ -10,9 +10,8 @@ Read README.md first. Key points for any session:
   (cell-tokens). Keep them in step when the preview changes; the studio drives the template through
   `window.CellEngine` (buildCell, render, snapshot, registerFont, registerFace). `window.CELL_ENGINE_MODE` stops the engine
   from using artifact capabilities.
-- **After any change:** `python3 tools/build.py && node tools/test.mjs`, then republish `dist/` and, when shared
-  code or knowledge changed, `dist-manual/` (see README for the file lists and capabilities). Keep
-  `knowledge/decisions.json` in step with rules.md. Publishing again to the same artifact keeps its link.
+- **After any change:** `python3 tools/build.py && node tools/test.mjs`, then republish `dist/` (see README for the
+  file list and capabilities). Publishing again to the same artifact keeps its link.
 - **Decisions are customer-facing.** Write them in plain language, no internal key names, one sentence each.
 - Statuses: as_designed, adapted, workaround. Cell types: cell_1 (text below image), cell_2 (beside / text
   only), cell_3 (over image), cell_info (headers).

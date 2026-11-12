@@ -47,25 +47,12 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
    asset, 500x280@2x thumbnail, overlay PNG when there's a gradient, `assets/` icons; plus a `plugin assets`
    folder for action plugin button icons; a `fonts` folder with the font files and names) and a PDF report.
 
-## Manual version (no Claude)
-
-`dist-manual/` is the same studio plus `src/manual.js`, published as its own artifact:
-https://claude.ai/artifact/TWMNzs5DYs62q5cEd8hBkw (capabilities: `{ "downloads": true }`).
-A person does the reading: draw a box round a cell on a screenshot, start from a blank cell or a worked example,
-and adjust it in forms that only offer what the cell framework can build. Rule checks flag what breaks the
-rules, ready-made decisions come from `knowledge/decisions.json`, and a Rules tab shows `knowledge/rules.md`.
-Cells are placed on screens by hand in the Screens tab. Work is kept in the browser and can be saved and opened
-as a project file. Saving files (zip, report, project) uses the downloads capability, which needs a signed-in
-viewer; signed out, each cell's JSON can still be copied.
-
 ## Repo
 
 | Path | What |
 |---|---|
 | `knowledge/rules.md` | The framework rules Claude follows. **Edit this to teach the studio something new.** |
 | `knowledge/schema.md` | The cell description format Claude answers in (and the converter reads). |
-| `knowledge/decisions.json` | Ready-made, customer-facing decisions per rule (manual version). |
-| `src/manual.js` | The manual version's editors (form inspector, new-cell dialog, screen layout, rules page, project files). |
 | `knowledge/examples.json` | Worked examples from a reviewed build, sent to Claude with every screen. |
 | `src/index.html`, `src/studio.js` | The studio page and its logic. |
 | `src/convert.js` | Description -> build spec. Runs in the page and in Node. |
