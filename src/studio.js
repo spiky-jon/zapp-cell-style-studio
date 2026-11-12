@@ -166,7 +166,8 @@
     let img, iw = ip, ih = ip;
     if (fig) {
       // the design's own icon: fitted into the icon box, recoloured when it's one colour (multi-colour artwork stays as drawn)
-      const src = await loadImg(fig.url), s = ip / Math.max(src.width, src.height);
+      const src = await loadImg(fig.hi || fig.url);
+      const s = ip / Math.max(src.width, src.height);
       iw = Math.max(1, Math.round(src.width * s)); ih = Math.max(1, Math.round(src.height * s));
       const t = document.createElement('canvas'); t.width = iw; t.height = ih; const tg = t.getContext('2d');
       tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, iw, ih);
@@ -295,13 +296,23 @@
       }
       const sid = figmaSession.id ? { sessionId: figmaSession.id } : {};
       const meta = textOf(await figmaCall('get_metadata', { fileKey: ref.fileKey, nodeId: ref.nodeId, ...sid }));
-      // top-level frames under the linked node become screens; a linked frame on its own is one screen
-      const frames = [...meta.matchAll(/<frame[^>]*\bid="([^"]+)"[^>]*\bname="([^"]*)"[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"/g)]
-        .map(m => ({ id: m[1], name: m[2], w: +m[3], h: +m[4] })).filter(f => f.w >= 300 && f.w <= 1600 && f.h >= 400);
-      const depthOk = frames.filter(f => f.id !== ref.nodeId);
-      const list = (depthOk.length ? depthOk : frames).slice(0, 12);
+      // screens are the frames directly under the linked page or section (frames inside sections count too), or the linked
+      // frame itself; frames nested inside a screen ("Screen View", "List") are not screens
+      const screenSized = f => f.w >= 300 && f.w <= 1600 && f.h >= 400;
+      const asFrame = el => ({ id: el.getAttribute('id'), name: el.getAttribute('name') || '', w: +el.getAttribute('width') || 0, h: +el.getAttribute('height') || 0 });
+      const metaRoot = parseMeta(meta), linked = metaRoot && [...metaRoot.querySelectorAll('*')].find(n => n.getAttribute('id') === ref.nodeId);
+      let frames;
+      if (linked) {
+        const kids = el => [...el.children].flatMap(c => c.tagName.toLowerCase() === 'section' ? kids(c) : [c]);
+        frames = linked.tagName.toLowerCase() === 'frame' && screenSized(asFrame(linked)) ? [asFrame(linked)]
+          : kids(linked).filter(c => ['frame', 'instance', 'component', 'symbol'].includes(c.tagName.toLowerCase())).map(asFrame).filter(screenSized);
+      } else {
+        frames = [...meta.matchAll(/<frame[^>]*\bid="([^"]+)"[^>]*\bname="([^"]*)"[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"/g)]
+          .map(m => ({ id: m[1], name: m[2], w: +m[3], h: +m[4] })).filter(screenSized).filter(f => f.id !== ref.nodeId);
+      }
+      const list = frames.slice(0, 12);
       if (!list.length) throw new Error('No screen-sized frames found under that link.');
-      let n = 0;
+      let n = 0; const added = [];
       for (const f of list) {
         msg.textContent = `Exporting ${++n} of ${list.length}: ${f.name}`;
         const shot = await figmaCall('get_screenshot', { fileKey: ref.fileKey, nodeId: f.id, maxDimension: Math.round(f.h * 3 > 4000 ? 4000 : f.h * 3), enableBase64Response: true, ...sid });
@@ -310,12 +321,13 @@
         $('device').value = f.w > 700 ? 'tablet' : 'phone'; $('screenW').value = Math.round(f.w);
         const scr = await addScreen({ name: f.name || `Frame ${f.id}`, blob: new Blob([u8], { type: im.mimeType || 'image/png' }), source: 'figma',
           meta: meta.split('\n').filter(l => l.includes(`"${f.id}"`) || l.includes(f.name)).slice(0, 1).join('') });
-        // the frame's own icons: exported from Figma so cells use them instead of a library
-        if (scr) {
-          msg.textContent = `Exporting icons from ${f.name}…`;
-          try { await figmaIconsFor(scr, f, meta, ref.fileKey, sid); } catch (e) { console.warn('icons', e); }
-        }
+        if (scr) added.push({ scr, f });
       }
+      // the screens' own icons, exported from Figma so cells use them instead of a library
+      msg.textContent = 'Exporting the icons the screens use…';
+      let viaPlugin = false;
+      try { viaPlugin = await figmaIconsViaPlugin(ref.fileKey, sid, added); } catch (e) { console.warn('icons via plugin', e); }
+      if (!viaPlugin) for (const { scr, f } of added) { try { await figmaIconsFor(scr, f, meta, ref.fileKey, sid); } catch (e) { console.warn('icons', e); } }
       const ni = Object.keys(S.figmaIcons).length;
       msg.textContent = `Added ${n} frame${n === 1 ? '' : 's'}${ni ? ` and ${ni} icon${ni === 1 ? '' : 's'} from the file` : ''}.`;
       renderIconPanel();
@@ -382,6 +394,48 @@
     const avg = [0, 1, 2].map(k => solid.reduce((a, i) => a + p[i + k], 0) / solid.length);
     const mono = solid.every(i => Math.abs(p[i] - avg[0]) + Math.abs(p[i + 1] - avg[1]) + Math.abs(p[i + 2] - avg[2]) < 90);
     return { url: c.toDataURL('image/png'), mono, w: W, h: H };
+  }
+  // Preferred: one read-only script in the file finds every icon instance in the screens, follows it to its component,
+  // and exports that component as SVG (vector, any size). Layer data alone can't see inside component instances.
+  const ICON_SCRIPT = ids => `const frameIds = ${JSON.stringify(ids)};
+const icons = new Map();
+for (const fid of frameIds) {
+  const frame = await figma.getNodeByIdAsync(fid);
+  if (!frame || !('findAllWithCriteria' in frame)) continue;
+  for (const inst of frame.findAllWithCriteria({ types: ['INSTANCE'] })) {
+    if (inst.width > 72 || inst.height > 72 || inst.width < 8 || inst.height < 8 || !inst.visible) continue;
+    if (inst.findAllWithCriteria({ types: ['TEXT'] }).length) continue;
+    const main = await inst.getMainComponentAsync();
+    const key = main ? main.id : inst.id;
+    if (!icons.has(key)) icons.set(key, { id: key, name: main ? (main.parent && main.parent.type === 'COMPONENT_SET' ? main.parent.name + ' / ' + main.name : main.name) : inst.name, w: Math.round(inst.width), h: Math.round(inst.height), frames: [], node: main || inst });
+    const ic = icons.get(key); if (!ic.frames.includes(fid)) ic.frames.push(fid);
+    if (icons.size >= 40) break;
+  }
+}
+const out = [];
+for (const ic of icons.values()) {
+  let svg = null;
+  try { svg = await ic.node.exportAsync({ format: 'SVG_STRING' }); } catch (e) { svg = null; }
+  if (svg && svg.length < 60000) out.push({ id: ic.id, name: ic.name, w: ic.w, h: ic.h, frames: ic.frames, svg });
+}
+return out;`;
+  const svgColours = svg => [...new Set([...svg.replace(/<defs>[\s\S]*?<\/defs>/g, '').matchAll(/(?:fill|stroke)(?:=|:\s*)"?(#[0-9a-f]{3,8}|rgba?\([^)]*\)|[a-z]+)/gi)].map(m => m[1].toLowerCase()).filter(c => c !== 'none' && c !== 'transparent' && !c.startsWith('url')))];
+  async function figmaIconsViaPlugin(fileKey, sid, added) {
+    if (!mcp || !added.length) return false;
+    const res = await figmaCall('use_figma', { fileKey, description: 'Read-only: export the icons used in these screens as SVG for Zapp cell styles', code: ICON_SCRIPT(added.map(a => a.f.id)), ...sid });
+    const txt = textOf(res); let list;
+    try { list = JSON.parse(txt); } catch (e) { const a = txt.indexOf('['), z = txt.lastIndexOf(']'); list = a >= 0 ? JSON.parse(txt.slice(a, z + 1)) : null; }
+    if (!Array.isArray(list)) return false;
+    for (const ic of list) {
+      if (!ic || !ic.svg) continue;
+      const ref = `figma:${ic.id}`;
+      // a large copy for drawing (an SVG draws at the size its own width and height say)
+      const tag = (ic.svg.match(/<svg\b[^>]*>/) || [''])[0], big = tag.replace(/\b(width|height)="([\d.]+)(px)?"/g, (m, k, v) => `${k}="${Math.round(+v * 12)}"`);
+      const enc = x => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(x);
+      S.figmaIcons[ref] = { ref, key: ic.id, name: ic.name || ref, w: ic.w, h: ic.h, svg: ic.svg, url: enc(ic.svg), hi: enc(ic.svg.replace(tag, big)), mono: svgColours(ic.svg).length <= 1, vector: true };
+      for (const { scr, f } of added) if ((ic.frames || []).includes(f.id)) (scr.figmaIcons ||= []).includes(ref) || scr.figmaIcons.push(ref);
+    }
+    return true;
   }
   async function figmaIconsFor(scr, frame, metaText, fileKey, sid) {
     const root = parseMeta(metaText); if (!root) return;

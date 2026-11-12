@@ -31,9 +31,10 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
 7. **Icons**: Claude picks the icon library closest to the design's icon style (Lucide, Phosphor, Tabler,
    Heroicons, Material Symbols, from `knowledge/icons.json`); the icon panel switches library and colours.
    Every icon a cell uses (badges, action icons, header buttons, plugin button flavours) is drawn as a PNG @3x.
-   From a Figma link, the frame's own icons are found in its layer data (small layers named like icons, or made of
-   vectors), exported through the Figma connector (Figma's render of the layer, or cut from the exported screen for
-   layers inside components) and listed to Claude by ref (`figma:12:34`) with a numbered contact sheet. Cells use
+   From a Figma link, a read-only `use_figma` script finds every small instance without text in the screens (icons
+   inside components included), follows each to its main component and exports it as SVG. Layer data from
+   `get_metadata` can't see inside instances, so it is only the fallback (layers named like icons, rendered or cut
+   from the exported screen). Icons are listed to Claude by ref (`figma:12:34`) with a numbered contact sheet. Cells use
    them instead of the library; one-colour icons are recoloured (plugin flavours), multi-colour ones kept as drawn.
    Cell badges are drawn to the design's size and shape (square, rounded or round plate behind the icon).
    Button labels use the design's wording; the zip lists the label to set on each action plugin.
@@ -83,7 +84,7 @@ and `dist/engine.js` as supporting files, and these capabilities:
 
 ```json
 { "sample": { "images": true }, "downloads": true,
-  "mcp": { "servers": [{ "server": "Figma", "tools": ["create_session", "get_metadata", "get_screenshot"] }] } }
+  "mcp": { "servers": [{ "server": "Figma", "tools": ["create_session", "get_metadata", "get_screenshot", "use_figma"] }] } }
 ```
 
 ## Scope
