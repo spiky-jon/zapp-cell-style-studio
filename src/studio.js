@@ -862,6 +862,8 @@ return { icons: out, specs };`;
   // the component settings that make the screen match the design (Zapp's horizontal list, list and grid plugins)
   function componentLines(c) {
     const L = c.spec?.layout || {}, d = c.desc.layout || {};
+    if (c.desc.plugin === 'cell_info') return ['Group Info inside a Group (as its header): the title shows the group feed\'s title, or set "Title override" on the component',
+      ...(c.desc.header?.button ? ['the whole header is tappable and opens the group\'s feed'] : [])];
     if (L.type === 'rail') return [L.cellsPerView ? `Horizontal list, scaled: cells per view ${L.cellsPerView}, next cell offset ${L.peek} (cells about ${L.itemWidth}pt wide on a ${c.spec.screen}pt screen)` : `Horizontal list: scaling off, cell width ${L.itemWidth}`,
       `gutter horizontal ${L.gap}`, `padding left and right ${L.padding}${L.padding === 20 ? ' (the theme default)' : ''}`];
     if (L.type === 'list') return [`List: gutter vertical ${num(L.rowGap)}${num(L.rowGap) === 0 ? ' (set it: the theme default is 12)' : ''}`, `padding left and right ${num(L.padding)}${num(L.padding) === 20 ? ' (the theme default)' : ''}`];

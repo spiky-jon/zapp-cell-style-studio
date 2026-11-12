@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 15 · phone and tablet · cell plugins 16.0.0-alpha
+Version 16 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -31,7 +31,7 @@ second cell after the first with what it holds (e.g. "Show Detail Hero" and "Sho
 | `cell_1` | Tiles with text **below** the image (news tiles, thumbnails with titles under them) | Image on top, then up to 3 labels stacked below, optional buttons |
 | `cell_2` | Rows with the image **beside** the text (episode rows, list rows), and **text-only** cells (info blocks, action rows, channel rows) | Optional image on the left at a fixed width, up to 3 labels to its right, optional right-hand column (cell badge or action icon) |
 | `cell_3` | Text and buttons **over** the image (hero cards, posters with tags, detail heroes) | Full-width image; labels in one of three zones over it (top, centre, bottom), up to 3 per zone; optional buttons |
-| `cell_info` | Rail and list headers ("Continue Watching", "View All") | One title, an optional text button on the right |
+| `cell_info` | Rail and list headers ("Continue Watching", "View All"), spacers and footers inside a group | An optional badge, one title, an optional button on the right |
 
 Choosing:
 - Text under a picture → `cell_1`. Text beside a picture, or no picture → `cell_2`. Text on a picture → `cell_3`.
@@ -43,6 +43,25 @@ Choosing:
 - If a `cell_3` design puts the text **below** the image (title, description and button under key art), it can
   be built with bottom cell padding that reserves the space, but the text then can't grow; prefer `cell_1`
   unless the design needs `cell_3`-only features.
+
+### Groups and group headers
+
+- A **Group** is a component that holds several components sharing **one feed**: its items fill the child
+  components in order (each child takes up to its item limit before the next one starts).
+- **Group Info** (the `cell_info` cell style) only works inside a group, as a header at the top, a decorative row
+  between components, or a footer. It can also be a blank spacer.
+- The header **title is the group's feed title**, or a "title override" set on the Group Info component. Sample
+  text in the design is just that feed's name.
+- The row is **badge (optional) → title → button**. The title stretches to fill the row and the button sits at
+  the far right, so a badge can only go **before** the title and nothing can follow the title directly (hence
+  the icon-only button for "Title >" designs).
+- When the button is switched on, **the whole header row is tappable** and opens the group's feed (where it goes
+  depends on the feed's type). With the button off the header isn't tappable.
+- The button only appears when its **label has a value**, even if its text is hidden: an icon-only button still
+  needs a label (the studio fills in "View all"; it is also read out by screen readers).
+- The header hides itself when the group has no items.
+- Spacing: the Group Info component has its own padding and margins (default 0). The header cell's side padding
+  falls back to the theme's component padding (20) when left empty, so it lines up with rails by default.
 
 ## 2. Text labels
 

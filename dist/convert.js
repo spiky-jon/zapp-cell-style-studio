@@ -140,13 +140,14 @@
     if (plugin === 'cell_info') {
       const h = d.header || {}, t = h.title || labels[0] || {}, btn = h.button && (h.button.text || h.button.icon) ? h.button : null;
       const btnText = btn && btn.text ? String(btn.text) : '', btnIcon = btn && btn.icon ? String(btn.icon) : '';
+      // the header button only renders when its label has a value, even with the text hidden, so an icon-only button keeps a label
       const pad = Array.isArray(h.padding) ? h.padding : box(cell.padding, [20, 0, 12, 0]);
       const P = v => (v === null || v === undefined ? '' : String(num(v)));
       Object.assign(set, {
         group_info_padding_top: P(pad[0]), group_info_padding_right: P(pad[1]), group_info_padding_bottom: P(pad[2]), group_info_padding_left: P(pad[3]),
         group_info_margin_top: '', group_info_margin_bottom: '', group_info_border_top_thickness: 0, group_info_border_bottom_thickness: 0,
         badge_asset_switch: false, badge_asset: '', button_icon_asset: '',
-        button_element_switch: !!btn, button_text_switch: !!btnText, button_text_key: 'other', button_text_custom_data_key: btnText,
+        button_element_switch: !!btn, button_text_switch: !!btnText, button_text_key: 'other', button_text_custom_data_key: btnText || (btnIcon ? 'View all' : ''),
         button_icon_switch: !!btnIcon, button_icon_width: num(btn && btn.iconSize, 24), button_icon_height: num(btn && btn.iconSize, 24),
         button_element_padding_top: 0, button_element_padding_right: 0, button_element_padding_bottom: 0, button_element_padding_left: 0,
         button_element_margin_left: 12, button_element_border_thickness: 0, button_element_corner_radius: 0, button_element_vertical_position: 'center',
