@@ -116,6 +116,9 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
 `icons.library` is the closest match to the design's icon style, from: `lucide` (Outline, 2px rounded strokes (iOS-like, Feather family)), `phosphor-regular` (Outline, 1.5px rounded strokes, friendly geometric), `phosphor-bold` (Heavy outline, bold rounded strokes), `phosphor-fill` (Solid filled shapes, rounded), `tabler` (Outline, 2px strokes, slightly technical), `heroicons-outline` (Outline, 1.5px strokes, clean UI), `heroicons-solid` (Solid filled, clean UI), `material-outlined` (Android / Google style outline, square-ish ends), `material-rounded` (Android / Google style outline, rounded ends), `material-rounded-fill` (Android / Google style, solid filled, rounded).
 `light` is the icon colour for dark backgrounds, `dark` the colour for light backgrounds.
 
+Icons from a Figma file: when the studio lists `ICONS FROM THE FIGMA FILE`, use their exact refs (`figma:12:34`) as
+the icon value instead of a role, wherever the design uses them. Roles are for icons the file doesn't have.
+
 Icon roles (use these names wherever an icon is named): `play`, `plus`, `check`, `heart`, `bookmark`, `share-ios`, `share-network`, `download`, `download-progress`, `download-done`, `download-error`, `download-expired`, `trailer`, `calendar-plus`, `more-horizontal`, `more-vertical`, `volume-mute`, `volume-on`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `arrow-right`, `info`, `close`, `lock`, `search`, `star`, `live`, `list`.
 
 Notes for the describer:

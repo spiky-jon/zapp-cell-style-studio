@@ -7,11 +7,11 @@
   const $ = id => document.getElementById(id);
   const K = window.KNOWLEDGE, BASES = window.CELL_BASES, C = window.Convert;
   const S = { screens: [], cells: [], sel: null, busy: false, icons: { library: 'lucide', light: '#FFFFFF', dark: '#121212', why: '' }, iconsTouched: false,
-    fonts: { uploads: {}, picks: [] } };
+    fonts: { uploads: {}, picks: [] }, figmaIcons: {} };
   const ICONS = K.icons;
   // the manual version (no Claude) plugs its editors in here; see src/manual.js
   const MANUAL = window.STUDIO_MANUAL || null;
-  let engine = null, sample = null, downloads = null, mcp = null, figmaSession = null;
+  let engine = null, sample = null, downloads = null, mcp = null, figmaSession = null, imgMax = 1;
   const uid = () => Math.random().toString(36).slice(2, 9);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const toast = (msg, action) => {
@@ -160,10 +160,23 @@
     if (circle && !plate) { plate = circle; radius = null; }
     const key = [S.icons.library, role, size, height, iconSize, color, plate, radius].join('|');
     if (iconCache.has(key)) return iconCache.get(key);
-    const k = 3, px = Math.round(size * k), py = Math.round((height || size) * k), ip = Math.round((iconSize || Math.min(size, height || size)) * k);
-    const svg = iconSvg(role).replace('<svg', `<svg width="${ip}" height="${ip}" style="color:${color}"`);
-    const img = new Image();
-    await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error(`Icon ${role} didn't draw.`)); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    const fig = S.figmaIcons[role];
+    // multi-colour Figma artwork with no plate behind it brings its own shape, so it fills the whole box
+    const k = 3, px = Math.round(size * k), py = Math.round((height || size) * k), ip = fig && !fig.mono && !plate ? Math.min(px, py) : Math.round((iconSize || Math.min(size, height || size)) * k);
+    let img, iw = ip, ih = ip;
+    if (fig) {
+      // the design's own icon: fitted into the icon box, recoloured when it's one colour (multi-colour artwork stays as drawn)
+      const src = await loadImg(fig.url), s = ip / Math.max(src.width, src.height);
+      iw = Math.max(1, Math.round(src.width * s)); ih = Math.max(1, Math.round(src.height * s));
+      const t = document.createElement('canvas'); t.width = iw; t.height = ih; const tg = t.getContext('2d');
+      tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, iw, ih);
+      if (fig.mono && color) { tg.globalCompositeOperation = 'source-in'; tg.fillStyle = color; tg.fillRect(0, 0, iw, ih); }
+      img = t;
+    } else {
+      const svg = iconSvg(role).replace('<svg', `<svg width="${ip}" height="${ip}" style="color:${color}"`);
+      img = new Image();
+      await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error(`Icon ${role} didn't draw.`)); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    }
     const c = document.createElement('canvas'); c.width = px; c.height = py; const g = c.getContext('2d');
     if (plate) {
       g.fillStyle = plate; g.beginPath();
@@ -173,7 +186,7 @@
     }
     // play glyphs sit a touch right of centre so they look centred on a plate
     const nudge = plate && role === 'play' ? ip * 0.06 : 0;
-    g.drawImage(img, (px - ip) / 2 + nudge, (py - ip) / 2, ip, ip);
+    g.drawImage(img, (px - iw) / 2 + nudge, (py - ih) / 2, iw, ih);
     const url = c.toDataURL('image/png'); iconCache.set(key, url); return url;
   }
   async function drawAssets(list) {
@@ -295,13 +308,127 @@
         const im = imageOf(shot); if (!im) continue;
         const bin = atob(im.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
         $('device').value = f.w > 700 ? 'tablet' : 'phone'; $('screenW').value = Math.round(f.w);
-        await addScreen({ name: f.name || `Frame ${f.id}`, blob: new Blob([u8], { type: im.mimeType || 'image/png' }), source: 'figma',
+        const scr = await addScreen({ name: f.name || `Frame ${f.id}`, blob: new Blob([u8], { type: im.mimeType || 'image/png' }), source: 'figma',
           meta: meta.split('\n').filter(l => l.includes(`"${f.id}"`) || l.includes(f.name)).slice(0, 1).join('') });
+        // the frame's own icons: exported from Figma so cells use them instead of a library
+        if (scr) {
+          msg.textContent = `Exporting icons from ${f.name}…`;
+          try { await figmaIconsFor(scr, f, meta, ref.fileKey, sid); } catch (e) { console.warn('icons', e); }
+        }
       }
-      msg.textContent = `Added ${n} frame${n === 1 ? '' : 's'}.`;
+      const ni = Object.keys(S.figmaIcons).length;
+      msg.textContent = `Added ${n} frame${n === 1 ? '' : 's'}${ni ? ` and ${ni} icon${ni === 1 ? '' : 's'} from the file` : ''}.`;
+      renderIconPanel();
     } catch (e) { msg.textContent = e?.code === 'server_not_connected' || e?.code === 'not_connected' ? 'Connect Figma on Claude first, then try again.' : (e?.message || 'Figma read failed.'); }
     finally { $('figmaAdd').disabled = false; }
   });
+
+  /* ---------- icons from the Figma file ---------- */
+  // S.figmaIcons['figma:12:34'] = { ref, name, w, h, url (PNG data URL, transparent), mono (one colour: recoloured to fit) }
+  const ICON_NAME = /icon|^ic[_\-\s/]|chevron|arrow|caret|play|pause|plus|add|share|download|heart|bookmark|search|close|cross|check|tick|info|more|dots|kebab|lock|star|cast|back|menu|thumb|rate|like|bell|filter|setting|volume|mute|subtitle|calendar|trailer|list|home|live|profile|user|episode/i;
+  const GENERIC = /^(vector|frame|group|union|subtract|intersect|exclude|rectangle|ellipse|shape)\s*\d*$/i;
+  const VECTORISH = new Set(['vector', 'boolean-operation', 'star', 'line', 'ellipse', 'polygon', 'rectangle', 'group', 'frame', 'instance']);
+  function parseMeta(text) {
+    const a = text.indexOf('<'), z = text.lastIndexOf('>'); if (a < 0) return null;
+    const doc = new DOMParser().parseFromString(`<root>${text.slice(a, z + 1)}</root>`, 'text/xml');
+    return doc.querySelector('parsererror') ? null : doc.documentElement;
+  }
+  // small, roughly square layers named like icons (or made only of vectors), without text, with their position in the frame
+  function iconLayers(frameEl, absolute) {
+    const out = [], fx = +frameEl.getAttribute('x') || 0, fy = +frameEl.getAttribute('y') || 0;
+    const walk = (el, ox, oy) => {
+      for (const ch of el.children) {
+        const ax = +ch.getAttribute('x') || 0, ay = +ch.getAttribute('y') || 0;
+        const x = absolute ? ax - fx : ox + ax, y = absolute ? ay - fy : oy + ay;
+        const w = +ch.getAttribute('width') || 0, h = +ch.getAttribute('height') || 0, name = ch.getAttribute('name') || '', tag = ch.tagName.toLowerCase();
+        const small = w >= 8 && h >= 8 && w <= 72 && h <= 72 && w / h <= 2.5 && h / w <= 2.5;
+        const onlyVectors = ch.children.length > 0 && [...ch.querySelectorAll('*')].every(n => VECTORISH.has(n.tagName.toLowerCase())) && !!ch.querySelector('vector, boolean-operation');
+        if (small && !ch.querySelector('text') && tag !== 'text' && (ICON_NAME.test(name) || onlyVectors || ((tag === 'vector' || tag === 'boolean-operation') && !GENERIC.test(name)))) { out.push({ id: ch.getAttribute('id'), name, x, y, w, h }); continue; }
+        walk(ch, x, y);
+      }
+    };
+    walk(frameEl, 0, 0);
+    return out;
+  }
+  const loadImg = url => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => fail(new Error('image')); i.src = url; });
+  // Makes an icon image clean: keeps transparency when the export has it; otherwise lifts the glyph off a flat
+  // background (icons on photos can't be lifted and are skipped). Reports whether the icon is one colour.
+  // key: true for icons cut from the exported screen (lift them off a flat background; on a photo they're skipped).
+  // Figma's own render of a layer is used as it is: anything opaque in it (a plate behind the glyph) is the icon.
+  function cleanIcon(img, { key = false, sx = 0, sy = 0, sw, sh } = {}) {
+    sw = sw ?? (img.naturalWidth || img.width); sh = sh ?? (img.naturalHeight || img.height);
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(sw)); c.height = Math.max(1, Math.round(sh));
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const im = g.getImageData(0, 0, c.width, c.height), p = im.data, W = c.width, H = c.height, at = (x, y) => (y * W + x) * 4;
+    const ring = []; for (let x = 0; x < W; x++) ring.push(at(x, 0), at(x, H - 1)); for (let y = 0; y < H; y++) ring.push(at(0, y), at(W - 1, y));
+    const transparent = ring.filter(i => p[i + 3] < 20).length > ring.length * 0.6;
+    if (key && !transparent) {
+      const bg = [0, 1, 2].map(k => ring.reduce((a, i) => a + p[i + k], 0) / ring.length);
+      const dist = i => Math.abs(p[i] - bg[0]) + Math.abs(p[i + 1] - bg[1]) + Math.abs(p[i + 2] - bg[2]);
+      if (Math.max(...ring.map(dist)) > 60) return null;          // busy background (a photo): can't lift the icon cleanly
+      let far = 0; for (let i = 0; i < p.length; i += 4) far = Math.max(far, dist(i));
+      if (far < 60) return null;                                   // nothing there
+      const full = Math.min(far, 140);
+      for (let i = 0; i < p.length; i += 4) {
+        const a = Math.min(1, dist(i) / full);
+        for (let k = 0; k < 3; k++) p[i + k] = a > 0.02 ? Math.max(0, Math.min(255, Math.round((p[i + k] - bg[k] * (1 - a)) / a))) : 0;
+        p[i + 3] = Math.round(a * 255);
+      }
+      g.putImageData(im, 0, 0);
+    }
+    // one colour? compare the solid pixels with their average
+    const solid = []; for (let i = 0; i < p.length; i += 4) if (p[i + 3] > 160) solid.push(i);
+    if (!solid.length) return null;
+    const avg = [0, 1, 2].map(k => solid.reduce((a, i) => a + p[i + k], 0) / solid.length);
+    const mono = solid.every(i => Math.abs(p[i] - avg[0]) + Math.abs(p[i + 1] - avg[1]) + Math.abs(p[i + 2] - avg[2]) < 90);
+    return { url: c.toDataURL('image/png'), mono, w: W, h: H };
+  }
+  async function figmaIconsFor(scr, frame, metaText, fileKey, sid) {
+    const root = parseMeta(metaText); if (!root) return;
+    const el = [...root.querySelectorAll('*')].find(n => n.getAttribute('id') === frame.id); if (!el) return;
+    // positions are relative to the parent in Figma's layer data; fall back to page coordinates if they don't fit the frame
+    let layers = iconLayers(el, false);
+    const inside = l => l.x >= -2 && l.y >= -2 && l.x + l.w <= frame.w + 2 && l.y + l.h <= frame.h + 2;
+    if (layers.length && layers.filter(inside).length < layers.length * 0.8) { const abs = iconLayers(el, true); if (abs.filter(inside).length > layers.filter(inside).length) layers = abs; }
+    const seen = new Map(), refs = [];
+    for (const l of layers.filter(inside)) {
+      const key = GENERIC.test(l.name) ? l.id : `${l.name.toLowerCase()}|${Math.round(l.w)}x${Math.round(l.h)}`;
+      if (seen.has(key)) { const r = seen.get(key); if (r && !refs.includes(r)) refs.push(r); continue; }
+      const existing = Object.values(S.figmaIcons).find(x => x.key === key);
+      if (existing) { seen.set(key, existing.ref); refs.push(existing.ref); continue; }
+      if (Object.keys(S.figmaIcons).length >= 40) break;
+      seen.set(key, null);
+      let got = null;
+      // 1. Figma renders the layer on its own (transparent, sharp) when it has a plain id
+      if (/^\d+:\d+$/.test(l.id) && mcp) {
+        try {
+          const shot = await figmaCall('get_screenshot', { fileKey, nodeId: l.id, maxDimension: Math.round(Math.max(l.w, l.h) * 4), contentsOnly: true, enableBase64Response: true, ...sid });
+          const im = imageOf(shot);
+          if (im) { const img = await loadImg(`data:${im.mimeType || 'image/png'};base64,${im.data}`); if (img.naturalWidth >= l.w * 1.5) got = cleanIcon(img); }
+        } catch (e) { /* fall back to the crop */ }
+      }
+      // 2. otherwise (layers inside components) cut it from the exported screen
+      if (!got) { const k = scr.w / frame.w, pad = 1; got = cleanIcon(scr.img, { key: true, sx: (l.x - pad) * k, sy: (l.y - pad) * k, sw: (l.w + pad * 2) * k, sh: (l.h + pad * 2) * k }); }
+      if (!got) continue;
+      const ref = `figma:${l.id}`;
+      S.figmaIcons[ref] = { ref, key, name: l.name || ref, w: Math.round(l.w), h: Math.round(l.h), url: got.url, mono: got.mono, screen: scr.name };
+      seen.set(key, ref); refs.push(ref);
+    }
+    scr.figmaIcons = refs;
+  }
+  // one image of the screen's Figma icons, numbered, so Claude can see which is which
+  async function iconSheet(refs) {
+    const list = refs.map(r => S.figmaIcons[r]).filter(Boolean); if (!list.length) return null;
+    const cols = Math.min(8, list.length), cell = 120, rows = Math.ceil(list.length / cols);
+    const c = document.createElement('canvas'); c.width = cols * cell; c.height = rows * cell; const g = c.getContext('2d');
+    g.fillStyle = '#7A7A7A'; g.fillRect(0, 0, c.width, c.height); g.font = '600 15px system-ui, sans-serif'; g.textAlign = 'center';
+    for (let i = 0; i < list.length; i++) {
+      const x = (i % cols) * cell, y = Math.floor(i / cols) * cell, img = await loadImg(list[i].url), s = 64 / Math.max(img.width, img.height);
+      g.drawImage(img, x + (cell - img.width * s) / 2, y + 12 + (64 - img.height * s) / 2, img.width * s, img.height * s);
+      g.fillStyle = '#FFFFFF'; g.fillText(String(i + 1), x + cell / 2, y + cell - 16);
+    }
+    return new Promise(ok => c.toBlob(ok, 'image/png'));
+  }
 
   /* ---------- analysis with Claude ---------- */
   const log = line => { const l = $('log'); l.hidden = false; l.textContent += (l.textContent ? '\n' : '') + line; l.scrollTop = l.scrollHeight; };
@@ -318,6 +445,7 @@
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
       Object.keys(S.fonts.uploads).length ? `UPLOADED FONTS (the design's own font files; wherever the design's type matches one, use its family name exactly and set "source": "uploaded"): ${Object.entries(S.fonts.uploads).map(([f, u]) => `${f} (weights ${[...new Set(u.faces.filter(x => !x.italic).map(x => x.weight))].join(', ')})`).join('; ')}` : '',
       S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
+      (scr.figmaIcons || []).length ? `ICONS FROM THE FIGMA FILE${scr.sheet ? ' (the second image shows them, numbered in this order)' : ''}: ${scr.figmaIcons.map((r, i) => `${i + 1}. ${r} "${S.figmaIcons[r]?.name}" ${S.figmaIcons[r]?.w}x${S.figmaIcons[r]?.h}${S.figmaIcons[r]?.mono ? '' : ' (multi-colour)'}`).join('; ')}. These are the design's own icons: wherever a cell uses one (badges, action icons, header buttons, button icons), set the icon to its exact ref (e.g. "${scr.figmaIcons[0]}") instead of a role name. Use a role only for an icon that isn't in this list. If a Figma icon already includes its background shape (a filled square or circle behind the glyph), set the badge background to null so it isn't drawn twice.` : '',
       'Work in this order: write the inventory first (every visible element, top to bottom), then fonts, then the cells that build every inventory element, then seen, screen and icons.',
       'Fidelity comes first (RULES section 0): match the screenshot as closely as the rules allow. Never leave out visible text, images or buttons to keep a block in one cell; split it into stacked cells instead.',
       'Include every distinct content cell style on the screen (headers, tiles, rows, heroes, banners, info blocks, button rows). Skip the status bar, app navigation bar, tab strips and bottom tab bar.',
@@ -330,7 +458,8 @@
     for (const scr of todo) {
       scr.state = 'Reading…'; renderScreens(); log(`${scr.name}: reading the screen…`);
       try {
-        const res = await sample.json(promptFor(scr, S.cells), { images: [scr.blob], modelTier: 'complex', cache: false });
+        const sheet = (scr.figmaIcons || []).length && (imgMax || 1) > 1 ? await iconSheet(scr.figmaIcons) : null; scr.sheet = !!sheet;
+        const res = await sample.json(promptFor(scr, S.cells), { images: sheet ? [scr.blob, sheet] : [scr.blob], modelTier: 'complex', cache: false });
         const found = Array.isArray(res?.cells) ? res.cells : [];
         for (const d of found) {
           if (!d || !d.name) continue;
@@ -487,7 +616,10 @@
   const PREVIEW_ROLES = ['play', 'plus', 'check', 'share-ios', 'download', 'chevron-right', 'heart', 'more-horizontal', 'close'];
   function renderIconPanel() {
     const box = $('iconPanel'), lib = ICONS.libraries[S.icons.library];
-    box.innerHTML = `<div class="row" style="justify-content:space-between"><span class="lab">Icons</span><span class="hint">${S.iconsSet && !S.iconsTouched ? 'matched to the designs' : ''}</span></div>
+    const figs = Object.values(S.figmaIcons);
+    box.innerHTML = `<div class="row" style="justify-content:space-between"><span class="lab">Icons</span><span class="hint">${figs.length ? `${figs.length} from Figma` : S.iconsSet && !S.iconsTouched ? 'matched to the designs' : ''}</span></div>
+      ${figs.length ? `<div class="strip fig" role="list" aria-label="Icons from the Figma file">${figs.map(f => `<img role="listitem" src="${f.url}" alt="${esc(f.name)}" title="${esc(f.name)} · ${f.w}×${f.h}${f.mono ? '' : ' · multi-colour'}">`).join('')}</div>
+        <span class="hint">The design's own icons, used wherever the cells need them. For anything the file doesn't have:</span>` : ''}
       <select class="inp" id="iconLib" aria-label="Icon library">${Object.entries(ICONS.libraries).map(([k, v]) => `<option value="${k}" ${k === S.icons.library ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
       <div class="strip" aria-hidden="true">${PREVIEW_ROLES.map(r => `<img alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent((lib.icons[r] || '').replace('<svg', `<svg width="20" height="20" style="color:${S.icons.light}"`))}">`).join('')}</div>
       <span class="hint">${esc(lib.style)}${S.icons.why ? ` · ${esc(S.icons.why)}` : ''}</span>
@@ -589,14 +721,19 @@
     try { await downloads.save({ filename, data }); toast(`Saved ${filename}`); }
     catch (e) { if (e?.code !== 'declined') toast(e?.message || "That file couldn't be saved."); }
   }
+  const iconSource = assets => {
+    const fig = assets.some(a => S.figmaIcons[a.role]), lib = assets.some(a => !S.figmaIcons[a.role]), name = ICONS.libraries[S.icons.library]?.name || S.icons.library;
+    return fig && lib ? `from the Figma file, others from ${name}` : fig ? 'from the Figma file' : name;
+  };
   function readme(c) {
     const d = c.desc, lines = [`${d.name} - ${c.json?.meta?.identifier || d.plugin}`, `${collection()} · built by Zapp Cell Style Studio (rules ${K.version})`, '', d.purpose || '', '',
       `${c.output}: import into the cell builder`, `thumbnails/${c.output.replace('.json', '@2x.png')}: thumbnail for the cell style (500 x 280 @2x)`];
     if (c.overlay) lines.push(`${c.overlay.file}: upload to image_overlay (the gradient over the image)`);
-    for (const a of (c.assets || []).filter(a => !a.shared)) lines.push(`assets/${a.file}: upload to ${a.field}`);
+    const figName = a => S.figmaIcons[a.role] ? ` (Figma icon "${S.figmaIcons[a.role].name}")` : '';
+    for (const a of (c.assets || []).filter(a => !a.shared)) lines.push(`assets/${a.file}: upload to ${a.field}${figName(a)}`);
     for (const a of (c.assets || []).filter(a => a.shared)) lines.push(`../plugin assets/${a.file}: ${a.field}`);
     for (const l of c.labels || []) lines.push(`Button label: set the ${C.PLUGIN[l.action]?.name || l.action} plugin's label to "${l.text}"`);
-    if ((c.assets || []).length) lines.push(`Icons: ${ICONS.libraries[S.icons.library]?.name || S.icons.library}`);
+    if ((c.assets || []).length) lines.push(`Icons: ${iconSource(c.assets)}`);
     const fn = fontNames([c]); if (fn.length) lines.push(`Fonts: ${fn.map(f => f.ps).join(', ')} (see ../fonts)`);
     const sec = t => (d.decisions || []).filter(x => x.type === t);
     if (sec('works').length) lines.push('', 'What works:', ...sec('works').map(x => `  - ${x.text}`));
@@ -656,8 +793,8 @@
       const pa = zip.folder('plugin assets');
       for (const a of pluginAssets.values()) pa.file(a.file, bytes(a.dataUrl));
       const L = [];
-      if (pluginAssets.size) L.push(`Action plugin button icons (${ICONS.libraries[S.icons.library]?.name || S.icons.library}). Upload each to its plugin in Zapp:`, '',
-        ...[...pluginAssets.values()].map(a => `${a.file}: ${a.field}`), '', 'Flavour 1 is for dark button backgrounds, flavour 2 for light.', '');
+      if (pluginAssets.size) L.push(`Action plugin button icons (${iconSource([...pluginAssets.values()])}). Upload each to its plugin in Zapp:`, '',
+        ...[...pluginAssets.values()].map(a => `${a.file}: ${a.field}${S.figmaIcons[a.role] ? ` (Figma icon "${S.figmaIcons[a.role].name}")` : ''}`), '', 'Flavour 1 is for dark button backgrounds, flavour 2 for light.', '');
       if (labels.size) {
         L.push('Button labels (set once on each action plugin, for the whole app):', '');
         for (const [action, texts] of labels) {
@@ -774,7 +911,7 @@
     if (window.claude?.use) {
       const [smp, dl, m] = await Promise.all(['sample', 'downloads', 'mcp'].map(n => window.claude.use(n).catch(() => null)));
       sample = smp; downloads = dl; mcp = m;
-      if (sample) { const lim = await sample.limits().catch(() => null); if (!lim?.images) { sample = null; $('aiHint').textContent = "Claude can't read images in this view, so cells can't be found from screenshots here."; } }
+      if (sample) { const lim = await sample.limits().catch(() => null); imgMax = lim?.images?.maxCount || 1; if (!lim?.images) { sample = null; $('aiHint').textContent = "Claude can't read images in this view, so cells can't be found from screenshots here."; } }
       else $('aiHint').textContent = 'Finding cells uses Claude, which isn’t available in this view.';
       if (!mcp) $('figmaAdd').disabled = true;
     } else $('aiHint').textContent = 'Open the published studio to find cells with Claude.';

@@ -31,6 +31,10 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
 7. **Icons**: Claude picks the icon library closest to the design's icon style (Lucide, Phosphor, Tabler,
    Heroicons, Material Symbols, from `knowledge/icons.json`); the icon panel switches library and colours.
    Every icon a cell uses (badges, action icons, header buttons, plugin button flavours) is drawn as a PNG @3x.
+   From a Figma link, the frame's own icons are found in its layer data (small layers named like icons, or made of
+   vectors), exported through the Figma connector (Figma's render of the layer, or cut from the exported screen for
+   layers inside components) and listed to Claude by ref (`figma:12:34`) with a numbered contact sheet. Cells use
+   them instead of the library; one-colour icons are recoloured (plugin flavours), multi-colour ones kept as drawn.
    Cell badges are drawn to the design's size and shape (square, rounded or round plate behind the icon).
    Button labels use the design's wording; the zip lists the label to set on each action plugin.
    After each run, headers that sit a few points off the first item of the rail below are lined up with it.

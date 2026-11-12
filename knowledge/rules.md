@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 4 · phone and tablet · cell plugins 16.0.0-alpha
+Version 5 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -113,8 +113,13 @@ Choosing:
 
 - Every icon a cell uses is a deliverable: button icons (per action plugin, two flavours: flavour 1 for dark
   backgrounds, flavour 2 for light), cell badges (chevrons, play buttons), action icons and header icons.
-- The studio draws them from an icon library chosen to match the design's icon style (outline or filled, stroke
-  weight, rounded or square ends). Name icons by role (`play`, `chevron-right`, `download`...).
+- When the design comes from a **Figma file**, use the file's own icons: the studio exports them and lists them
+  by ref (`figma:12:34`). Use the ref wherever a cell needs that icon. One-colour icons are recoloured to fit
+  (e.g. the plugin's light and dark flavours); multi-colour artwork stays as drawn. If a Figma icon already
+  includes its background shape, don't add a plate behind it.
+- For screenshots, and for any icon the Figma file doesn't have, the studio draws from an icon library chosen to
+  match the design's icon style (outline or filled, stroke weight, rounded or square ends). Name those icons by
+  role (`play`, `chevron-right`, `download`...).
 - A play button on a thumbnail is a cell badge with a filled circle behind the icon.
 
 ## 6. Buttons
