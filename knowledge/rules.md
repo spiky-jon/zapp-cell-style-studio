@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 5 · phone and tablet · cell plugins 16.0.0-alpha
+Version 6 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -113,6 +113,8 @@ Choosing:
 
 - Every icon a cell uses is a deliverable: button icons (per action plugin, two flavours: flavour 1 for dark
   backgrounds, flavour 2 for light), cell badges (chevrons, play buttons), action icons and header icons.
+- When the design comes from a **Figma file**, the studio also sends the screen's layer details (exact positions,
+  auto-layout padding and gaps, fonts, colours and text). Use those numbers instead of measuring the picture.
 - When the design comes from a **Figma file**, use the file's own icons: the studio exports them and lists them
   by ref (`figma:12:34`). Use the ref wherever a cell needs that icon. One-colour icons are recoloured to fit
   (e.g. the plugin's light and dark flavours); multi-colour artwork stays as drawn. If a Figma icon already
@@ -147,13 +149,19 @@ Choosing:
   item of the rail or list below them; heroes and banners are often inset differently on purpose. Copy what the
   design does: compare the header title's left edge with the first tile's left edge, and give both the same
   inset when they line up in the design.
+- **List rows keep their spacing inside the cell.** A row in a vertical list (a category, a setting, a menu item)
+  puts the space above and below its text into the cell's own top and bottom padding (equal, as designed), and
+  the list has no gap between rows. That keeps the whole row tappable (a good hit area) and the divider in the
+  right place. Use a list gap only when the design shows real space between separate cards.
 - Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
   **dividers** (thickness, colour, margins); they're inset by the cell's side padding. An edge-to-edge divider
   with padded content isn't possible: accept the inset, or move side spacing to the component.
 - Cell 2 **centres its text vertically** against the image when the text is shorter than the image, and
   top-aligns when taller. A full-width line under both the image and the text (e.g. a synopsis under an episode
   row) isn't possible: the text stays beside the image.
-- Describe each screen as components top to bottom (single, rail, list, grid) so the studio can mock it up.
+- Describe each screen as components top to bottom (single, rail, list, grid) so the studio can mock it up, with
+  the text each item shows on that screen (the feed decides it in the app, but the mock-up should read like the
+  design: "Search" for the page title, "All Shows", "Comedy"... for the rows).
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
 - **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them

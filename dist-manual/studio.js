@@ -199,8 +199,13 @@
     return out;
   }
 
+  // the engine draws one cell at a time: anything that renders and then snapshots queues here
+  let engineQ = Promise.resolve();
+  const withEngine = fn => { const r = engineQ.then(fn, fn); engineQ = r.catch(() => {}); return r; };
+
   /* ---------- build one cell: description -> spec -> JSON -> render -> snapshot ---------- */
-  async function buildCell(c) {
+  async function buildCell(c) { return withEngine(() => buildCellNow(c)); }
+  async function buildCellNow(c) {
     c.error = null; c.warnings = [];
     try {
       const scr = S.screens.find(s => s.id === c.screenId);
@@ -216,6 +221,7 @@
       await new Promise(r => setTimeout(r, 60));
       c.snap = await engine.CellEngine.snapshot({ scale: 2, pad: 12 });
       c.snapRaw = await engine.CellEngine.snapshot({ scale: 2, pad: 0 });
+      c.rev = (c.rev || 0) + 1; c.itemSnaps = new Map();
     } catch (e) { c.error = e.message || String(e); console.error(e); }
   }
 
@@ -398,19 +404,56 @@
   // Preferred: one read-only script in the file finds every icon instance in the screens, follows it to its component,
   // and exports that component as SVG (vector, any size). Layer data alone can't see inside component instances.
   const ICON_SCRIPT = ids => `const frameIds = ${JSON.stringify(ids)};
-const icons = new Map();
+const icons = new Map(), specs = {};
+const hex = p => { const c = p.color, h = v => Math.round(v * 255).toString(16).padStart(2, '0'); return '#' + h(c.r) + h(c.g) + h(c.b) + (p.opacity != null && p.opacity < 1 ? h(p.opacity) : ''); };
+const paint = ps => { if (!Array.isArray(ps)) return ''; const p = ps.find(x => x.visible !== false); if (!p) return ''; return p.type === 'SOLID' ? hex(p) : p.type === 'IMAGE' ? 'image' : p.type.indexOf('GRADIENT') === 0 ? 'gradient' : p.type.toLowerCase(); };
+const r1 = v => Math.round(v * 10) / 10;
+const isIcon = n => n.type === 'INSTANCE' && n.width <= 72 && n.height <= 72 && n.width >= 8 && n.height >= 8 && !n.findAllWithCriteria({ types: ['TEXT'] }).length;
+const textOf = n => { const fn = n.fontName, lh = n.lineHeight, ls = n.letterSpacing;
+  return '"' + n.characters.slice(0, 80).replace(/\\n/g, ' ') + '" ' + (typeof fn === 'symbol' ? 'mixed' : fn.family + ' ' + fn.style) + ' ' + (typeof n.fontSize === 'symbol' ? 'mixed' : n.fontSize) + '/'
+    + (typeof lh === 'symbol' || lh.unit === 'AUTO' ? 'auto' : lh.unit === 'PIXELS' ? r1(lh.value) : r1(lh.value) + '%')
+    + (typeof ls !== 'symbol' && ls.value ? ' ls=' + r1(ls.value) + (ls.unit === 'PERCENT' ? '%' : '') : '') + ' ' + paint(n.fills)
+    + (n.textAlignHorizontal !== 'LEFT' ? ' align=' + n.textAlignHorizontal.toLowerCase() : '')
+    + (n.textCase && typeof n.textCase !== 'symbol' && n.textCase !== 'ORIGINAL' ? ' case=' + n.textCase.toLowerCase() : ''); };
 for (const fid of frameIds) {
   const frame = await figma.getNodeByIdAsync(fid);
   if (!frame || !('findAllWithCriteria' in frame)) continue;
+  // icons: every small instance without text, followed to its component
   for (const inst of frame.findAllWithCriteria({ types: ['INSTANCE'] })) {
-    if (inst.width > 72 || inst.height > 72 || inst.width < 8 || inst.height < 8 || !inst.visible) continue;
-    if (inst.findAllWithCriteria({ types: ['TEXT'] }).length) continue;
+    if (!inst.visible || !isIcon(inst) || icons.size >= 40) continue;
     const main = await inst.getMainComponentAsync();
     const key = main ? main.id : inst.id;
     if (!icons.has(key)) icons.set(key, { id: key, name: main ? (main.parent && main.parent.type === 'COMPONENT_SET' ? main.parent.name + ' / ' + main.name : main.name) : inst.name, w: Math.round(inst.width), h: Math.round(inst.height), frames: [], node: main || inst });
-    const ic = icons.get(key); if (!ic.frames.includes(fid)) ic.frames.push(fid);
-    if (icons.size >= 40) break;
+    const ic = icons.get(key); if (ic.frames.indexOf(fid) < 0) ic.frames.push(fid);
   }
+  // layer details: positions in the screen, auto-layout padding and gaps, fills, strokes, radius, text and type
+  const fx = frame.absoluteTransform[0][2], fy = frame.absoluteTransform[1][2], lines = [], seenMain = new Map(); let size = 0;
+  const walk = async (n, depth) => {
+    if (n.visible === false || size > 16000) return;
+    let line = '  '.repeat(depth) + n.type.toLowerCase() + ' "' + n.name + '" ' + r1(n.absoluteTransform[0][2] - fx) + ',' + r1(n.absoluteTransform[1][2] - fy) + ' ' + r1(n.width) + 'x' + r1(n.height);
+    if (n.type === 'TEXT') line += ' ' + textOf(n);
+    else {
+      if ('layoutMode' in n && n.layoutMode !== 'NONE') line += ' auto=' + n.layoutMode.toLowerCase() + ' pad=' + [n.paddingTop, n.paddingRight, n.paddingBottom, n.paddingLeft].join(',') + ' gap=' + n.itemSpacing;
+      const f = paint(n.fills); if (f) line += ' fill=' + f;
+      const st = paint(n.strokes);
+      if (st && n.strokeWeight) line += ' stroke=' + st + '/' + (typeof n.strokeWeight === 'symbol' && 'strokeTopWeight' in n ? 'top ' + n.strokeTopWeight + ' right ' + n.strokeRightWeight + ' bottom ' + n.strokeBottomWeight + ' left ' + n.strokeLeftWeight : n.strokeWeight);
+      if ('cornerRadius' in n && typeof n.cornerRadius === 'number' && n.cornerRadius) line += ' radius=' + n.cornerRadius;
+      if ('opacity' in n && n.opacity < 1) line += ' opacity=' + r1(n.opacity);
+    }
+    if (n.type === 'INSTANCE') {
+      const main = await n.getMainComponentAsync();
+      if (main && isIcon(n)) { lines.push(line + ' icon=figma:' + main.id); size += line.length; return; }
+      if (main && seenMain.has(main.id)) {
+        const texts = n.findAllWithCriteria({ types: ['TEXT'] }).filter(t => t.visible).map(t => '"' + t.characters.slice(0, 60).replace(/\\n/g, ' ') + '"').join(' ');
+        line += ' (same component as "' + seenMain.get(main.id) + '" above) texts: ' + texts; lines.push(line); size += line.length; return;
+      }
+      if (main) seenMain.set(main.id, n.name);
+    }
+    lines.push(line); size += line.length;
+    if ('children' in n && depth < 9) for (const ch of n.children) await walk(ch, depth + 1);
+  };
+  await walk(frame, 0);
+  specs[fid] = lines.join('\\n');
 }
 const out = [];
 for (const ic of icons.values()) {
@@ -418,14 +461,16 @@ for (const ic of icons.values()) {
   try { svg = await ic.node.exportAsync({ format: 'SVG_STRING' }); } catch (e) { svg = null; }
   if (svg && svg.length < 60000) out.push({ id: ic.id, name: ic.name, w: ic.w, h: ic.h, frames: ic.frames, svg });
 }
-return out;`;
+return { icons: out, specs };`;
   const svgColours = svg => [...new Set([...svg.replace(/<defs>[\s\S]*?<\/defs>/g, '').matchAll(/(?:fill|stroke)(?:=|:\s*)"?(#[0-9a-f]{3,8}|rgba?\([^)]*\)|[a-z]+)/gi)].map(m => m[1].toLowerCase()).filter(c => c !== 'none' && c !== 'transparent' && !c.startsWith('url')))];
   async function figmaIconsViaPlugin(fileKey, sid, added) {
     if (!mcp || !added.length) return false;
-    const res = await figmaCall('use_figma', { fileKey, description: 'Read-only: export the icons used in these screens as SVG for Zapp cell styles', code: ICON_SCRIPT(added.map(a => a.f.id)), ...sid });
-    const txt = textOf(res); let list;
-    try { list = JSON.parse(txt); } catch (e) { const a = txt.indexOf('['), z = txt.lastIndexOf(']'); list = a >= 0 ? JSON.parse(txt.slice(a, z + 1)) : null; }
+    const res = await figmaCall('use_figma', { fileKey, description: 'Read-only: read the layer details of these screens and export the icons they use as SVG, for Zapp cell styles', code: ICON_SCRIPT(added.map(a => a.f.id)), ...sid });
+    const txt = textOf(res); let data;
+    try { data = JSON.parse(txt); } catch (e) { const a = txt.indexOf('{'), z = txt.lastIndexOf('}'); data = a >= 0 ? JSON.parse(txt.slice(a, z + 1)) : null; }
+    const list = Array.isArray(data) ? data : data?.icons;
     if (!Array.isArray(list)) return false;
+    for (const { scr, f } of added) if (data?.specs?.[f.id]) scr.figmaSpec = data.specs[f.id];
     for (const ic of list) {
       if (!ic || !ic.svg) continue;
       const ref = `figma:${ic.id}`;
@@ -493,9 +538,10 @@ return out;`;
       '', '# RULES', K.rules, '', '# FORMAT', K.schema, '', '# WORKED EXAMPLES (from a reviewed build; match this level of detail)', JSON.stringify(K.examples),
       '', '# THIS SCREEN',
       `The attached image is the "${scr.name}" screen. It is ${scr.w} px wide and ${scr.h} px tall. The screen is ${scr.screenW} points wide (${scr.device}), so 1 point = ${(scr.w / scr.screenW).toFixed(3)} px. Give every size in points.`,
-      scr.meta ? `Figma layer data for this frame: ${scr.meta.slice(0, 2000)}` : '',
+      scr.figmaSpec ? `FIGMA LAYER DETAILS for this screen, from the design file (positions in points from the screen's top left, auto-layout padding as top,right,bottom,left, gaps, fills, strokes, and each text's content, font, size/line height, letter spacing and colour). These are exact: use them for sizes, padding, spacing, colours, fonts and sample text instead of measuring the image. Padding inside a component that wraps a row is the cell's padding; a list with gap=0 has no gap between rows. icon=figma:… marks an icon from the list below.\n${scr.figmaSpec}`
+        : scr.meta ? `Figma layer data for this frame: ${scr.meta.slice(0, 2000)}` : '',
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
-      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names) and icons.',
+      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts") and icons.',
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
       Object.keys(S.fonts.uploads).length ? `UPLOADED FONTS (the design's own font files; wherever the design's type matches one, use its family name exactly and set "source": "uploaded"): ${Object.entries(S.fonts.uploads).map(([f, u]) => `${f} (weights ${[...new Set(u.faces.filter(x => !x.italic).map(x => x.weight))].join(', ')})`).join('; ')}` : '',
       S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
@@ -729,23 +775,56 @@ return out;`;
 
   /* ---------- screens mock-up ---------- */
   const findCell = name => S.cells.find(c => c.desc.name.toLowerCase() === String(name).toLowerCase());
-  function mockBlock(item, W) {
+  // how many items a placement shows
+  const itemCount = (item, c) => { const comp = item.component || c?.spec?.layout?.type || 'single', cols = Math.max(1, +item.columns || 3);
+    return comp === 'rail' ? Math.max(1, Math.min(12, +item.count || 4)) : comp === 'list' ? Math.max(1, Math.min(18, +item.count || 3)) : comp === 'grid' ? Math.max(cols, Math.min(18, +item.count || cols * 2)) : 1; };
+  // one item drawn with the text the design shows in that place (texts are keyed by each label's data key)
+  async function itemSnap(c, texts) {
+    if (!texts || !Object.keys(texts).length || !c.json) return null;
+    const key = `${c.rev}|${JSON.stringify(texts)}`; c.itemSnaps ||= new Map();
+    if (!c.itemSnaps.has(key)) c.itemSnaps.set(key, withEngine(async () => {
+      const o = renderOpts(c), ext = { ...(o.ext || {}) };
+      for (const [k, v] of Object.entries(texts)) { if (k === 'title') o.title = String(v); else if (k === 'summary') o.summary = String(v); else ext[k] = String(v); }
+      const r = engine.CellEngine.render(c.json, { ...o, ext });
+      await new Promise(ok => setTimeout(ok, 30));
+      return { url: await engine.CellEngine.snapshot({ scale: 2, pad: 0 }), w: r.width, h: r.height };
+    }).catch(() => null));
+    return c.itemSnaps.get(key);
+  }
+  function mockBlock(item, W, imgs) {
     const c = findCell(item.cell); if (!c || !c.snapRaw || !c.size) return { html: '', h: 0 };
     const lay = c.spec.layout || {}, comp = item.component || lay.type || 'single';
-    const pad = num(lay.padding), gap = num(lay.gap ?? lay.rowGap ?? 8), cw = c.size.w, ch = c.size.h;
-    const im = (w, h) => `<img src="${c.snapRaw}" alt="" style="width:${w}px;height:${h}px">`;
-    if (comp === 'rail') { const n = Math.max(1, Math.min(12, +item.count || 4));
-      return { h: ch, html: `<div class="blk" style="gap:${gap}px;padding-left:${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>` }; }
-    if (comp === 'list') { const n = Math.max(1, Math.min(12, +item.count || 3));
-      return { h: n * ch + (n - 1) * num(lay.rowGap ?? 0), html: `<div class="blk" style="flex-direction:column;gap:${num(lay.rowGap ?? 0)}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(cw, ch)).join('')}</div>` }; }
-    if (comp === 'grid') { const cols = Math.max(1, +item.columns || 3), n = Math.max(cols, Math.min(18, +item.count || cols * 2));
-      const g = num(lay.gap ?? 8), w = (W - pad * 2 - g * (cols - 1)) / cols, h = ch * w / cw;
-      const rows = Math.ceil(n / cols);
-      return { h: rows * h + (rows - 1) * g, html: `<div class="blk" style="flex-wrap:wrap;gap:${g}px;padding:0 ${pad}px">${Array.from({ length: n }, () => im(w, h)).join('')}</div>` }; }
-    return { h: ch, html: `<div class="blk" style="padding-left:${Math.max(0, (W - cw) / 2)}px">${im(cw, ch)}</div>` };
+    const pad = num(lay.padding), gap = num(lay.gap ?? lay.rowGap ?? 8), n = itemCount(item, c);
+    const at = i => (imgs && imgs[i]) || { url: c.snapRaw, w: c.size.w, h: c.size.h };
+    const im = (x, w, h) => `<img src="${x.url}" alt="" style="width:${w ?? x.w}px;height:${h ?? x.h}px">`;
+    const all = Array.from({ length: n }, (_, i) => at(i));
+    if (comp === 'rail') return { h: Math.max(...all.map(x => x.h)), html: `<div class="blk" style="gap:${gap}px;padding-left:${pad}px;align-items:flex-start">${all.map(x => im(x)).join('')}</div>` };
+    if (comp === 'list') { const rg = num(lay.rowGap ?? 0);
+      return { h: all.reduce((a, x) => a + x.h, 0) + (n - 1) * rg, html: `<div class="blk" style="flex-direction:column;gap:${rg}px;padding:0 ${pad}px">${all.map(x => im(x)).join('')}</div>` }; }
+    if (comp === 'grid') { const cols = Math.max(1, +item.columns || 3), g = num(lay.gap ?? 8), w = (W - pad * 2 - g * (cols - 1)) / cols, h = c.size.h * w / c.size.w, rows = Math.ceil(n / cols);
+      return { h: rows * h + (rows - 1) * g, html: `<div class="blk" style="flex-wrap:wrap;gap:${g}px;padding:0 ${pad}px">${all.map(x => im(x, w, h)).join('')}</div>` }; }
+    return { h: all[0].h, html: `<div class="blk" style="padding-left:${Math.max(0, (W - all[0].w) / 2)}px">${im(all[0])}</div>` };
+  }
+  // draws straight away with each cell's own sample, then again once the items with the design's text are ready
+  let mockToken = 0;
+  function renderMock() {
+    const t = ++mockToken;
+    drawMock(null);
+    const jobs = [];
+    for (const scr of S.screens) (scr.layout || []).forEach((item, i) => {
+      const c = findCell(item.cell), texts = Array.isArray(item.texts) ? item.texts.filter(x => x && typeof x === 'object') : [];
+      if (!c || !texts.length) return;
+      jobs.push(Promise.all(Array.from({ length: itemCount(item, c) }, (_, j) => itemSnap(c, texts[j % texts.length]))).then(imgs => [scr.id, i, imgs]));
+    });
+    if (!jobs.length) return;
+    Promise.all(jobs).then(res => {
+      if (t !== mockToken || $('v-screens').hidden) return;
+      const map = new Map(); for (const [sid, i, imgs] of res) { if (!map.has(sid)) map.set(sid, []); map.get(sid)[i] = imgs; }
+      drawMock(map);
+    });
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
-  function renderMock() {
+  function drawMock(itemImgs) {
     const box = $('mock'), done = S.screens.filter(s => MANUAL || (s.layout || []).length);
     if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>${MANUAL ? 'Add screenshots on the Designs tab; each screen is rebuilt here from the cells you place on it.' : 'Find cells from your designs; each screen is rebuilt here from its cells.'}</span></div>`; return; }
     box.innerHTML = done.map(scr => {
@@ -754,7 +833,7 @@ return out;`;
       const bg = first?.spec?.appBg || '#000';
       const missing = scr.layout.filter(i => !findCell(i.cell)).map(i => i.cell);
       // the mock grows when the cells run longer than the screenshot (split cells, sample text)
-      const blocks = scr.layout.map(i => mockBlock(i, W)), contentH = blocks.reduce((a, b) => a + b.h, 0);
+      const blocks = scr.layout.map((it, i) => mockBlock(it, W, itemImgs?.get(scr.id)?.[i])), contentH = blocks.reduce((a, b) => a + b.h, 0);
       return `<section class="mscreen"><h2>${esc(scr.name)} <span class="hint">${tablet ? 'Tablet' : 'Phone'} · ${W}pt</span></h2>
         <div class="mpair">
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
@@ -836,8 +915,8 @@ return out;`;
         dir.file(`assets/${a.file}`, bytes(a.dataUrl));
       }
       try {
-        renderInEngine(c);
-        dir.file(`thumbnails/${c.output.replace('.json', '@2x.png')}`, bytes(await engine.CellEngine.snapshot({ thumb: true })));
+        const thumb = await withEngine(async () => { renderInEngine(c); return engine.CellEngine.snapshot({ thumb: true }); });
+        dir.file(`thumbnails/${c.output.replace('.json', '@2x.png')}`, bytes(thumb));
       } catch (e) { console.warn('thumbnail', e); }
     }
     // button labels are set once per action plugin: list each, and flag a plugin the designs label two ways

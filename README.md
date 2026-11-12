@@ -34,13 +34,15 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
    From a Figma link, a read-only `use_figma` script finds every small instance without text in the screens (icons
    inside components included), follows each to its main component and exports it as SVG. Layer data from
    `get_metadata` can't see inside instances, so it is only the fallback (layers named like icons, rendered or cut
-   from the exported screen). Icons are listed to Claude by ref (`figma:12:34`) with a numbered contact sheet. Cells use
+   from the exported screen). Icons are listed to Claude by ref (`figma:12:34`) with a numbered contact sheet.
+   The same script returns each screen's layer details (positions, auto-layout padding and gaps, fills, strokes,
+   fonts and text), which Claude uses instead of measuring the picture. Cells use
    them instead of the library; one-colour icons are recoloured (plugin flavours), multi-colour ones kept as drawn.
    Cell badges are drawn to the design's size and shape (square, rounded or round plate behind the icon).
    Button labels use the design's wording; the zip lists the label to set on each action plugin.
    After each run, headers that sit a few points off the first item of the rail below are lined up with it.
 8. **Screens**: each screen mocked up from the built cells, laid out as the components Claude described
-   (single, rail, list, grid), next to the original.
+   (single, rail, list, grid), next to the original. Each item is drawn with the text the design shows there.
 9. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each
    asset, 500x280@2x thumbnail, overlay PNG when there's a gradient, `assets/` icons; plus a `plugin assets`
    folder for action plugin button icons; a `fonts` folder with the font files and names) and a PDF report.

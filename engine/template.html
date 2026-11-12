@@ -2452,6 +2452,8 @@ window.CellEngine = {
     state.infoIcon = opts.infoIcon || null;
     state.actionLabels = opts.actionLabels || null;
     $('screenW').value = state.screenW; $('pad').value = state.pad; $('appbg').value = state.appBg;
+    // header (group info) cells show the feed's title: the studio passes it as feedTitle, or the cell's title sample
+    $('dFeedTitle').value = opts.feedTitle ?? opts.title ?? 'Continue Watching';
     $('dTitle').value = opts.title ?? 'Content Title'; $('dSummary').value = opts.summary ?? 'Two rock-bottom drivers transport a wealthy teen to rehab, but their simple job spirals into chaos.';
     for (const [k, v] of Object.entries(opts.ext || {})) SAMPLE_EXT[k] = String(v);
     $('hoverOn').checked = false; $('outline').checked = false;

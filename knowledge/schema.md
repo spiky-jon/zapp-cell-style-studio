@@ -105,8 +105,10 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
   "screen": [                                 // this screen top to bottom, as components of cells (for the screen mock-up)
     { "cell": "Hero Card", "component": "single" },
     { "cell": "Section Header", "component": "single" },
+    { "cell": "Page Title", "component": "single", "texts": [{ "title": "Search" }] },
     { "cell": "Poster Tile", "component": "rail", "count": 4 },          // rail: horizontal list; count = items visible
-    { "cell": "Episode Row", "component": "list", "count": 3 },          // list: vertical list
+    { "cell": "Category Row", "component": "list", "count": 3,           // list: vertical list
+      "texts": [{ "title": "All Shows" }, { "title": "Audio Described" }, { "title": "Comedy" }] },  // what each item shows here
     { "cell": "Poster Tile", "component": "grid", "columns": 3, "count": 6 }
   ],
   "icons": { "library": "lucide", "light": "#FFFFFF", "dark": "#121212", "why": "Thin rounded outline icons" }
@@ -120,6 +122,10 @@ Icons from a Figma file: when the studio lists `ICONS FROM THE FIGMA FILE`, use 
 the icon value instead of a role, wherever the design uses them. Roles are for icons the file doesn't have.
 
 Icon roles (use these names wherever an icon is named): `play`, `plus`, `check`, `heart`, `bookmark`, `share-ios`, `share-network`, `download`, `download-progress`, `download-done`, `download-error`, `download-expired`, `trailer`, `calendar-plus`, `more-horizontal`, `more-vertical`, `volume-mute`, `volume-on`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `arrow-right`, `info`, `close`, `lock`, `search`, `star`, `live`, `list`.
+
+`texts`: one object per visible item, in order, giving the text that item shows on this screen, keyed by each label's
+`dataKey` (`title`, `summary`, `extensions.genre`...). The cell's own `sample` is just one example; `texts` makes the
+mock-up read like the design. Give them whenever the items show different text.
 
 Notes for the describer:
 

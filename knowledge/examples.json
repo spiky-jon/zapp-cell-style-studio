@@ -1496,6 +1496,116 @@
      "text": "Add a rating action plugin to bring back the Rate button as a third button in this row."
     }
    ]
+  },
+  {
+   "name": "Category Row",
+   "screen": "Search",
+   "purpose": "Text-only list row: a category name with a chevron, divided by a thin line.",
+   "bbox": {
+    "x": 0.03,
+    "y": 0.19,
+    "w": 0.94,
+    "h": 0.05
+   },
+   "plugin": "cell_2",
+   "status": "as_designed",
+   "layout": {
+    "type": "list",
+    "rowGap": 0,
+    "padding": 12
+   },
+   "appBackground": "#1E1E1E",
+   "cell": {
+    "background": "rgba(0,0,0,0)",
+    "radius": 0,
+    "padding": [
+     9,
+     0,
+     9,
+     0
+    ],
+    "border": null,
+    "dividerTop": null,
+    "dividerBottom": {
+     "thickness": 1,
+     "color": "rgba(255,255,255,0.15)",
+     "margin": [
+      9,
+      0,
+      0,
+      0
+     ]
+    }
+   },
+   "image": null,
+   "overlay": null,
+   "secondaryImage": null,
+   "labels": [
+    {
+     "role": "title",
+     "dataKey": "title",
+     "sample": "All Shows",
+     "font": {
+      "family": "Inter",
+      "weight": 500,
+      "size": 16,
+      "lineHeight": 24,
+      "letterSpacing": -0.4
+     },
+     "color": "#FFFFFF",
+     "background": null,
+     "padding": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "radius": 0,
+     "align": "left",
+     "lines": 1,
+     "uppercase": false,
+     "margin": [
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "badge": {
+    "icon": "chevron-right",
+    "position": "cell_right",
+    "width": 24,
+    "height": 24,
+    "iconSize": 24,
+    "color": "#FFFFFF",
+    "background": null,
+    "shape": "square",
+    "radius": 0,
+    "margin": [
+     0,
+     0,
+     0,
+     8
+    ]
+   },
+   "buttons": null,
+   "progress": null,
+   "runtime": null,
+   "decisions": [
+    {
+     "type": "works",
+     "text": "Category name with a chevron on the right and a thin divider under each row."
+    },
+    {
+     "type": "works",
+     "text": "The space above and below the text is inside the row, with no gap between rows, so the whole row is tappable."
+    },
+    {
+     "type": "works",
+     "text": "Each row draws its own divider, so the list also ends with a line under the last row."
+    }
+   ]
   }
  ]
 }
