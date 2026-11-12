@@ -794,11 +794,16 @@ return { icons: out, specs };`;
     const at = i => (imgs && imgs[i]) || { url: c.snapRaw, w: c.size.w, h: c.size.h };
     const im = (x, w, h) => `<img src="${x.url}" alt="" style="width:${w ?? x.w}px;height:${h ?? x.h}px">`;
     const all = Array.from({ length: n }, (_, i) => at(i));
-    if (comp === 'rail') return { h: Math.max(...all.map(x => x.h)), html: `<div class="blk" style="gap:${gap}px;padding-left:${pad}px;align-items:flex-start">${all.map(x => im(x)).join('')}</div>` };
+    // rails make every item as tall as the deepest one, filled with the cell's background (as on device)
+    const fill = c.desc?.cell?.background || 'transparent', boxed = (x, w, h, H) => `<div style="flex:none;width:${w ?? x.w}px;height:${H}px;background:${esc(fill)}">${im(x, w, h)}</div>`;
+    if (comp === 'rail') { const H = Math.max(...all.map(x => x.h)); return { h: H, html: `<div class="blk" style="gap:${gap}px;padding-left:${pad}px;align-items:flex-start">${all.map(x => boxed(x, null, null, H)).join('')}</div>` }; }
     if (comp === 'list') { const rg = num(lay.rowGap ?? 0);
       return { h: all.reduce((a, x) => a + x.h, 0) + (n - 1) * rg, html: `<div class="blk" style="flex-direction:column;gap:${rg}px;padding:0 ${pad}px">${all.map(x => im(x)).join('')}</div>` }; }
-    if (comp === 'grid') { const cols = Math.max(1, +item.columns || 3), g = num(lay.gap ?? 8), w = (W - pad * 2 - g * (cols - 1)) / cols, h = c.size.h * w / c.size.w, rows = Math.ceil(n / cols);
-      return { h: rows * h + (rows - 1) * g, html: `<div class="blk" style="flex-wrap:wrap;gap:${g}px;padding:0 ${pad}px">${all.map(x => im(x, w, h)).join('')}</div>` }; }
+    // grids: each row as tall as its deepest item
+    if (comp === 'grid') { const cols = Math.max(1, +item.columns || 3), g = num(lay.gap ?? 8), w = (W - pad * 2 - g * (cols - 1)) / cols, rows = [];
+      for (let i = 0; i < n; i += cols) rows.push(all.slice(i, i + cols).map(x => ({ x, h: x.h * w / x.w })));
+      const rowH = rows.map(r => Math.max(...r.map(o => o.h)));
+      return { h: rowH.reduce((a, b) => a + b, 0) + (rows.length - 1) * g, html: `<div class="blk" style="flex-direction:column;gap:${g}px;padding:0 ${pad}px">${rows.map((r, ri) => `<div style="display:flex;gap:${g}px;align-items:flex-start">${r.map(o => boxed(o.x, w, o.h, rowH[ri])).join('')}</div>`).join('')}</div>` }; }
     return { h: all[0].h, html: `<div class="blk" style="padding-left:${Math.max(0, (W - all[0].w) / 2)}px">${im(all[0])}</div>` };
   }
   // draws straight away with each cell's own sample, then again once the items with the design's text are ready

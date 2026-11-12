@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 7 · phone and tablet · cell plugins 16.0.0-alpha
+Version 8 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -108,10 +108,11 @@ Choosing:
   mixed feed (a play icon on videos, a TV icon on shows). Every item of that type shows the same badge.
 - A badge that depends on the viewer (NEXT EPISODE, "new for you", watched) **can't** come from content badges:
   the type also decides where a tap goes (video opens the player, show or movie opens the screen mapped to that
-  type), so changing an item's type to get a badge would break navigation. Record it as `changed` and suggest the
-  feed supplies it as text (a tag label) or artwork instead.
-- **Lock badge**: a locked or unlocked image (top left, fixed size) driven by a feed field (e.g. `extensions.free`)
-  for paid content.
+  type), so changing an item's type to get a badge would break navigation. Record it as `changed`. Alternative:
+  the feed supplies it per item, as text (e.g. `extensions.tag`, shown as a tag label) or artwork (a secondary
+  image), which needs the customer's backend to know what to send (e.g. which episode is next for this viewer).
+- **Lock badge**: driven by a feed field (e.g. `extensions.free`): `true` shows the unlocked image, `false` the
+  locked image, and no value shows no badge. Fixed size, in a corner of the image. (Confirmed on device.)
 - A cell with no image area at all (Cell 2 text only) can't show content or lock badges.
 - **Cell badge**: one static image the studio draws and ships in the download, at **any width and height**,
   placed in a corner or the centre of the image (Cell 2 also in its right-hand column), fine-tuned with margins.
@@ -176,10 +177,13 @@ Choosing:
 - Describe each screen as components top to bottom (single, rail, list, grid) so the studio can mock it up, with
   the text each item shows on that screen (the feed decides it in the app, but the mock-up should read like the
   design: "Search" for the page title, "All Shows", "Comedy"... for the rows).
-- **Rail height is the tallest possible cell**: every item in a rail is as tall as the deepest cell could be (the
-  image, every label at its maximum lines, buttons), even when the text is shorter. Shorter items keep their text
-  at the top and the cell's background fills the rest. So extra lines on a label make every tile taller: match
-  the design's lines exactly. (Confirmed on device.)
+- **Heights by component** (confirmed on device):
+  - **Rail**: every item is as tall as the deepest cell could be (the image, every label at its maximum lines,
+    buttons), even when the text is shorter. Shorter items keep their text at the top and the cell's background
+    fills the rest. So extra lines on a label make every tile taller: match the design's lines exactly.
+  - **Grid**: each row is as tall as its deepest item's actual content, so rows can differ.
+  - **List**: each cell is its own height.
+  - **Cell 3** is sized by its image ratio, so text over the image never changes its height in any component.
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
 - **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them
