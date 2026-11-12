@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 12 · phone and tablet · cell plugins 16.0.0-alpha
+Version 13 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -178,8 +178,9 @@ Choosing:
 - Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
   **dividers** (thickness, colour). Each divider has **its own margins** (top, right, bottom, left), added inside
   the cell's side padding, so the top and bottom dividers can have different insets (e.g. a full-width top line
-  and a shorter bottom line). (Confirmed on device.) Both start from the cell's side padding, so an edge-to-edge
-  divider with padded content isn't possible: accept the inset, or move side spacing to the component.
+  and a shorter bottom line). (Confirmed on device.) Both start from the cell's side padding. For a divider flush
+  with the screen edges, give the component no side padding and the cell no side padding, and inset the content
+  with the labels' (and image's and buttons') own margins. Don't use negative margins for this.
 - Cell 2 **centres its text vertically** against the image when the text is shorter than the image, and
   top-aligns when taller. A full-width line under both the image and the text (e.g. a synopsis under an episode
   row) isn't possible: the text stays beside the image.
