@@ -14,13 +14,19 @@ first; this note covers status and what's next.
 
 ## What the studio does now
 
-- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 17).
+- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 18).
 - From Figma: a read-only `use_figma` script returns each screen's layer details (padding, gaps, fonts, colours,
   text) and exports the icons used (instances followed to their components, as SVG).
 - Cells built with the cell preview engine; gallery, inspector, icon panel (Figma icons or a matched library),
   fonts panel (Google Fonts match or uploaded .ttf/.otf), remove with undo.
 - Screens tab: mock-up drawn with each item's own text and device height rules, plus a **screen outline** as Zapp
   components (Hero, Horizontal List, List, Grid, Group with Group Info) in the layout's format.
+- Screens tab, theme: a **Suggested theme values** card (the value most components and screens use, in the theme
+  plugin's order, with Copy JSON) and the components or screens that set their own value instead. Each screen's
+  spacing (screen padding, gap between components, background) comes back from Claude in `spacing`.
+- Screens tab, components: tap a component in the built preview (or in the list beside it) to see its settings,
+  each marked Theme or Override. Screen outlines only carry what differs from the suggested theme, including
+  screen padding on the screen itself; `screens/theme.json` is in the zip.
 - Downloads: cells zip (JSON, assets, thumbnails, plugin assets with labels, fonts, `screens/*.json`) and a PDF
   report.
 
@@ -36,6 +42,13 @@ From the framework code: theme defaults (screen, component padding/margins, gutt
 shares one feed; Group Info row is badge → title → button; whole header tappable when the button is on; the header
 button needs a non-empty label (fixed: icon-only buttons get a hidden "View all").
 
+Theme (from the framework code): screens can override the theme's screen padding; Group Info falls back to the
+theme's margins when empty, so headers always set bottom margin 0; the Group itself adds no margin or padding.
+
+Ch4 theme agreed with Jon: component padding 12, margin bottom 24, gutters 10, screen padding 24 top / 48 bottom
+(0 top on screens that open with a hero), background #1E1E1E. The theme and tap-to-inspect changes were tested
+with canned screens in headless Chrome, not yet with a live run on the Ch4 file.
+
 ## Open questions
 
 - How the app chooses phone vs tablet cell styles.
@@ -45,5 +58,6 @@ button needs a non-empty label (fixed: icon-only buttons get a hidden "View all"
 ## Possible next steps
 
 - Build the whole app layout (screens, bottom tabs, type mapping) as one file from all screens.
+- Re-run the Ch4 Figma file in the published studio and check the suggested theme against the agreed values.
 - Run Jon's real test designs end to end (screenshots and the Ch4 Figma file) and review results.
 - Later scope: components, plugins, web, TV.

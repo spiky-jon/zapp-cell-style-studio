@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 17 · phone and tablet · cell plugins 16.0.0-alpha
+Version 18 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -221,6 +221,17 @@ Choosing:
   - Component padding: sides 20 (52), top and bottom 0. Component margin: bottom 20 (20), the space between
     components.
   - Gutters: 12 (16), between cells in a row (horizontal) and between rows or list items (vertical).
+- **Theme values come from the designs.** The theme holds the value most components and screens use, counted
+  across every screen: side padding, the space between components (component margin bottom), the gutters,
+  screen padding and the app background. Report each screen's own spacing in `spacing` and keep it out of the
+  cells, because spacing baked into a cell can't follow the theme. A component or screen that differs sets its
+  own value instead (e.g. a hero with wider side padding).
+- **Screen padding top** is the space between the navigation bar and the first component. Use the most common
+  value for the theme; a screen that opens with a hero against the navigation bar sets its own top padding to 0
+  (screens can override the theme's screen padding).
+- **Headers and the theme margin**: a Group Info left on the theme's bottom margin opens that gap between the
+  header and its list, so the header's bottom margin is always set to 0. The Group itself adds no margin or
+  padding; the gap after the group comes from the rail, list or grid inside it.
 - **How the studio's components map to Zapp components** (as in a Zapp layout):
   - `single` → **Hero**: its cells stack vertically at full width (not a carousel). Used for heroes and for the
     blocks of a detail screen; set its side padding to 0 for edge-to-edge artwork.

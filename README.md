@@ -44,6 +44,8 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
 8. **Screens**: each screen as an outline of Zapp components (Hero, Horizontal List, List, Grid, Group with Group
    Info) with their settings, in the layout's own format (`screens/*.json` in the zip), and mocked up from the built cells, laid out as the components Claude described
    (single, rail, list, grid), next to the original. Each item is drawn with the text the design shows there.
+   The tab opens with the suggested theme values (the most common spacing and colours across all screens);
+   tapping a component in the preview shows its settings and which ones override the theme.
 9. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each
    asset, 500x280@2x thumbnail, overlay PNG when there's a gradient, `assets/` icons; plus a `plugin assets`
    folder for action plugin button icons; a `fonts` folder with the font files and names) and a PDF report.

@@ -539,7 +539,7 @@ return { icons: out, specs };`;
       scr.figmaSpec ? `FIGMA LAYER DETAILS for this screen, from the design file (positions in points from the screen's top left, auto-layout padding as top,right,bottom,left, gaps, fills, strokes, and each text's content, font, size/line height, letter spacing and colour). These are exact: use them for sizes, padding, spacing, colours, fonts and sample text instead of measuring the image. Padding inside a component that wraps a row is the cell's padding; a list with gap=0 has no gap between rows. icon=figma:… marks an icon from the list below.\n${scr.figmaSpec}`
         : scr.meta ? `Figma layer data for this frame: ${scr.meta.slice(0, 2000)}` : '',
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
-      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts") and icons.',
+      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts"), spacing (the screen padding, the gap between components and its background) and icons.',
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
       Object.keys(S.fonts.uploads).length ? `UPLOADED FONTS (the design's own font files; wherever the design's type matches one, use its family name exactly and set "source": "uploaded"): ${Object.entries(S.fonts.uploads).map(([f, u]) => `${f} (weights ${[...new Set(u.faces.filter(x => !x.italic).map(x => x.weight))].join(', ')})`).join('; ')}` : '',
       S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
@@ -568,6 +568,7 @@ return { icons: out, specs };`;
           await buildCell(c); renderAll();
         }
         if (Array.isArray(res?.screen)) scr.layout = res.screen.filter(x => x && x.cell);
+        if (res?.spacing && typeof res.spacing === 'object') scr.spacing = res.spacing;
         if (res?.icons?.library && ICONS.libraries[res.icons.library] && !S.iconsTouched && !S.iconsSet) {
           S.icons = { library: res.icons.library, light: C.color(res.icons.light, '#FFFFFF'), dark: C.color(res.icons.dark, '#121212'), why: res.icons.why || '' };
           S.iconsSet = true; renderIconPanel();
@@ -825,89 +826,224 @@ return { icons: out, specs };`;
     });
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
-  // the Zapp component each placement becomes
-  /* ---------- screen outline: the screen as Zapp components, in the layout's own format ---------- */
-  const ZAPP_TYPE = { single: 'hero-qb', rail: 'horizontal_list_qb', list: 'list-qb', grid: 'grid-qb' };
+  /* ---------- theme: the values most components and screens share ---------- */
   const ZAPP_NAME = { 'hero-qb': 'Hero', horizontal_list_qb: 'Horizontal List', 'list-qb': 'List', 'grid-qb': 'Grid', 'group-qb': 'Group', 'group-info-qb': 'Group Info' };
-  const THEME = { padding: 20, gutter: 12 };
-  // the component settings for one placement; theme defaults are left out so the theme still applies
-  function componentStyles(item, c) {
-    const L = c.spec?.layout || {}, d = c.desc.layout || {}, comp = item.component || L.type || 'single', st = {};
-    const pad = comp === 'single' ? d.padding : L.padding ?? d.padding;
-    if (pad != null && num(pad) !== THEME.padding) Object.assign(st, { component_padding_left: num(pad), component_padding_right: num(pad) });
+  const ZAPP_TYPE = { single: 'hero-qb', rail: 'horizontal_list_qb', list: 'list-qb', grid: 'grid-qb' };
+  // what the theme plugin starts with (phone), used when the designs don't give a value
+  const ZAPP_DEFAULT = { padding: 20, gutter: 12, marginBottom: 20, screenTop: 25, screenBottom: 50 };
+  const fin = v => (v != null && v !== '' && isFinite(+v) ? +v : null);
+  const boxAt = (scr, i) => (Array.isArray(scr.spacing?.screenPadding) ? fin(scr.spacing.screenPadding[i]) : null);
+  // every component placed on a screen, with the spacing the design gives it
+  function placements(scr) {
+    const items = scr.layout || [], out = [];
+    items.forEach((it, i) => {
+      const c = findCell(it.cell); if (!c) return;
+      const L = c.spec?.layout || {}, d = c.desc.layout || {}, comp = it.component || L.type || 'single', header = c.desc.plugin === 'cell_info';
+      const next = items[i + 1], nc = next && findCell(next.cell);
+      // a header sits directly on the rail, list or grid it introduces (they share a Group)
+      const heads = !!(header && nc && nc.output && nc.desc.plugin !== 'cell_info' && ['rail', 'list', 'grid'].includes(next.component));
+      const prev = items[i - 1], pc = prev && findCell(prev.cell);
+      const headed = !header && ['rail', 'list', 'grid'].includes(comp) && !!(pc && pc.desc.plugin === 'cell_info');
+      out.push({ i, it, c, comp, header, heads, headed,
+        pad: header ? null : fin(comp === 'single' ? d.padding : L.padding ?? d.padding),
+        gapH: comp === 'rail' ? fin(L.gap ?? d.gap) : comp === 'grid' ? fin(d.gap) : null,
+        gapV: comp === 'list' ? num(fin(L.rowGap ?? d.rowGap), 0) : comp === 'grid' ? fin(d.gap) : null,
+        after: heads ? 0 : i === items.length - 1 ? null : fin(it.gapAfter) ?? fin(scr.spacing?.componentGap) });
+    });
+    return out;
+  }
+  // the most common value; a tie goes to `prefer` when it is one of the tied values, then to the larger one
+  function common(vals, dflt, prefer) {
+    const got = vals.filter(v => v != null), n = new Map(); for (const v of got) n.set(v, (n.get(v) || 0) + 1);
+    if (!n.size) return { value: dflt, count: 0, of: 0, measured: false };
+    const top = Math.max(...n.values()), tied = [...n].filter(([, k]) => k === top).map(([v]) => v);
+    const value = tied.includes(prefer) ? prefer : typeof tied[0] === 'number' ? Math.max(...tied) : tied[0];
+    return { value, count: top, of: got.length, measured: true };
+  }
+  const rgbOf = v => { const s = String(v || ''), h = /^#([0-9a-f]{6})/i.exec(s); if (h) { const n = parseInt(h[1], 16); return [n >> 16, n >> 8 & 255, n & 255]; }
+    const m = s.match(/[\d.]+/g); return m && m.length >= 3 ? m.slice(0, 3).map(Number) : [0, 0, 0]; };
+  const rgbaText = v => { const [r, g, b] = rgbOf(v); return `rgba(${r}, ${g}, ${b}, 1)`; };
+  const hexText = v => '#' + rgbOf(v).map(x => Math.round(x).toString(16).padStart(2, '0')).join('').toUpperCase();
+  function themeValues() {
+    const scrs = S.screens.filter(s => (s.layout || []).length), P = scrs.flatMap(placements);
+    const gutterH = common(P.map(p => p.gapH), ZAPP_DEFAULT.gutter);
+    const gutterV = common(P.map(p => p.gapV), ZAPP_DEFAULT.gutter, gutterH.value);
+    // screens that open with a hero sit against the navigation bar (0), so the theme takes the most common gap of the others
+    const tops = scrs.map(s => boxAt(s, 0)).filter(v => v != null), spaced = tops.filter(v => v > 0);
+    const screenTop = { ...common(spaced.length ? spaced : tops, ZAPP_DEFAULT.screenTop), of: tops.length };
+    const bgs = scrs.map(s => s.spacing?.background || findCell((s.layout.find(i => findCell(i.cell)) || {}).cell)?.spec?.appBg).filter(Boolean).map(hexText);
+    const background = common(bgs, '#000000');
+    const [r, g, b] = rgbOf(background.value), dark = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    return { scrs, P, padding: common(P.map(p => p.pad), ZAPP_DEFAULT.padding), marginBottom: common(P.filter(p => !p.heads).map(p => p.after), ZAPP_DEFAULT.marginBottom),
+      gutterH, gutterV, screenTop, screenBottom: common(scrs.map(s => boxAt(s, 2)), ZAPP_DEFAULT.screenBottom),
+      screenSide: common(scrs.flatMap(s => [boxAt(s, 1), boxAt(s, 3)]), 0), background, statusTheme: dark ? 'light' : 'dark' };
+  }
+  // the theme plugin's own fields, ready to type in
+  const themeJson = T => ({
+    screen_padding_top: T.screenTop.value, screen_padding_bottom: T.screenBottom.value, screen_padding_left: T.screenSide.value, screen_padding_right: T.screenSide.value,
+    component_margin_top: 0, component_margin_left: 0, component_margin_right: 0, component_margin_bottom: T.marginBottom.value,
+    component_padding_top: 0, component_padding_bottom: 0, component_padding_left: T.padding.value, component_padding_right: T.padding.value,
+    component_gutter_vertical: T.gutterV.value, component_gutter_horizontal: T.gutterH.value, component_corner_radius: 0,
+    app_background_color: rgbaText(T.background.value), status_background_color: rgbaText(T.background.value), status_theme: `${T.statusTheme}-content` });
+
+  /* ---------- screen outline: the screen as Zapp components, in the layout's own format ---------- */
+  // the component settings for one placement; whatever matches the theme is left out so the theme still applies
+  function componentStyles(p, T) {
+    const { c, comp, it } = p, L = c.spec?.layout || {}, d = c.desc.layout || {}, st = {};
+    if (p.pad != null && p.pad !== T.padding.value) Object.assign(st, { component_padding_left: p.pad, component_padding_right: p.pad });
     if (comp === 'rail') {
       if (L.cellsPerView) Object.assign(st, { horizontal_list_scaled_switch: true, horizontal_list_cells_per_view: L.cellsPerView, horizontal_list_next_offset: L.peek });
       else Object.assign(st, { horizontal_list_scaled_switch: false, horizontal_list_cell_width: L.itemWidth });
-      if (num(L.gap, THEME.gutter) !== THEME.gutter) st.component_gutter_horizontal = num(L.gap);
     }
-    if (comp === 'list') st.component_gutter_vertical = num(L.rowGap ?? d.rowGap, 0);
-    if (comp === 'grid') {
-      st.component_columns = +item.columns || d.columns || 2;
-      const g = num(d.gap, THEME.gutter); if (g !== THEME.gutter) Object.assign(st, { component_gutter_horizontal: g, component_gutter_vertical: g });
-    }
+    if (comp === 'grid') st.component_columns = +it.columns || d.columns || 2;
+    if (p.gapH != null && p.gapH !== T.gutterH.value) st.component_gutter_horizontal = p.gapH;
+    if (p.gapV != null && p.gapV !== T.gutterV.value) st.component_gutter_vertical = p.gapV;
+    // a header left on the theme's margin would open a gap above its list, so it is always set
+    if (p.after != null && p.after !== T.marginBottom.value) st.component_margin_bottom = p.after;
     return st;
   }
   const feedName = (item, c) => String((item.texts || [])[0]?.title || c.desc.header?.title?.sample || c.desc.name);
-  function screenOutline(scr) {
-    const items = scr.layout || [], out = [];
-    const component = (item, c, inGroup) => {
-      const type = ZAPP_TYPE[item.component] || 'hero-qb';
-      return { component_type: type, name: ZAPP_NAME[type], cell_style: c.desc.name,
-        styles: { cell_plugin_configuration_id: c.output, ...componentStyles(item, c) },
-        ...(inGroup ? {} : { data: { source: '', type: '' } }), rules: { component_cells_selectable: true } };
+  function screenStyles(scr, T) {
+    const st = {}, top = boxAt(scr, 0), bottom = boxAt(scr, 2);
+    if (top != null && top !== T.screenTop.value) st.screen_padding_top = top;
+    if (bottom != null && bottom !== T.screenBottom.value) st.screen_padding_bottom = bottom;
+    return st;
+  }
+  function screenOutline(scr, T = themeValues()) {
+    const P = placements(scr).filter(p => p.c.output), out = [];
+    const component = (p, inGroup) => {
+      const type = p.header ? 'group-info-qb' : ZAPP_TYPE[p.comp] || 'hero-qb';
+      return { component_type: type, name: ZAPP_NAME[type], cell_style: p.c.desc.name,
+        styles: { cell_plugin_configuration_id: p.c.output, ...componentStyles(p, T) },
+        ...(inGroup ? {} : { data: { source: '', type: '' } }), rules: p.header ? { hide_component_if_data_is_empty: true } : { component_cells_selectable: true } };
     };
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i], c = findCell(it.cell); if (!c || !c.output) continue;
-      if (c.desc.plugin === 'cell_info') {
+    for (let k = 0; k < P.length; k++) {
+      const p = P[k];
+      if (p.header) {
         // a header and the rail, list or grid under it share one feed: a Group holding Group Info and that component
-        const next = items[i + 1], nc = next && findCell(next.cell);
-        const group = { component_type: 'group-qb', name: feedName(it, c), data: { source: '', type: '' }, rules: { hide_component_if_data_is_empty: true },
-          ui_components: [{ component_type: 'group-info-qb', name: 'Group Info', cell_style: c.desc.name, styles: { cell_plugin_configuration_id: c.output }, rules: { hide_component_if_data_is_empty: true } }] };
-        if (nc && nc.output && nc.desc.plugin !== 'cell_info' && ['rail', 'list', 'grid'].includes(next.component)) { group.ui_components.push(component(next, nc, true)); i++; }
+        const group = { component_type: 'group-qb', name: feedName(p.it, p.c), data: { source: '', type: '' }, rules: { hide_component_if_data_is_empty: true }, ui_components: [component(p, true)] };
+        if (p.heads && P[k + 1] && P[k + 1].i === p.i + 1) { group.ui_components.push(component(P[k + 1], true)); k++; }
         out.push(group);
-      } else out.push(component(it, c, false));
+      } else out.push(component(p, false));
     }
-    return { name: scr.name, type: 'general_content', ui_components: out };
+    const st = screenStyles(scr, T);
+    return { name: scr.name, type: 'general_content', ...(Object.keys(st).length ? { styles: st } : {}), ui_components: out };
   }
-  // what a person reads: one line per component, settings in plain words
-  const SETTING = { component_padding_left: v => `side padding ${v}`, horizontal_list_scaled_switch: v => v ? 'scaled' : 'fixed width', horizontal_list_cells_per_view: v => `${v} cells per view`,
-    horizontal_list_next_offset: v => `next cell offset ${v}`, horizontal_list_cell_width: v => `cell width ${v}`, component_gutter_horizontal: v => `gap ${v}`, component_gutter_vertical: v => `vertical gap ${v}`, component_columns: v => `${v} columns` };
-  const settingsText = st => Object.entries(st).filter(([k, v]) => SETTING[k] && v !== undefined).map(([k, v]) => SETTING[k](v)).join(' · ');
-  function outlineHtml(scr) {
-    const o = screenOutline(scr);
-    const row = (comp, depth) => `<li class="oc d${depth}"><b>${esc(ZAPP_NAME[comp.component_type] || comp.component_type)}</b>${comp.component_type === 'group-qb' ? ` <span class="feed">${esc(comp.name)}</span> <span class="hint">· one feed for the group</span>`
-      : ` <span class="hint">·</span> ${esc(comp.cell_style)}${settingsText(comp.styles) ? ` <span class="hint">· ${esc(settingsText(comp.styles))}</span>` : ''}${comp.data ? ' <span class="hint">· own feed</span>' : ''}`}
-      ${comp.ui_components ? `<ul>${comp.ui_components.map(ch => row(ch, depth + 1)).join('')}</ul>` : ''}</li>`;
-    return `<div class="outline"><div class="row" style="justify-content:space-between"><span class="lab">Screen outline (Zapp components)</span><button class="btn small" type="button" data-copy-outline="${esc(scr.id)}">Copy JSON</button></div>
-      <ul class="otree">${o.ui_components.map(cpt => row(cpt, 0)).join('')}</ul>
-      <p class="hint">Theme defaults (side padding 20, gaps 12) are left to the theme. Cell styles are named by file: point each component at the id Zapp gives that cell style when it's imported, then set the feeds.</p></div>`;
+
+  /* ---------- screens tab: theme summary, mock-ups, and one component's details at a time ---------- */
+  const tag = on => `<span class="tg ${on ? 'ov' : ''}">${on ? 'Override' : 'Theme'}</span>`;
+  const usedBy = (m, what) => !m.measured ? 'Not in the designs: Zapp default' : `${m.count} of ${m.of} ${what}`;
+  function overridesList(T) {
+    const out = [];
+    for (const scr of T.scrs) {
+      const ss = screenStyles(scr, T);
+      if ('screen_padding_top' in ss) out.push(`${scr.name}: screen padding top ${ss.screen_padding_top}${ss.screen_padding_top === 0 ? ' (the first component sits against the navigation bar)' : ''}`);
+      if ('screen_padding_bottom' in ss) out.push(`${scr.name}: screen padding bottom ${ss.screen_padding_bottom}`);
+      for (const p of placements(scr)) {
+        const st = componentStyles(p, T), bits = [];
+        if ('component_padding_left' in st) bits.push(`side padding ${st.component_padding_left}`);
+        if ('component_gutter_horizontal' in st) bits.push(`gap between cells ${st.component_gutter_horizontal}`);
+        if ('component_gutter_vertical' in st) bits.push(`gap between rows ${st.component_gutter_vertical}`);
+        if ('component_margin_bottom' in st && !p.heads) bits.push(`space below ${st.component_margin_bottom}`);
+        if (bits.length) out.push(`${scr.name}: ${p.c.desc.name} (${ZAPP_NAME[ZAPP_TYPE[p.comp]] || 'Hero'}), ${bits.join(', ')}`);
+      }
+    }
+    return [...new Set(out)];
   }
-  $('mock').addEventListener('click', async e => {
-    const b = e.target.closest('[data-copy-outline]'); if (!b) return;
-    const scr = S.screens.find(x => x.id === b.dataset.copyOutline); if (!scr) return;
-    const txt = JSON.stringify(screenOutline(scr), null, 2);
-    try { await navigator.clipboard.writeText(txt); toast(`Copied the ${scr.name} outline`); } catch (err) { toast("Couldn't copy here; the outline is in the cells download too."); }
+  function themeHtml(T) {
+    const four = (label, vals, note) => `<div class="trow"><span class="tl">${label}</span><span class="tv">${vals.map(([k, v]) => `<span class="tbox"><b>${esc(v)}</b><small>${k}</small></span>`).join('')}</span><span class="hint">${esc(note)}</span></div>`;
+    const one = (label, v, note, sw) => `<div class="trow"><span class="tl">${label}</span><span class="tv"><span class="tbox wide">${sw ? `<i style="background:${esc(sw)}"></i>` : ''}<b>${esc(v)}</b></span></span><span class="hint">${esc(note)}</span></div>`;
+    const ov = overridesList(T), measured = T.scrs.some(s => s.spacing);
+    return `<section class="theme"><div class="row" style="justify-content:space-between"><h2>Suggested theme values</h2><button class="btn small" type="button" data-copy-theme>Copy JSON</button></div>
+      <p class="hint">The value most components and screens use, in the order of the Zapp theme plugin. Anything different is set on that component or screen.</p>
+      <div class="tgrid">
+        ${four('Screen padding', [['Top', T.screenTop.value], ['Bottom', T.screenBottom.value], ['Left', T.screenSide.value], ['Right', T.screenSide.value]], !T.screenTop.measured ? usedBy(T.screenTop) : `Top: ${T.screenTop.count} of ${T.screenTop.of} screens · bottom: ${usedBy(T.screenBottom, 'screens')}`)}
+        ${four('Component margin', [['Top', 0], ['Left', 0], ['Right', 0], ['Bottom', T.marginBottom.value]], `Bottom is the space between components: ${usedBy(T.marginBottom, 'components')}`)}
+        ${four('Component padding', [['Top', 0], ['Bottom', 0], ['Left', T.padding.value], ['Right', T.padding.value]], `Sides: ${usedBy(T.padding, 'components')}`)}
+        ${one('Component gutter vertical', T.gutterV.value, `Between rows: ${usedBy(T.gutterV, 'lists and grids')}`)}
+        ${one('Component gutter horizontal', T.gutterH.value, `Between cells: ${usedBy(T.gutterH, 'rails and grids')}`)}
+        ${one('Component corner radius', 0, 'Corners are part of each cell style')}
+        ${one('App background colour', T.background.value, usedBy(T.background, 'screens'), T.background.value)}
+        ${one('Status bar background', T.background.value, 'Matches the app background', T.background.value)}
+        ${one('Status theme', T.statusTheme === 'light' ? 'Light' : 'Dark', T.statusTheme === 'light' ? 'Light text on a dark bar' : 'Dark text on a light bar')}
+      </div>
+      ${ov.length ? `<details class="olist" open><summary>Set on a component or screen instead (${ov.length})</summary><ul class="left">${ov.map(o => `<li>${esc(o)}</li>`).join('')}</ul></details>` : ''}
+      ${measured ? '' : '<p class="hint">Screen padding and the space between components are read when cells are found; find cells again on a screen to measure them.</p>'}
+    </section>`;
+  }
+  const compName = p => (p.header ? 'Group Info' : ZAPP_NAME[ZAPP_TYPE[p.comp]] || 'Hero');
+  function componentHtml(scr, p, T) {
+    const st = componentStyles(p, T), L = p.c.spec?.layout || {}, rows = [], n = itemCount(p.it, p.c);
+    const row = (label, value, over) => rows.push(`<div class="srow"><span>${label}</span><b>${esc(value)}</b>${over == null ? '' : tag(over)}</div>`);
+    row('Cell style', p.c.desc.name);
+    if (p.header) row('Feed', p.heads ? 'Shared with the component below (one Group)' : 'Its own Group');
+    else if (p.headed) row('Feed', 'From its Group (shared with the header above)');
+    else row('Feed', 'Its own');
+    if (p.comp !== 'single' && !p.header) row('Items shown', n);
+    if (p.comp === 'rail') row('Cell width', L.cellsPerView ? `Scaled: ${L.cellsPerView} per view, next cell offset ${L.peek}` : `Fixed: ${L.itemWidth}`);
+    if (p.comp === 'grid') row('Columns', st.component_columns);
+    if (!p.header) row('Side padding', p.pad ?? T.padding.value, 'component_padding_left' in st);
+    if (p.gapH != null) row('Gap between cells', p.gapH, 'component_gutter_horizontal' in st);
+    if (p.gapV != null) row('Gap between rows', p.gapV, 'component_gutter_vertical' in st);
+    if (p.heads) row('Space below', '0, so it sits on its list', T.marginBottom.value !== 0);
+    else if (p.i === (scr.layout || []).length - 1) row('Space below', `${T.marginBottom.value} (last on the screen)`, false);
+    else row('Space below', p.after ?? T.marginBottom.value, 'component_margin_bottom' in st);
+    return `<div class="row" style="justify-content:space-between"><button class="btn small ghost" type="button" data-back="${esc(scr.id)}">← ${esc(scr.name)}</button><span class="hint">Component ${p.i + 1} of ${scr.layout.length}</span></div>
+      <h3 class="ctitle">${esc(compName(p))}${p.header ? ' <span class="hint">in a Group</span>' : ''}</h3>
+      <div class="srows">${rows.join('')}</div>
+      <div class="row"><button class="btn small" type="button" data-open-cell="${esc(p.c.id)}">Open cell style</button></div>
+      <p class="hint">Theme: uses the suggested theme value. Override: set this on the component.</p>`;
+  }
+  function sideHtml(scr, T) {
+    const P = placements(scr), sel = S.pick?.[scr.id], p = P.find(x => x.i === sel);
+    if (p) return componentHtml(scr, p, T);
+    const ss = screenStyles(scr, T), top = boxAt(scr, 0), bottom = boxAt(scr, 2), missing = scr.layout.filter(i => !findCell(i.cell)).map(i => i.cell);
+    return `<div class="row" style="justify-content:space-between"><span class="lab">This screen</span><button class="btn small" type="button" data-copy-outline="${esc(scr.id)}">Copy JSON</button></div>
+      <div class="srows">
+        <div class="srow"><span>Screen padding top</span><b>${top ?? T.screenTop.value}</b>${tag('screen_padding_top' in ss)}</div>
+        <div class="srow"><span>Screen padding bottom</span><b>${bottom ?? T.screenBottom.value}</b>${tag('screen_padding_bottom' in ss)}</div>
+      </div>
+      <span class="lab">Components</span>
+      <ol class="clist">${P.map(x => `<li><button type="button" class="cbtn" data-pick="${esc(scr.id)}:${x.i}"><b>${esc(compName(x))}</b> <span class="hint">${esc(x.c.desc.name)}${x.heads ? ' · header of the next' : ''}</span></button></li>`).join('')}</ol>
+      <p class="hint">Tap a component here or in the preview to see its settings.</p>
+      ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
+      ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
+      <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p>`;
+  }
+  function pick(sid, i) {
+    S.pick ||= {}; S.pick[sid] = S.pick[sid] === i ? null : i;
+    const sec = $('mock').querySelector(`.mscreen[data-scr="${CSS.escape(sid)}"]`), scr = S.screens.find(x => x.id === sid); if (!sec || !scr) return;
+    sec.querySelectorAll('.cmp').forEach(el => { const on = +el.dataset.pick.split(':').pop() === S.pick[sid]; el.classList.toggle('on', on); el.setAttribute('aria-pressed', on); });
+    sec.querySelector('.mside').innerHTML = sideHtml(scr, themeValues());
+  }
+  const copy = async (txt, ok) => { try { await navigator.clipboard.writeText(txt); toast(ok); } catch (err) { toast("Couldn't copy here; it's in the cells download too."); } };
+  $('mock').addEventListener('click', e => {
+    const at = sel => e.target.closest(sel);
+    let b;
+    if ((b = at('[data-copy-outline]'))) { const scr = S.screens.find(x => x.id === b.dataset.copyOutline); if (scr) copy(JSON.stringify(screenOutline(scr), null, 2), `Copied the ${scr.name} outline`); }
+    else if (at('[data-copy-theme]')) copy(JSON.stringify(themeJson(themeValues()), null, 2), 'Copied the theme values');
+    else if ((b = at('[data-back]'))) pick(b.dataset.back, S.pick?.[b.dataset.back]);
+    else if ((b = at('[data-open-cell]'))) { S.sel = b.dataset.openCell; show('cells'); renderAll(); }
+    else if ((b = at('[data-pick]'))) { const k = b.dataset.pick.lastIndexOf(':'); pick(b.dataset.pick.slice(0, k), +b.dataset.pick.slice(k + 1)); }
   });
-  const zappComponent = i => findCell(i.cell)?.desc.plugin === 'cell_info' ? 'Group Info (in a Group)' : ({ rail: 'Horizontal List', list: 'List', grid: `Grid${i.columns ? `, ${i.columns} columns` : ''}` })[i.component] || 'Hero';
+  $('mock').addEventListener('keydown', e => { const b = e.target.closest('.cmp'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click(); } });
   function drawMock(itemImgs) {
     const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
     if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>Find cells from your designs; each screen is rebuilt here from its cells.</span></div>`; return; }
-    box.innerHTML = done.map(scr => {
+    const T = themeValues();
+    box.innerHTML = themeHtml(T) + done.map(scr => {
       const W = scr.screenW, tablet = scr.device === 'tablet', disp = tablet ? 560 : 300, k = disp / W, H = scr.h * W / scr.w;
-      const first = findCell((scr.layout.find(i => findCell(i.cell)) || {}).cell);
-      const bg = first?.spec?.appBg || '#000';
-      const missing = scr.layout.filter(i => !findCell(i.cell)).map(i => i.cell);
+      const bg = scr.spacing?.background || findCell((scr.layout.find(i => findCell(i.cell)) || {}).cell)?.spec?.appBg || '#000';
       // the mock grows when the cells run longer than the screenshot (split cells, sample text)
-      const blocks = scr.layout.map((it, i) => mockBlock(it, W, itemImgs?.get(scr.id)?.[i])), contentH = blocks.reduce((a, b) => a + b.h, 0);
-      return `<section class="mscreen"><h2>${esc(scr.name)} <span class="hint">${tablet ? 'Tablet' : 'Phone'} · ${W}pt</span></h2>
+      const P = new Map(placements(scr).map(p => [p.i, p])), top = boxAt(scr, 0) || 0, bottom = boxAt(scr, 2) || 0, sel = S.pick?.[scr.id];
+      const blocks = scr.layout.map((it, i) => ({ ...mockBlock(it, W, itemImgs?.get(scr.id)?.[i]), i, gap: P.get(i)?.after || 0, p: P.get(i) }));
+      const contentH = top + bottom + blocks.reduce((a, b) => a + b.h + (b.html ? b.gap : 0), 0);
+      return `<section class="mscreen" data-scr="${esc(scr.id)}"><h2>${esc(scr.name)} <span class="hint">${tablet ? 'Tablet' : 'Phone'} · ${W}pt</span></h2>
         <div class="mpair">
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
-          <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
-            <div class="inner" style="width:${W}px;transform:scale(${k})">${blocks.map(b => b.html).join('')}</div></div></div>
-          <div class="mside">${outlineHtml(scr)}<details class="olist"><summary>Cells top to bottom</summary><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(zappComponent(i))}${i.count && (i.component || 'single') !== 'single' ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol></details>
-            ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
-            ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
-            <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>
+          <div class="mcol"><span class="lab">Built from cells · tap a component</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
+            <div class="inner" style="width:${W}px;transform:scale(${k});padding-top:${top}px">${blocks.filter(b => b.html && b.p).map(b => `<div class="cmp${sel === b.i ? ' on' : ''}" role="button" tabindex="0" aria-pressed="${sel === b.i}" aria-label="${esc(compName(b.p))}: ${esc(b.p.c.desc.name)}" data-pick="${esc(scr.id)}:${b.i}" style="margin-bottom:${b.gap}px">${b.html}</div>`).join('')}</div></div></div>
+          <div class="mside">${sideHtml(scr, T)}</div>
         </div></section>`;
     }).join('');
   }
@@ -1018,14 +1154,18 @@ return { icons: out, specs };`;
     const laid = S.screens.filter(scr => (scr.layout || []).some(it => ok.some(c => c.desc.name.toLowerCase() === String(it.cell).toLowerCase())));
     if (list === S.cells && laid.length) {
       const sz = zip.folder('screens');
-      for (const scr of laid) sz.file(`${C.slug(scr.name)}.json`, JSON.stringify(screenOutline(scr), null, 2));
+      const T = themeValues();
+      for (const scr of laid) sz.file(`${C.slug(scr.name)}.json`, JSON.stringify(screenOutline(scr, T), null, 2));
+      sz.file('theme.json', JSON.stringify(themeJson(T), null, 2));
       sz.file('README.txt', ['Screen outlines', '', 'Each file describes one screen as Zapp components, in the same shape as a Zapp layout (ui_components).', '',
         '- component_type: hero-qb (full-width cells stacked), horizontal_list_qb (rail), list-qb, grid-qb, group-qb (holds a feed shared by its',
         '  Group Info header and the component below it), group-info-qb (the header).',
         '- styles.cell_plugin_configuration_id holds the cell style\'s file name from this download. After importing the cell styles, replace it with',
         '  the id Zapp gives each one.',
         '- data.source is empty: set each component\'s (or group\'s) feed. Group names are the header text from the design.',
-        '- Only settings that differ from the theme are listed (theme defaults: side padding 20, gaps 12, space between components 20).',
+        '- theme.json holds the suggested values for the Zapp theme plugin: the spacing and colours most components and screens use.',
+        '- Only settings that differ from theme.json are listed, on the component or (for screen padding) on the screen. A header always sets its',
+        '  bottom margin to 0 so it sits on its list.',
         '- Detail screens (show, movie) are opened by the item\'s type: map each type to its screen; the screen then shows the tapped item.', ''].join('\n'));
     }
     const fn = fontNames(ok);

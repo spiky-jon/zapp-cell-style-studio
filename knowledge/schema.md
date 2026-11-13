@@ -114,6 +114,12 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       "texts": [{ "title": "All Shows" }, { "title": "Audio Described" }, { "title": "Comedy" }] },  // what each item shows here
     { "cell": "Poster Tile", "component": "grid", "columns": 3, "count": 6 }
   ],
+  "spacing": {                                // the screen's own spacing, outside any cell (for the theme values)
+    "screenPadding": [24, 0, 48, 0],          // content area: space above the first component (below the navigation bar), right,
+                                              //   below the last component (above the tab bar or screen end), left
+    "componentGap": 24,                       // the usual vertical space between two components on this screen
+    "background": "#1E1E1E"                   // the screen colour
+  },
   "icons": { "library": "lucide", "light": "#FFFFFF", "dark": "#121212", "why": "Thin rounded outline icons" }
 }
 ```
@@ -125,6 +131,11 @@ Icons from a Figma file: when the studio lists `ICONS FROM THE FIGMA FILE`, use 
 the icon value instead of a role, wherever the design uses them. Roles are for icons the file doesn't have.
 
 Icon roles (use these names wherever an icon is named): `play`, `plus`, `check`, `heart`, `bookmark`, `share-ios`, `share-network`, `download`, `download-progress`, `download-done`, `download-error`, `download-expired`, `trailer`, `calendar-plus`, `more-horizontal`, `more-vertical`, `volume-mute`, `volume-on`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `arrow-right`, `info`, `close`, `lock`, `search`, `star`, `live`, `list`.
+
+`spacing`: measure it on this screen. `screenPadding` top is 0 when the first component touches the navigation bar or
+runs under it (a hero). The space between a header and the rail, list or grid it introduces is not a component gap.
+When one component is followed by a different gap from the usual one, add `"gapAfter": 40` to that item in `screen`.
+Never put this spacing into a cell's padding.
 
 `texts`: one object per visible item, in order, giving the text that item shows on this screen, keyed by each label's
 `dataKey` (`title`, `summary`, `extensions.genre`...). The cell's own `sample` is just one example; `texts` makes the

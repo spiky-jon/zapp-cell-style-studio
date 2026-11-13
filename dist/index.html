@@ -186,6 +186,30 @@ ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13p
 .phone .blk img { display: block; flex: none }
 .mside { flex: 1; min-width: 220px; display: grid; gap: 6px; align-content: start }
 .mside ol { margin: 0; padding-left: 18px; color: var(--ink-2) }
+.phone .cmp { position: relative; cursor: pointer; outline: 0 }
+.phone .cmp::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 0 var(--focus); transition: box-shadow .12s }
+.phone .cmp:hover::after, .phone .cmp:focus-visible::after { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--focus) 55%, transparent) }
+.phone .cmp.on::after { box-shadow: inset 0 0 0 3px var(--focus); background: color-mix(in srgb, var(--focus) 12%, transparent) }
+.mside { max-width: 420px }
+.srows { display: grid; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--raised); overflow: hidden }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: baseline; padding: 7px 10px; font-size: 13px }
+.srow + .srow { border-top: 1px solid var(--line) } .srow > span:first-child { color: var(--ink-2) } .srow b { font-weight: 600; text-align: right }
+.tg { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--chip); color: var(--ink-2) }
+.tg.ov { background: var(--alt-bg); color: var(--alt) }
+.ctitle { margin: 2px 0 0; font-size: 16px }
+.clist { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; counter-reset: c }
+.cbtn { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 5px 8px; border-radius: 6px; font-size: 13px; display: block }
+.cbtn::before { counter-increment: c; content: counter(c) "  "; color: var(--ink-3); font-variant-numeric: tabular-nums }
+.cbtn:hover { background: var(--chip) } .cbtn:focus-visible { box-shadow: 0 0 0 2px var(--focus) }
+.theme { display: grid; gap: 10px; padding-bottom: 22px; border-bottom: 1px solid var(--line) }
+.theme h2 { font-size: 15px; margin: 0 }
+.tgrid { display: grid; gap: 6px; max-width: 860px }
+.trow { display: grid; grid-template-columns: 200px auto minmax(0, 1fr); gap: 12px; align-items: center; font-size: 13px }
+.trow .tl { color: var(--ink-2) } .trow .tv { display: flex; gap: 6px }
+.tbox { display: grid; justify-items: center; min-width: 46px; padding: 4px 6px; border-radius: 6px; background: var(--raised); box-shadow: var(--shadow); font-variant-numeric: tabular-nums }
+.tbox.wide { display: flex; gap: 6px; align-items: center; min-width: 98px; justify-content: flex-start; padding: 6px 8px }
+.tbox i { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 0 0 1px var(--line-strong) } .tbox b { font-weight: 600 } .tbox small { font-size: 10px; color: var(--ink-3) }
+@media (max-width: 760px) { .trow { grid-template-columns: 1fr } }
 #engine { position: fixed; left: -10000px; top: 0; width: 1500px; height: 1200px; border: 0; visibility: hidden }
 .phone.tablet { width: 560px; border-radius: 14px }
 @media (max-width: 1100px) { #v-cells { grid-template-columns: 220px minmax(0, 1fr) } .insp { grid-column: 1 / -1 } }
