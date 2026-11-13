@@ -309,6 +309,103 @@
     return { base, spec, warnings: notes.warnings, fonts: [...notes.fonts], assets, labels: notes.buttonLabels };
   }
 
-  const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN };
+  /* ---------- navigation: the navigation bar and bottom tab bar plugins (QuickBrick mobile-nav-bar-2, quick-brick-bottom-tabs) ---------- */
+  const NAV_DEFAULT = { padding: [8, 8, 8, 8], gutter: 4, titleMargin: 8, logo: [87, 40], button: [40, 40], buttonGap: 4, title: { size: 17, lineHeight: 20, letterSpacing: -0.4 } };
+  const TAB = { height: { ios: 49, android: 56 }, iconBox: 32, maxTabs: 5, labelLineHeight: 14 };
+  const solid = c => { const v = color(c, null); if (!v) return null; if (v.startsWith('#')) { const h = v.slice(1), n = parseInt(h.slice(0, 6), 16), a = h.length === 8 ? Math.round(parseInt(h.slice(6), 16) / 2.55) / 100 : 1;
+    return `rgba(${n >> 16}, ${n >> 8 & 255}, ${n & 255}, ${a})`; } return v.replace(/,/g, ', ').replace(/\s+/g, ' '); };
+  const wh2 = (o, d) => [num(o && o.width, d[0]), num(o && o.height, d[1])];
+  // one navigation bar description -> the plugin's styles and assets, the images to upload, nav items, and decisions in plain words
+  function navBar(d) {
+    if (!d) return null;
+    const notes = [], styles = {}, assets = {}, images = [];
+    const bg = d.background || {}, grad = bg.type === 'gradient';
+    const [pt, pr, pb, pl] = box(d.padding, NAV_DEFAULT.padding);
+    const btn = wh2(d.buttonSize, NAV_DEFAULT.button), logo = d.logo ? wh2(d.logo, NAV_DEFAULT.logo) : null;
+    const centre = ['logo', 'title', 'none'].includes(d.centre) ? d.centre : d.logo ? 'logo' : d.title ? 'title' : 'none';
+    const t = d.title || null, tf = (t && t.font) || {};
+    let titleLH = num(tf.lineHeight, NAV_DEFAULT.title.lineHeight);
+    // the bar is as tall as its tallest part (the logo or title, or a button image) plus its padding
+    if (centre === 'title' && titleLH > num(tf.size, 17) * 1.6) { const lh = Math.round(num(tf.size, 17) * 1.25); notes.push(`The title's line height is ${lh}: the design's taller text box only centres it, and the bar centres the title itself.`); titleLH = lh; }
+    if (centre === 'title' && titleLH > btn[1]) { notes.push(`The title's line height is set to ${btn[1]} (the button height): taller lines would make the bar taller than designed.`); titleLH = btn[1]; }
+    // a hidden logo still counts towards the height, so it is sized like the buttons
+    const logoForHeight = centre === 'title' ? 0 : (logo || (centre === 'none' ? [btn[0], Math.min(btn[1], NAV_DEFAULT.logo[1])] : NAV_DEFAULT.logo))[1];
+    const content = centre === 'title' ? Math.max(titleLH, btn[1]) : Math.max(logoForHeight, btn[1]);
+    let top = pt, bottom = pb;
+    const want = num(d.height, content + pt + pb);
+    if (content + top + bottom !== want) {
+      const extra = want - content; top = Math.max(0, Math.floor(extra / 2)); bottom = Math.max(0, extra - top);
+      notes.push(`Padding top and bottom set to ${top} and ${bottom} so the bar is ${want} tall, as designed: its height comes from the tallest item plus its padding.`);
+    }
+    const contentPosition = { below_bar: 'on_bottom_navbar', below_status_bar: 'on_bottom_status_bar', under_bar: 'on_top_screen' }[d.contentPosition] || 'on_bottom_navbar';
+    const sb = d.statusBar || {};
+    Object.assign(styles, {
+      status_bar__background_color: grad && bg.coversStatusBar !== false ? 'rgba(0, 0, 0, 0)' : solid(sb.background) || solid(bg.color) || 'rgba(17, 17, 17, 1)',
+      status_bar__theme: sb.theme === 'dark' ? 'dark-content' : 'light-content',
+      navbar_enabled: true, content_position: contentPosition,
+      background_type: grad ? 'Gradient' : 'Color',
+      ...(grad ? { navbar_gradient__top_background_color: solid(bg.top) || 'rgba(17, 17, 17, 1)', navbar_gradient__bottom_background_color: solid(bg.bottom) || 'rgba(17, 17, 17, 0)',
+        navbar_gradient__mode: bg.coversStatusBar === false ? 'on_bottom_status_bar' : 'on_top_screen' } : { background_color: solid(bg.color) || 'rgba(17, 17, 17, 1)' }),
+      style: d.alignment === 'left' ? 'left' : 'center',
+      navbar__border_bottom_color: solid(d.border && d.border.color) || 'rgba(0, 0, 0, 0)', navbar__border_bottom_thickness: num(d.border && d.border.width, 0),
+      navbar__background_blur: !!d.blur, ...(d.blur ? { navbar__background_blur_amount: ['light', 'medium', 'strong'].includes(d.blur) ? d.blur : 'medium' } : {}),
+      presentation_style: centre === 'logo' ? 'logo' : centre === 'title' ? 'title' : 'hidden',
+      navbar_h_gutter: num(d.gap, 0), navbar_padding_top: top, navbar_padding_bottom: bottom, navbar_padding_left: pl, navbar_padding_right: pr,
+      navbar_title_margin_left: 0, navbar_title_margin_right: 0,
+    });
+    if (t || centre === 'title') {
+      const f = F({ ...tf, lineHeight: titleLH, size: num(tf.size, NAV_DEFAULT.title.size) });
+      Object.assign(styles, { navbar_title__ios_font_family: f.font, navbar_title__android_font_family: f.font, title_color: solid(t && t.color) || 'rgba(239, 239, 239, 1)',
+        title_text_transform: t && t.uppercase ? 'uppercase' : 'default', navbar_title__ios_font_size: f.size, navbar_title__android_font_size: f.size,
+        navbar_title__ios_line_height: f.lineHeight, navbar_title__android_line_height: f.lineHeight, navbar_title__ios_letter_spacing: f.letterSpacing, navbar_title__android_letter_spacing: f.letterSpacing });
+    }
+    const right = (Array.isArray(d.right) ? d.right : []).filter(Boolean);
+    Object.assign(styles, { navbar_buttons__horizontal_gutter: num(d.buttonGap, NAV_DEFAULT.buttonGap), navbar_buttons__button_background_color: solid(d.buttonBackground) || 'rgba(0, 0, 0, 0)',
+      navbar_buttons__button_border_radius: num(d.buttonRadius, 0) });
+    const logoBox = logo || [btn[0], Math.min(btn[1], NAV_DEFAULT.logo[1])];
+    Object.assign(assets, { logo_asset_width: logoBox[0], logo_asset_height: logoBox[1], asset_width: btn[0], asset_height: btn[1] });
+    // images: every button image is the button's whole box, with the glyph at its designed size in the middle
+    const glyph = num(d.iconSize, Math.round(Math.min(btn[0], btn[1]) * 0.6)), tint = color(d.iconColor, '#FFFFFF');
+    if (centre === 'logo' && d.logo && d.logo.icon) images.push({ field: 'app_logo', file: 'app_logo.png', icon: d.logo.icon, width: logoBox[0], height: logoBox[1], fill: true });
+    if (d.leftIcon) images.push({ field: d.left === 'menu' ? 'menu_button' : 'back_button', file: d.left === 'menu' ? 'menu_button.png' : 'back_button.png', icon: d.leftIcon, width: btn[0], height: btn[1], iconSize: glyph, color: tint });
+    const navItems = right.map((r, i) => ({ label: String(r.label || `Button ${i + 1}`), target: String(r.target || ''), modal: !!r.modal,
+      image: { field: 'icon', file: `nav_item_${slug(r.label || `button-${i + 1}`)}.png`, icon: r.icon, width: btn[0], height: btn[1], iconSize: glyph, color: color(r.color, tint) } }));
+    if (d.left === 'menu') notes.push('The menu button shows only when the app uses the side menu, or when this screen sets a menu target screen.');
+    if (d.left === 'back') notes.push('The back button shows by itself whenever there is a screen to go back to; nothing to set on the screen.');
+    if (centre === 'title') notes.push('The title is the screen\'s name (or its localised title), so name each screen as the bar should read.');
+    if (contentPosition === 'on_top_screen') notes.push('Content starts at the top of the screen, under the status bar and the navigation bar, so a hero can run behind them.');
+    if (right.length > 1 && right.some(r => num(r.width, btn[0]) !== btn[0])) notes.push('All buttons share one image size, so they are all drawn at the size of the first.');
+    for (const x of Array.isArray(d.unsupported) ? d.unsupported : []) notes.push(String(x));
+    return { styles, assets, images, navItems, notes, height: content + top + bottom };
+  }
+  // one bottom tab bar description -> the plugin's styles, the tabs with their two icons, and decisions
+  function tabBar(d) {
+    if (!d) return null;
+    const notes = [], tabs = (Array.isArray(d.tabs) ? d.tabs : []).filter(Boolean);
+    const labels = !!d.labels && tabs.some(x => x.label);
+    const f = labels ? F(d.font || { size: 10 }) : null;
+    const active = solid(d.activeColor) || 'rgba(4, 207, 153, 1)', idle = solid(d.defaultColor) || 'rgba(137, 142, 159, 1)';
+    const styles = { bar_background_color: solid(d.background) || 'rgba(13, 17, 29, 1)', top_border_width: num(d.border && d.border.width, 0),
+      top_border_color: solid(d.border && d.border.color) || 'rgba(0, 0, 0, 0)', separator_width_for_horizontal_layout: 4,
+      title_label_toggle: labels, inline_tab_label: false,
+      ...(labels ? { title_ios_font_selector: f.font, title_android_font_selector: f.font, title_ios_font_size: f.size, title_android_font_size: f.size,
+        title_ios_letter_spacing: f.letterSpacing, title_android_letter_spacing: f.letterSpacing } : {}),
+      title_active_font_color: active, title_default_font_color: idle };
+    if (tabs.length > TAB.maxTabs) notes.push(`The tab bar takes up to ${TAB.maxTabs} tabs; the last ${tabs.length - TAB.maxTabs} are left out.`);
+    const glyph = Math.min(TAB.iconBox, num(d.iconSize, 24));
+    const list = tabs.slice(0, TAB.maxTabs).map((x, i) => {
+      const name = String(x.label || x.target || `Tab ${i + 1}`), s = slug(name);
+      return { label: name, target: String(x.target || x.label || ''), selected: !!x.selected, modal: !!x.modal,
+        icon: { file: `${s}.png`, icon: x.icon, width: TAB.iconBox, height: TAB.iconBox, iconSize: glyph, color: color(d.defaultColor, '#898E9F') },
+        iconSelected: { file: `${s}_selected.png`, icon: x.selectedIcon || x.icon, width: TAB.iconBox, height: TAB.iconBox, iconSize: glyph, color: color(d.activeColor, '#04CF99') } };
+    });
+    if (num(d.height, TAB.height.ios) !== TAB.height.ios) notes.push(`The bar is ${TAB.height.ios} tall on iPhone and ${TAB.height.android} on Android, fixed by the plugin (designed at ${num(d.height)}).`);
+    notes.push(`Each tab icon is drawn in a ${TAB.iconBox}×${TAB.iconBox} box; the images include the space around the ${glyph}pt glyph so it keeps its designed size.`);
+    if (labels) notes.push('Tab labels are one line, 14 tall, under the icon.');
+    for (const x of Array.isArray(d.unsupported) ? d.unsupported : []) notes.push(String(x));
+    return { styles, tabs: list, notes, height: TAB.height.ios + num(d.border && d.border.width, 0) };
+  }
+
+  const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, NAV_DEFAULT, TAB };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

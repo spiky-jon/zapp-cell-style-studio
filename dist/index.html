@@ -210,6 +210,16 @@ ul.left { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13p
 .tbox.wide { display: flex; gap: 6px; align-items: center; min-width: 98px; justify-content: flex-start; padding: 6px 8px }
 .tbox i { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 0 0 1px var(--line-strong) } .tbox b { font-weight: 600 } .tbox small { font-size: 10px; color: var(--ink-3) }
 @media (max-width: 760px) { .trow { grid-template-columns: 1fr } }
+.ngrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start }
+.ncol { display: grid; gap: 10px; align-content: start }
+.nvar { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--r-s); background: var(--raised); box-shadow: var(--shadow) }
+.nthumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 }
+.nthumbs figure { margin: 0; display: grid; justify-items: center; gap: 3px; width: 54px }
+.nthumbs img, .nthumbs span { width: 40px; max-height: 40px; object-fit: contain; border-radius: 6px; background: #2A2A2D; padding: 4px; display: block }
+.nthumbs figcaption { font-size: 10px; color: var(--ink-3); text-align: center; line-height: 1.2 }
+i.sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; box-shadow: 0 0 0 1px var(--line-strong); vertical-align: -1px; margin-right: 5px }
+.srow b .hint { font-weight: 400 }
+.clist.nolist .cbtn::before { content: none }
 #engine { position: fixed; left: -10000px; top: 0; width: 1500px; height: 1200px; border: 0; visibility: hidden }
 .phone.tablet { width: 560px; border-radius: 14px }
 @media (max-width: 1100px) { #v-cells { grid-template-columns: 220px minmax(0, 1fr) } .insp { grid-column: 1 / -1 } }

@@ -46,6 +46,9 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
    (single, rail, list, grid), next to the original. Each item is drawn with the text the design shows there.
    The tab opens with the suggested theme values (the most common spacing and colours across all screens);
    tapping a component in the preview shows its settings and which ones override the theme.
+   The navigation bar and bottom tab bar are set up as their plugins: drawn in each preview (tap one for its
+   settings), summed up in a Navigation card, and downloaded as `navigation/` (plugin fields, @3x images, upload
+   list). `node tools/test.mjs` also checks the navigation conversion against `tools/nav-fixture.json`.
 9. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each
    asset, 500x280@2x thumbnail, overlay PNG when there's a gradient, `assets/` icons; plus a `plugin assets`
    folder for action plugin button icons; a `fonts` folder with the font files and names) and a PDF report.

@@ -1,0 +1,23 @@
+{
+  "note": "The Ch4 Figma file's three navigation bars and its tab bar, as Claude should describe them. tools/test.mjs checks the plugin settings they give.",
+  "navBars": [
+    { "variant": "Top Level", "height": 64, "background": { "type": "color", "color": "#1E1E1E" }, "contentPosition": "below_bar", "padding": [8, 12, 8, 12], "gap": 0,
+      "left": null, "centre": "logo", "alignment": "left", "logo": { "icon": "figma:25:848", "width": 48, "height": 48 }, "buttonSize": { "width": 48, "height": 48 }, "iconSize": 24,
+      "iconColor": "#FFFFFF", "right": [{ "icon": "figma:25:1357", "label": "Account", "target": "Account" }], "statusBar": { "height": 59, "background": "#1E1E1E", "theme": "light" },
+      "expect": { "height": 64, "presentation_style": "logo", "style": "left", "content_position": "on_bottom_navbar", "images": ["app_logo"] } },
+    { "variant": "Second Level", "height": 64, "background": { "type": "color", "color": "#1E1E1E" }, "contentPosition": "below_bar", "padding": [8, 12, 8, 12], "gap": 0,
+      "left": "back", "leftIcon": "figma:25:1594", "centre": "title", "alignment": "center", "title": { "sample": "All Shows", "font": { "family": "Channel 4 Chadwick", "weight": 500, "size": 17, "lineHeight": 48 }, "color": "#FFFFFF" },
+      "buttonSize": { "width": 48, "height": 48 }, "iconSize": 24, "iconColor": "#FFFFFF", "right": [{ "icon": "figma:25:1357", "label": "Account", "target": "Account" }],
+      "expect": { "height": 64, "presentation_style": "title", "style": "center", "navbar_title__ios_line_height": 21, "images": ["back_button"] } },
+    { "variant": "Gradient", "height": 64, "background": { "type": "gradient", "top": "#1E1E1E", "bottom": "rgba(30,30,30,0)", "coversStatusBar": true }, "contentPosition": "under_bar",
+      "padding": [8, 12, 8, 12], "left": "back", "leftIcon": "figma:25:1594", "centre": "none", "alignment": "center", "buttonSize": { "width": 48, "height": 48 }, "iconSize": 24,
+      "right": [{ "icon": "figma:25:1357", "label": "Account", "target": "Account" }],
+      "expect": { "height": 64, "presentation_style": "hidden", "content_position": "on_top_screen", "navbar_gradient__mode": "on_top_screen", "status_bar__background_color": "rgba(0, 0, 0, 0)" } },
+    { "variant": "Odd height", "height": 56, "background": { "type": "color", "color": "#000000" }, "padding": [8, 8, 8, 8], "centre": "title", "title": { "font": { "size": 17, "lineHeight": 22 } },
+      "buttonSize": { "width": 44, "height": 44 }, "expect": { "height": 56, "navbar_padding_top": 6, "navbar_padding_bottom": 6 } }
+  ],
+  "tabBar": { "height": 49, "background": "#1E1E1E", "border": { "width": 0.5, "color": "#585858" }, "iconSize": 28, "activeColor": "#8DFF77", "defaultColor": "#787878", "labels": false,
+    "tabs": [{ "label": "Home", "icon": "figma:25:1355", "selected": true }, { "label": "Search", "icon": "figma:25:1299" }, { "label": "Live TV", "icon": "figma:25:1356" },
+      { "label": "Downloads", "icon": "figma:25:1354" }, { "label": "Account", "icon": "figma:25:1357" }, { "label": "Extra", "icon": "figma:25:1357" }],
+    "expect": { "tabs": 5, "title_label_toggle": false, "top_border_width": 0.5 } }
+}

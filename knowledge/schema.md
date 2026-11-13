@@ -120,6 +120,44 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
     "componentGap": 24,                       // the usual vertical space between two components on this screen
     "background": "#1E1E1E"                   // the screen colour
   },
+  "navigation": {                             // the status bar, navigation bar and bottom tab bar on this screen (plugins, not cells)
+    "statusBar": { "height": 59, "background": "#1E1E1E", "theme": "light" },   // theme: light = light text
+    "navBar": {                               // null when the screen has no navigation bar
+      "variant": "Second Level",              // the design's own name for this version of the bar, else a short one
+      "height": 64,                           // the bar without the status bar
+      "background": { "type": "color", "color": "#1E1E1E" },
+                                              //   or { "type": "gradient", "top": "#1E1E1E", "bottom": "rgba(30,30,30,0)", "coversStatusBar": true }
+      "border": null,                         // { "width": 1, "color": "#333333" } along the bottom
+      "contentPosition": "below_bar",         // below_bar | below_status_bar | under_bar (content runs behind the bar)
+      "padding": [8, 12, 8, 12],
+      "gap": 0,                               // space between the left button and the logo or title
+      "left": "back",                         // back | menu | null
+      "leftIcon": "figma:25:1594",            // the glyph (Figma ref or role)
+      "centre": "title",                      // logo | title | none
+      "alignment": "center",                  // left | center
+      "logo": null,                           // { "icon": "figma:25:848", "width": 48, "height": 48 } (the logo's whole box)
+      "title": { "sample": "All Shows", "font": { "family": "Inter", "weight": 500, "size": 17, "lineHeight": 20 }, "color": "#FFFFFF", "uppercase": false },
+      "buttonSize": { "width": 48, "height": 48 },   // each button's whole tap area
+      "iconSize": 24,                         // the glyph inside it
+      "iconColor": "#FFFFFF",
+      "right": [ { "icon": "figma:25:1357", "label": "Account", "target": "Account" } ],   // left to right; target = the screen it opens
+      "buttonGap": 4,
+      "blur": false,                          // false | light | medium | strong
+      "unsupported": []                       // what the bar shows that the plugin can't, one plain sentence each
+    },
+    "tabBar": {                               // null when the screen has no bottom tab bar
+      "height": 49,
+      "background": "#1E1E1E",
+      "border": { "width": 0.5, "color": "#585858" },   // along the top, as it looks (a translucent line: give its colour over the bar)
+      "tabs": [ { "label": "Home", "icon": "figma:25:1355", "selected": true, "target": "Home" },
+                { "label": "Search", "icon": "figma:25:1299", "target": "Search" } ],   // label even when not shown: it names the tab
+      "iconSize": 28,                         // the glyph inside the 32x32 box
+      "activeColor": "#8DFF77", "defaultColor": "#787878",
+      "labels": false,                        // whether labels show under the icons
+      "font": null,                           // the label font when labels show
+      "unsupported": []
+    }
+  },
   "icons": { "library": "lucide", "light": "#FFFFFF", "dark": "#121212", "why": "Thin rounded outline icons" }
 }
 ```
@@ -131,6 +169,11 @@ Icons from a Figma file: when the studio lists `ICONS FROM THE FIGMA FILE`, use 
 the icon value instead of a role, wherever the design uses them. Roles are for icons the file doesn't have.
 
 Icon roles (use these names wherever an icon is named): `play`, `plus`, `check`, `heart`, `bookmark`, `share-ios`, `share-network`, `download`, `download-progress`, `download-done`, `download-error`, `download-expired`, `trailer`, `calendar-plus`, `more-horizontal`, `more-vertical`, `volume-mute`, `volume-on`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `arrow-right`, `info`, `close`, `lock`, `search`, `star`, `live`, `list`.
+
+`navigation`: describe the bars as the design draws them, following the navigation rules. Icons are the Figma refs
+of the glyphs (a button or tab layer usually wraps the glyph: give the glyph's ref, and the wrapper's size as
+`buttonSize`). When a bar matches one described for an earlier screen, use the same `variant` name and values.
+Don't describe the status bar's contents (time, battery): only its height, colour and text theme.
 
 `spacing`: measure it on this screen. `screenPadding` top is 0 when the first component touches the navigation bar or
 runs under it (a hero). The space between a header and the rail, list or grid it introduces is not a component gap.

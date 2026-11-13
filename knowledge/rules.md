@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 18 · phone and tablet · cell plugins 16.0.0-alpha
+Version 19 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -252,6 +252,38 @@ Choosing:
   (theme default 12; set it to 0 for rows that touch, see "List rows" above).
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
+- **The navigation bar and the bottom tab bar are plugins, not cells.** Describe them in `navigation` (never as
+  cells) so the studio can set up the two plugins. Each screen carries its own navigation bar settings, so
+  screens can use different bars (a top-level bar with a logo, a second-level bar with back and a title, a
+  see-through bar over a hero).
+- **Navigation bar height** is the tallest of the logo (or the title's line height), and the button images, plus
+  padding top and bottom. Give the bar's real height and padding; the studio adjusts the padding when they don't
+  add up.
+- **Navigation bar left side**: a back button appears by itself when there is a screen to go back to; otherwise
+  a menu button, but only with a side menu (or a menu target screen). There is only one left button. A design
+  with two buttons on the left can't be built: keep the first and record the other.
+- **Navigation bar centre**: a logo, the screen's title, or nothing, aligned left or centre. The title is the
+  screen's name, one line, in one font. Text other than the screen name (a subtitle, a search field, tabs)
+  can't be built in the bar: build it as the first cell on the screen instead.
+- **Navigation bar right side**: icon buttons only, all the same size, each opening a screen (pushed or as a
+  modal). Text buttons, a profile photo or a badge on an icon can't be built: draw the icon only.
+- **Navigation bar button images** are the whole tap area (often 44 or 48): the glyph sits in the middle with
+  its padding around it. Give the box size in `buttonSize` and the glyph in `iconSize`.
+- **Navigation bar background**: a colour or a two-colour vertical gradient, optional bottom border, optional
+  blur. A gradient fading over a hero covers the status bar too. When content runs behind the bar (a hero under
+  a see-through bar), set `contentPosition` to `under_bar`.
+- **Bottom tab bar** (fixed by the plugin): 49 tall on iPhone (56 on Android) plus the home indicator area, up
+  to 5 tabs of equal width, each an icon in a 32x32 box with an optional one-line label (14 tall) under it, a
+  background colour and a top border. Colours: one for the selected tab, one for the rest. A selected pill or
+  underline, notification badges, per-tab colours, a floating or rounded bar and a see-through bar can't be
+  built: draw any selected marker into the selected icon, leave the rest out, and record each in `unsupported`.
+- **Tab icons** keep their designed size: give the glyph size in `iconSize` (the studio draws it inside the
+  32x32 box). Give a separate `selectedIcon` only when the selected tab uses a different glyph (filled versus
+  outline), not for a colour change.
+- **Screens without the tab bar** (a detail screen that hides it) set "hide the menu" on that screen. The tab
+  bar also hides on player screens and on the search screen plugin, so a search screen with a tab bar must be a
+  normal screen.
+
 - **No expand/collapse**: cells can't open or close in place. Chevrons that toggle a row have no job: leave them
   out and record why. Show an expanded state as its own cell(s).
 - A composition that depends on an exact width (number + poster) only works in a horizontal list with a fixed

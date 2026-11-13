@@ -20,4 +20,10 @@ for (const d of src.cells) {
     console.log('ok  ', d.name.padEnd(22), base.padEnd(12), out.output, n, 'fields', warnings.length ? warnings : '');
   } catch (e) { fail++; console.log('FAIL', d.name, e.message); }
 }
+// navigation bar and tab bar settings (tools/nav-fixture.json)
+const nav = JSON.parse(readFileSync(root + 'tools/nav-fixture.json'));
+const check = (name, got, expect) => { const bad = Object.entries(expect).filter(([k, v]) => JSON.stringify(got[k]) !== JSON.stringify(v));
+  if (bad.length) { fail++; console.log('FAIL', name, bad.map(([k, v]) => `${k}: ${JSON.stringify(got[k])} (expected ${JSON.stringify(v)})`).join('; ')); } else console.log('ok  ', name); };
+for (const d of nav.navBars) { const r = Convert.navBar(d); check(`nav bar ${d.variant}`, { ...r.styles, height: r.height, images: r.images.map(i => i.field) }, d.expect); }
+{ const r = Convert.tabBar(nav.tabBar); check('tab bar', { ...r.styles, tabs: r.tabs.length }, nav.tabBar.expect); }
 process.exit(fail ? 1 : 0);

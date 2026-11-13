@@ -14,7 +14,7 @@ first; this note covers status and what's next.
 
 ## What the studio does now
 
-- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 18).
+- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 19).
 - From Figma: a read-only `use_figma` script returns each screen's layer details (padding, gaps, fonts, colours,
   text) and exports the icons used (instances followed to their components, as SVG).
 - Cells built with the cell preview engine; gallery, inspector, icon panel (Figma icons or a matched library),
@@ -27,6 +27,13 @@ first; this note covers status and what's next.
 - Screens tab, components: tap a component in the built preview (or in the list beside it) to see its settings,
   each marked Theme or Override. Screen outlines only carry what differs from the suggested theme, including
   screen padding on the screen itself; `screens/theme.json` is in the zip.
+- Navigation: Claude describes each screen's status bar, navigation bar and bottom tab bar in `navigation`;
+  `Convert.navBar` / `Convert.tabBar` turn them into the plugins' own fields (QuickBrick `mobile-nav-bar-2`,
+  `quick-brick-bottom-tabs`), with checks (bar height = tallest item + padding, padding adjusted to match; 5 tabs;
+  fixed 49/56 tab bar). Screens with identical bars are grouped into versions. The bars are drawn in each preview
+  and tappable; a Navigation card sums them up. The zip has `navigation/` (plugin JSON, @3x button and tab images,
+  upload list) and each screen outline carries its `navigations` and `hide_menu`. The Figma script now looks
+  through button and tab wrappers to the glyph, records each glyph's colour, and skips the device status bar.
 - Downloads: cells zip (JSON, assets, thumbnails, plugin assets with labels, fonts, `screens/*.json`) and a PDF
   report.
 
@@ -49,6 +56,14 @@ Ch4 theme agreed with Jon: component padding 12, margin bottom 24, gutters 10, s
 (0 top on screens that open with a hero), background #1E1E1E. The theme and tap-to-inspect changes were tested
 with canned screens in headless Chrome, not yet with a live run on the Ch4 file.
 
+Navigation (from the framework code): nav bar settings live on each screen; height = max(logo or title line
+height, button image) + padding; left button is back (automatic) or menu (side menu or menu target only);
+title is the screen name; tab bar height fixed (49 iOS / 56 Android) plus safe area, icons drawn in 32x32, up to
+5 tabs, no selected indicator or badges; tab bar hides on player screens, the search screen plugin and screens
+with "hide menu". Ch4: three bar versions (Top Level logo left, Second Level back + centred title, Gradient over
+the Show hero with content under the bar); tab bar #1E1E1E with a 0.5 top border, no labels, Category has none.
+Tested with canned screens in headless Chrome and `tools/nav-fixture.json`; not yet a live run.
+
 ## Open questions
 
 - How the app chooses phone vs tablet cell styles.
@@ -58,6 +73,7 @@ with canned screens in headless Chrome, not yet with a live run on the Ch4 file.
 ## Possible next steps
 
 - Build the whole app layout (screens, bottom tabs, type mapping) as one file from all screens.
-- Re-run the Ch4 Figma file in the published studio and check the suggested theme against the agreed values.
+- Re-run the Ch4 Figma file in the published studio: check the suggested theme and the three navigation bar versions.
+- Navigation bar and tab bar in the PDF report (not there yet).
 - Run Jon's real test designs end to end (screenshots and the Ch4 Figma file) and review results.
 - Later scope: components, plugins, web, TV.

@@ -403,10 +403,17 @@
   // and exports that component as SVG (vector, any size). Layer data alone can't see inside component instances.
   const ICON_SCRIPT = ids => `const frameIds = ${JSON.stringify(ids)};
 const icons = new Map(), specs = {};
-const hex = p => { const c = p.color, h = v => Math.round(v * 255).toString(16).padStart(2, '0'); return '#' + h(c.r) + h(c.g) + h(c.b) + (p.opacity != null && p.opacity < 1 ? h(p.opacity) : ''); };
-const paint = ps => { if (!Array.isArray(ps)) return ''; const p = ps.find(x => x.visible !== false); if (!p) return ''; return p.type === 'SOLID' ? hex(p) : p.type === 'IMAGE' ? 'image' : p.type.indexOf('GRADIENT') === 0 ? 'gradient' : p.type.toLowerCase(); };
 const r1 = v => Math.round(v * 10) / 10;
+const hex = p => { const c = p.color, h = v => Math.round(v * 255).toString(16).padStart(2, '0'); return '#' + h(c.r) + h(c.g) + h(c.b) + (p.opacity != null && p.opacity < 1 ? h(p.opacity) : ''); };
+const paint = ps => { if (!Array.isArray(ps)) return ''; const p = ps.find(x => x.visible !== false); if (!p) return ''; return p.type === 'SOLID' ? hex(p) : p.type === 'IMAGE' ? 'image' : p.type.indexOf('GRADIENT') === 0 ? 'gradient(' + p.gradientStops.map(g => hex({ color: g.color, opacity: g.color.a }) + ' ' + r1(g.position)).join(', ') + ')' : p.type.toLowerCase(); };
 const isIcon = n => n.type === 'INSTANCE' && n.width <= 72 && n.height <= 72 && n.width >= 8 && n.height >= 8 && !n.findAllWithCriteria({ types: ['TEXT'] }).length;
+// a button or tab layer often wraps the glyph (an icon instance inside a padded box): the glyph is the icon
+const innerIcons = n => n.findAllWithCriteria({ types: ['INSTANCE'] }).filter(k => k.visible && isIcon(k));
+const glyphOf = n => { const kids = innerIcons(n).filter(k => !innerIcons(k).length); return kids.length === 1 ? kids[0] : null; };
+const isStatus = n => /status ?bar/i.test(n.name) && n.height <= 70;
+const underStatus = (n, stop) => { for (let p = n; p && p !== stop; p = p.parent) if (isStatus(p)) return true; return false; };
+const glyphColour = n => { const v = n.findAll(x => x.visible && ['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'ELLIPSE', 'POLYGON'].indexOf(x.type) >= 0 && Array.isArray(x.fills) && x.fills.some(f => f.visible !== false && f.type === 'SOLID'));
+  if (!v.length) return ''; const f = v[v.length - 1].fills.find(f => f.visible !== false && f.type === 'SOLID'); return f ? hex(f) : ''; };
 const textOf = n => { const fn = n.fontName, lh = n.lineHeight, ls = n.letterSpacing;
   return '"' + n.characters.slice(0, 80).replace(/\\n/g, ' ') + '" ' + (typeof fn === 'symbol' ? 'mixed' : fn.family + ' ' + fn.style) + ' ' + (typeof n.fontSize === 'symbol' ? 'mixed' : n.fontSize) + '/'
     + (typeof lh === 'symbol' || lh.unit === 'AUTO' ? 'auto' : lh.unit === 'PIXELS' ? r1(lh.value) : r1(lh.value) + '%')
@@ -418,7 +425,7 @@ for (const fid of frameIds) {
   if (!frame || !('findAllWithCriteria' in frame)) continue;
   // icons: every small instance without text, followed to its component
   for (const inst of frame.findAllWithCriteria({ types: ['INSTANCE'] })) {
-    if (!inst.visible || !isIcon(inst) || icons.size >= 40) continue;
+    if (!inst.visible || !isIcon(inst) || icons.size >= 40 || glyphOf(inst) || underStatus(inst, frame)) continue;
     const main = await inst.getMainComponentAsync();
     const key = main ? main.id : inst.id;
     if (!icons.has(key)) icons.set(key, { id: key, name: main ? (main.parent && main.parent.type === 'COMPONENT_SET' ? main.parent.name + ' / ' + main.name : main.name) : inst.name, w: Math.round(inst.width), h: Math.round(inst.height), frames: [], node: main || inst });
@@ -428,6 +435,7 @@ for (const fid of frameIds) {
   const fx = frame.absoluteTransform[0][2], fy = frame.absoluteTransform[1][2], lines = [], seenMain = new Map(); let size = 0;
   const walk = async (n, depth) => {
     if (n.visible === false || size > 16000) return;
+    if (isStatus(n)) { const l = '  '.repeat(depth) + 'status bar (device: time, signal, battery) ' + r1(n.absoluteTransform[0][2] - fx) + ',' + r1(n.absoluteTransform[1][2] - fy) + ' ' + r1(n.width) + 'x' + r1(n.height); lines.push(l); size += l.length; return; }
     let line = '  '.repeat(depth) + n.type.toLowerCase() + ' "' + n.name + '" ' + r1(n.absoluteTransform[0][2] - fx) + ',' + r1(n.absoluteTransform[1][2] - fy) + ' ' + r1(n.width) + 'x' + r1(n.height);
     if (n.type === 'TEXT') line += ' ' + textOf(n);
     else {
@@ -440,10 +448,13 @@ for (const fid of frameIds) {
     }
     if (n.type === 'INSTANCE') {
       const main = await n.getMainComponentAsync();
-      if (main && isIcon(n)) { lines.push(line + ' icon=figma:' + main.id); size += line.length; return; }
+      if (main && isIcon(n) && !glyphOf(n)) { const c = glyphColour(n); line += ' icon=figma:' + main.id + (c ? ' colour=' + c : ''); lines.push(line); size += line.length; return; }
+      if (main && isIcon(n)) line += ' (wraps the icon below)';
       if (main && seenMain.has(main.id)) {
         const texts = n.findAllWithCriteria({ types: ['TEXT'] }).filter(t => t.visible).map(t => '"' + t.characters.slice(0, 60).replace(/\\n/g, ' ') + '"').join(' ');
-        line += ' (same component as "' + seenMain.get(main.id) + '" above) texts: ' + texts; lines.push(line); size += line.length; return;
+        const glyphs = innerIcons(n).filter(k => !innerIcons(k).length), refs = [];
+        for (const k of glyphs) { const m = await k.getMainComponentAsync(), c = glyphColour(k); refs.push('figma:' + (m ? m.id : k.id) + (c ? ' ' + c : '')); }
+        line += ' (same component as "' + seenMain.get(main.id) + '" above) texts: ' + texts + (refs.length ? ' icons: ' + refs.join(', ') : ''); lines.push(line); size += line.length; return;
       }
       if (main) seenMain.set(main.id, n.name);
     }
@@ -538,15 +549,16 @@ return { icons: out, specs };`;
       `The attached image is the "${scr.name}" screen. It is ${scr.w} px wide and ${scr.h} px tall. The screen is ${scr.screenW} points wide (${scr.device}), so 1 point = ${(scr.w / scr.screenW).toFixed(3)} px. Give every size in points.`,
       scr.figmaSpec ? `FIGMA LAYER DETAILS for this screen, from the design file (positions in points from the screen's top left, auto-layout padding as top,right,bottom,left, gaps, fills, strokes, and each text's content, font, size/line height, letter spacing and colour). These are exact: use them for sizes, padding, spacing, colours, fonts and sample text instead of measuring the image. Padding inside a component that wraps a row is the cell's padding; a list with gap=0 has no gap between rows. icon=figma:… marks an icon from the list below.\n${scr.figmaSpec}`
         : scr.meta ? `Figma layer data for this frame: ${scr.meta.slice(0, 2000)}` : '',
+      navKnown().length ? `Navigation already described on earlier screens (reuse the same variant name and values when a bar matches): ${navKnown().join(' | ')}` : '',
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
-      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts"), spacing (the screen padding, the gap between components and its background) and icons.',
+      'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts"), spacing (the screen padding, the gap between components and its background), navigation (the status bar, navigation bar and bottom tab bar, as plugins) and icons.',
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
       Object.keys(S.fonts.uploads).length ? `UPLOADED FONTS (the design's own font files; wherever the design's type matches one, use its family name exactly and set "source": "uploaded"): ${Object.entries(S.fonts.uploads).map(([f, u]) => `${f} (weights ${[...new Set(u.faces.filter(x => !x.italic).map(x => x.weight))].join(', ')})`).join('; ')}` : '',
       S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
       (scr.figmaIcons || []).length ? `ICONS FROM THE FIGMA FILE${scr.sheet ? ' (the second image shows them, numbered in this order)' : ''}: ${scr.figmaIcons.map((r, i) => `${i + 1}. ${r} "${S.figmaIcons[r]?.name}" ${S.figmaIcons[r]?.w}x${S.figmaIcons[r]?.h}${S.figmaIcons[r]?.mono ? '' : ' (multi-colour)'}`).join('; ')}. These are the design's own icons: wherever a cell uses one (badges, action icons, header buttons, button icons), set the icon to its exact ref (e.g. "${scr.figmaIcons[0]}") instead of a role name. Use a role only for an icon that isn't in this list. If a Figma icon already includes its background shape (a filled square or circle behind the glyph), set the badge background to null so it isn't drawn twice.` : '',
       'Work in this order: write the inventory first (every visible element, top to bottom), then fonts, then the cells that build every inventory element, then seen, screen and icons.',
       'Fidelity comes first (RULES section 0): match the screenshot as closely as the rules allow. Never leave out visible text, images or buttons to keep a block in one cell; split it into stacked cells instead.',
-      'Include every distinct content cell style on the screen (headers, tiles, rows, heroes, banners, info blocks, button rows). Skip the status bar, app navigation bar, tab strips and bottom tab bar.',
+      'Include every distinct content cell style on the screen (headers, tiles, rows, heroes, banners, info blocks, button rows). Do not make cells for the status bar, the app navigation bar or the bottom tab bar: describe those in navigation. Skip tab strips.',
     ].filter(Boolean).join('\n');
   }
   async function analyse() {
@@ -569,6 +581,7 @@ return { icons: out, specs };`;
         }
         if (Array.isArray(res?.screen)) scr.layout = res.screen.filter(x => x && x.cell);
         if (res?.spacing && typeof res.spacing === 'object') scr.spacing = res.spacing;
+        if (res?.navigation && typeof res.navigation === 'object') scr.navigation = res.navigation;
         if (res?.icons?.library && ICONS.libraries[res.icons.library] && !S.iconsTouched && !S.iconsSet) {
           S.icons = { library: res.icons.library, light: C.color(res.icons.light, '#FFFFFF'), dark: C.color(res.icons.dark, '#121212'), why: res.icons.why || '' };
           S.iconsSet = true; renderIconPanel();
@@ -812,7 +825,8 @@ return { icons: out, specs };`;
   function renderMock() {
     const t = ++mockToken;
     drawMock(null);
-    const jobs = [];
+    const jobs = [], pending = navImages().filter(im => !navImgCache.has(imgKey(im)));
+    if (pending.length) jobs.push(Promise.all(pending.map(makeNavImg)).then(() => null));
     for (const scr of S.screens) (scr.layout || []).forEach((item, i) => {
       const c = findCell(item.cell), texts = Array.isArray(item.texts) ? item.texts.filter(x => x && typeof x === 'object') : [];
       if (!c || !texts.length) return;
@@ -821,7 +835,7 @@ return { icons: out, specs };`;
     if (!jobs.length) return;
     Promise.all(jobs).then(res => {
       if (t !== mockToken || $('v-screens').hidden) return;
-      const map = new Map(); for (const [sid, i, imgs] of res) { if (!map.has(sid)) map.set(sid, []); map.get(sid)[i] = imgs; }
+      const map = new Map(); for (const r of res) { if (!r) continue; const [sid, i, imgs] = r; if (!map.has(sid)) map.set(sid, []); map.get(sid)[i] = imgs; }
       drawMock(map);
     });
   }
@@ -926,8 +940,9 @@ return { icons: out, specs };`;
         out.push(group);
       } else out.push(component(p, false));
     }
-    const st = screenStyles(scr, T);
-    return { name: scr.name, type: 'general_content', ...(Object.keys(st).length ? { styles: st } : {}), ui_components: out };
+    const st = screenStyles(scr, T), M = navModel(), navs = scr.navigation ? screenNavigations(scr, M) : [];
+    const hide = M.tabs && scr.navigation && !scr.navigation.tabBar;
+    return { name: scr.name, type: 'general_content', ...(hide ? { general: { hide_menu: true } } : {}), ...(Object.keys(st).length ? { styles: st } : {}), ...(navs.length ? { navigations: navs } : {}), ui_components: out };
   }
 
   /* ---------- screens tab: theme summary, mock-ups, and one component's details at a time ---------- */
@@ -994,8 +1009,9 @@ return { icons: out, specs };`;
       <div class="row"><button class="btn small" type="button" data-open-cell="${esc(p.c.id)}">Open cell style</button></div>
       <p class="hint">Theme: uses the suggested theme value. Override: set this on the component.</p>`;
   }
-  function sideHtml(scr, T) {
+  function sideHtml(scr, T, M = navModel()) {
     const P = placements(scr), sel = S.pick?.[scr.id], p = P.find(x => x.i === sel);
+    if (sel === 'nav' || sel === 'tabs') return navSideHtml(scr, sel, M);
     if (p) return componentHtml(scr, p, T);
     const ss = screenStyles(scr, T), top = boxAt(scr, 0), bottom = boxAt(scr, 2), missing = scr.layout.filter(i => !findCell(i.cell)).map(i => i.cell);
     return `<div class="row" style="justify-content:space-between"><span class="lab">This screen</span><button class="btn small" type="button" data-copy-outline="${esc(scr.id)}">Copy JSON</button></div>
@@ -1005,16 +1021,18 @@ return { icons: out, specs };`;
       </div>
       <span class="lab">Components</span>
       <ol class="clist">${P.map(x => `<li><button type="button" class="cbtn" data-pick="${esc(scr.id)}:${x.i}"><b>${esc(compName(x))}</b> <span class="hint">${esc(x.c.desc.name)}${x.heads ? ' · header of the next' : ''}</span></button></li>`).join('')}</ol>
-      <p class="hint">Tap a component here or in the preview to see its settings.</p>
+      ${M.variantOf(scr) || (M.tabs && scr.navigation?.tabBar) ? `<span class="lab">Navigation</span><ol class="clist nolist">${M.variantOf(scr) ? `<li><button type="button" class="cbtn" data-pick="${esc(scr.id)}:nav"><b>Navigation bar</b> <span class="hint">${esc(M.variantOf(scr).name)}</span></button></li>` : ''}${M.tabs && scr.navigation?.tabBar ? `<li><button type="button" class="cbtn" data-pick="${esc(scr.id)}:tabs"><b>Bottom tab bar</b></button></li>` : ''}</ol>` : ''}
+      ${M.tabs && scr.navigation && !scr.navigation.tabBar ? '<p class="hint">No tab bar on this screen: turn on "hide menu" for it.</p>' : ''}
+      <p class="hint">Tap a component or bar here or in the preview to see its settings.</p>
       ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
       ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
-      <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p>`;
+      <p class="hint">Sample text and placeholder artwork.${scr.navigation ? ' The bars are drawn from their plugin settings; the device status bar is left plain.' : ' The status bar, navigation and tab bars are drawn once cells are found again.'}</p>`;
   }
   function pick(sid, i) {
     S.pick ||= {}; S.pick[sid] = S.pick[sid] === i ? null : i;
     const sec = $('mock').querySelector(`.mscreen[data-scr="${CSS.escape(sid)}"]`), scr = S.screens.find(x => x.id === sid); if (!sec || !scr) return;
-    sec.querySelectorAll('.cmp').forEach(el => { const on = +el.dataset.pick.split(':').pop() === S.pick[sid]; el.classList.toggle('on', on); el.setAttribute('aria-pressed', on); });
-    sec.querySelector('.mside').innerHTML = sideHtml(scr, themeValues());
+    sec.querySelectorAll('.cmp').forEach(el => { const on = el.dataset.pick.split(':').pop() === String(S.pick[sid]); el.classList.toggle('on', on); el.setAttribute('aria-pressed', on); });
+    sec.querySelector('.mside').innerHTML = sideHtml(scr, themeValues(), navModel());
   }
   const copy = async (txt, ok) => { try { await navigator.clipboard.writeText(txt); toast(ok); } catch (err) { toast("Couldn't copy here; it's in the cells download too."); } };
   $('mock').addEventListener('click', e => {
@@ -1024,28 +1042,227 @@ return { icons: out, specs };`;
     else if (at('[data-copy-theme]')) copy(JSON.stringify(themeJson(themeValues()), null, 2), 'Copied the theme values');
     else if ((b = at('[data-back]'))) pick(b.dataset.back, S.pick?.[b.dataset.back]);
     else if ((b = at('[data-open-cell]'))) { S.sel = b.dataset.openCell; show('cells'); renderAll(); }
-    else if ((b = at('[data-pick]'))) { const k = b.dataset.pick.lastIndexOf(':'); pick(b.dataset.pick.slice(0, k), +b.dataset.pick.slice(k + 1)); }
+    else if ((b = at('[data-copy-nav]'))) { const M = navModel(), w = b.dataset.copyNav, v = w.startsWith('nav:') && M.variants.find(x => x.name === w.slice(4));
+      if (v) copy(JSON.stringify(navJson(v), null, 2), `Copied the ${v.name} navigation bar`); else if (w === 'tabs' && M.tabs) copy(JSON.stringify(tabsJson(M.tabs), null, 2), 'Copied the tab bar'); }
+    else if ((b = at('[data-pick]'))) { const k = b.dataset.pick.lastIndexOf(':'), id = b.dataset.pick.slice(k + 1); pick(b.dataset.pick.slice(0, k), /^\d+$/.test(id) ? +id : id); }
   });
   $('mock').addEventListener('keydown', e => { const b = e.target.closest('.cmp'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click(); } });
   function drawMock(itemImgs) {
     const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
     if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>Find cells from your designs; each screen is rebuilt here from its cells.</span></div>`; return; }
-    const T = themeValues();
-    box.innerHTML = themeHtml(T) + done.map(scr => {
+    const T = themeValues(), M = navModel();
+    box.innerHTML = themeHtml(T) + navCardHtml(M) + done.map(scr => {
       const W = scr.screenW, tablet = scr.device === 'tablet', disp = tablet ? 560 : 300, k = disp / W, H = scr.h * W / scr.w;
       const bg = scr.spacing?.background || findCell((scr.layout.find(i => findCell(i.cell)) || {}).cell)?.spec?.appBg || '#000';
       // the mock grows when the cells run longer than the screenshot (split cells, sample text)
       const P = new Map(placements(scr).map(p => [p.i, p])), top = boxAt(scr, 0) || 0, bottom = boxAt(scr, 2) || 0, sel = S.pick?.[scr.id];
       const blocks = scr.layout.map((it, i) => ({ ...mockBlock(it, W, itemImgs?.get(scr.id)?.[i]), i, gap: P.get(i)?.after || 0, p: P.get(i) }));
-      const contentH = top + bottom + blocks.reduce((a, b) => a + b.h + (b.html ? b.gap : 0), 0);
+      const NF = navFrame(scr, M), contentH = NF.top + NF.bottom + top + bottom + blocks.reduce((a, b) => a + b.h + (b.html ? b.gap : 0), 0);
       return `<section class="mscreen" data-scr="${esc(scr.id)}"><h2>${esc(scr.name)} <span class="hint">${tablet ? 'Tablet' : 'Phone'} · ${W}pt</span></h2>
         <div class="mpair">
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
           <div class="mcol"><span class="lab">Built from cells · tap a component</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
-            <div class="inner" style="width:${W}px;transform:scale(${k});padding-top:${top}px">${blocks.filter(b => b.html && b.p).map(b => `<div class="cmp${sel === b.i ? ' on' : ''}" role="button" tabindex="0" aria-pressed="${sel === b.i}" aria-label="${esc(compName(b.p))}: ${esc(b.p.c.desc.name)}" data-pick="${esc(scr.id)}:${b.i}" style="margin-bottom:${b.gap}px">${b.html}</div>`).join('')}</div></div></div>
-          <div class="mside">${sideHtml(scr, T)}</div>
+            <div class="inner" style="width:${W}px;height:${Math.max(H, contentH)}px;transform:scale(${k});padding-top:${NF.top + top}px;box-sizing:border-box">${scr.navigation ? navBarHtml(scr, NF, sel) + tabBarHtml(scr, NF, sel) : ''}${blocks.filter(b => b.html && b.p).map(b => `<div class="cmp${sel === b.i ? ' on' : ''}" role="button" tabindex="0" aria-pressed="${sel === b.i}" aria-label="${esc(compName(b.p))}: ${esc(b.p.c.desc.name)}" data-pick="${esc(scr.id)}:${b.i}" style="margin-bottom:${b.gap}px">${b.html}</div>`).join('')}</div></div></div>
+          <div class="mside">${sideHtml(scr, T, M)}</div>
         </div></section>`;
     }).join('');
+  }
+
+  /* ---------- navigation: the navigation bar and bottom tab bar plugins ---------- */
+  const NAV_ID = 'quick_brick_applicaster_navbar', TABS_ID = 'quick-brick-bottom-tabs';
+  const navScreens = () => S.screens.filter(s => s.navigation && (s.layout || []).length);
+  // what earlier screens described, so later screens reuse the same variant names and values
+  function navKnown() {
+    const out = [], seen = new Set();
+    for (const s of S.screens) {
+      const n = s.navigation; if (!n) continue;
+      if (n.navBar && !seen.has('v:' + n.navBar.variant)) { seen.add('v:' + n.navBar.variant); out.push(`navigation bar "${n.navBar.variant}" (${s.name}): ${JSON.stringify(n.navBar)}`); }
+      if (n.tabBar && !seen.has('tabs')) { seen.add('tabs'); out.push(`bottom tab bar (${s.name}): ${JSON.stringify(n.tabBar)}`); }
+    }
+    return out;
+  }
+  // screens grouped by identical navigation bar settings (each group is one way of setting up the plugin), and the tab bar
+  function navModel() {
+    const scrs = navScreens(), variants = [], byKey = new Map();
+    for (const s of scrs) {
+      const d = s.navigation.navBar; if (!d) continue;
+      const conv = C.navBar({ ...d, statusBar: s.navigation.statusBar });
+      const key = JSON.stringify([conv.styles, conv.assets, conv.images.map(i => [i.field, i.icon]), conv.navItems.map(n => [n.label, n.target, n.image.icon])]);
+      if (!byKey.has(key)) {
+        let name = String(d.variant || 'Navigation bar'); while (variants.some(v => v.name === name)) name += ' 2';
+        const v = { name, desc: d, conv, screens: [], statusBar: s.navigation.statusBar || {} }; byKey.set(key, v); variants.push(v);
+      }
+      byKey.get(key).screens.push(s);
+    }
+    const withTabs = scrs.filter(s => s.navigation.tabBar), tabDesc = withTabs.length ? withTabs.reduce((a, s) => ((s.navigation.tabBar.tabs || []).length > (a.tabs || []).length ? s.navigation.tabBar : a), withTabs[0].navigation.tabBar) : null;
+    const tabs = tabDesc ? { desc: tabDesc, conv: C.tabBar(tabDesc), screens: withTabs, hidden: scrs.filter(s => !s.navigation.tabBar) } : null;
+    if (tabs) {
+      const names = d => (d.tabs || []).map(x => x.label).join('|');
+      if (withTabs.some(s => names(s.navigation.tabBar) !== names(tabDesc))) tabs.conv.notes.unshift(`The tab bar is the same on every screen, so it uses the tabs drawn on ${withTabs.find(s => s.navigation.tabBar === tabDesc).name}.`);
+      if (tabs.hidden.length) tabs.conv.notes.unshift(`${tabs.hidden.map(s => s.name).join(', ')} ${tabs.hidden.length === 1 ? 'has' : 'have'} no tab bar: turn on "hide menu" on ${tabs.hidden.length === 1 ? 'that screen' : 'those screens'}.`);
+    }
+    return { variants, tabs, variantOf: s => variants.find(v => v.screens.includes(s)) || null };
+  }
+  // images for the plugins: each button or tab image is its whole box with the glyph at its designed size in the middle
+  const navImgCache = new Map();
+  const imgKey = im => [im.icon, im.width, im.height, im.iconSize, im.color, im.fill].join('|');
+  const navImg = im => (im && im.icon ? navImgCache.get(imgKey(im)) || '' : '');
+  async function makeNavImg(im) {
+    if (!im || !im.icon) return '';
+    const k = imgKey(im); if (navImgCache.has(k)) return navImgCache.get(k);
+    let url = '';
+    try { url = await iconPng(im.icon, { size: im.width, height: im.height, iconSize: im.fill ? Math.min(im.width, im.height) : im.iconSize, color: im.fill ? (S.figmaIcons[im.icon] ? null : '#FFFFFF') : im.color }); } catch (e) { console.warn('nav image', e); }
+    navImgCache.set(k, url); return url;
+  }
+  function navImages(M = navModel()) {
+    const list = [];
+    for (const v of M.variants) { list.push(...v.conv.images); for (const n of v.conv.navItems) list.push(n.image); }
+    if (M.tabs) for (const t of M.tabs.conv.tabs) list.push(t.icon, t.iconSelected);
+    return list.filter(x => x && x.icon);
+  }
+  const statusH = scr => num(scr.navigation?.statusBar?.height, scr.device === 'tablet' ? 24 : 59);
+  const safeBottom = scr => (scr.device === 'tablet' ? 20 : 34);
+  // where the content starts below the bars, and how much the tab bar takes at the bottom
+  function navFrame(scr, M) {
+    const v = M.variantOf(scr), sb = statusH(scr), t = M.tabs && scr.navigation?.tabBar ? M.tabs : null;
+    const barH = v ? v.conv.height + num(v.conv.styles.navbar__border_bottom_thickness) : 0, pos = v?.conv.styles.content_position;
+    const top = !v ? sb : pos === 'on_top_screen' ? 0 : pos === 'on_bottom_status_bar' ? sb : sb + barH;
+    return { v, t, sb, barH, top, bottom: t ? t.conv.height + safeBottom(scr) : 0 };
+  }
+  const titleFont = st => { const ps = st.navbar_title__ios_font_family || '', fam = (S.fonts.picks.find(p => C.famPrefix(p.family) === ps.split('-')[0]) || {}).family;
+    return `font-family:${fam ? `'${fam}', ` : ''}system-ui, sans-serif;font-weight:${/Bold|Black/.test(ps) ? 700 : /Semi|Medium/.test(ps) ? 600 : 400}`; };
+  function navBarHtml(scr, F, sel) {
+    const v = F.v; if (!v) return '';
+    const st = v.conv.styles, as = v.conv.assets, d = v.desc;
+    const bg = st.background_type === 'Gradient' ? `linear-gradient(${st.navbar_gradient__top_background_color}, ${st.navbar_gradient__bottom_background_color})` : st.background_color;
+    const coverSB = st.background_type === 'Gradient' && st.navbar_gradient__mode === 'on_top_screen';
+    const img = (im, w, h) => { const u = navImg(im); return u ? `<img src="${u}" alt="" style="width:${w}px;height:${h}px">` : `<span style="width:${w}px;height:${h}px;display:block"></span>`; };
+    const leftImg = v.conv.images.find(i => i.field === 'back_button' || i.field === 'menu_button'), logo = v.conv.images.find(i => i.field === 'app_logo');
+    const centre = st.presentation_style === 'logo' ? (logo ? img(logo, as.logo_asset_width, as.logo_asset_height) : '')
+      : st.presentation_style === 'title' ? `<span style="color:${st.title_color};font-size:${st.navbar_title__ios_font_size}px;line-height:${st.navbar_title__ios_line_height}px;letter-spacing:${st.navbar_title__ios_letter_spacing}px;${titleFont(st)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:${st.title_text_transform === 'default' ? 'none' : st.title_text_transform}">${esc(d.title?.sample || scr.name)}</span>` : '';
+    const leftW = leftImg ? as.asset_width + st.navbar_h_gutter : 0, rightW = v.conv.navItems.length ? v.conv.navItems.length * as.asset_width + (v.conv.navItems.length - 1) * st.navbar_buttons__horizontal_gutter + st.navbar_h_gutter : 0;
+    const side = st.style === 'center' ? Math.max(leftW, rightW) : 0;
+    return `<div class="cmp navb${sel === 'nav' ? ' on' : ''}" role="button" tabindex="0" aria-pressed="${sel === 'nav'}" aria-label="Navigation bar: ${esc(v.name)}" data-pick="${esc(scr.id)}:nav"
+        style="position:absolute;left:0;right:0;top:0;height:${F.sb + F.barH}px;z-index:3">
+      <div style="height:${F.sb}px;background:${coverSB ? 'transparent' : st.status_bar__background_color}"></div>
+      ${coverSB ? `<div style="position:absolute;inset:0;background:${bg};z-index:-1"></div>` : ''}
+      <div style="position:relative;height:${v.conv.height}px;box-sizing:border-box;padding:${st.navbar_padding_top}px ${st.navbar_padding_right}px ${st.navbar_padding_bottom}px ${st.navbar_padding_left}px;display:flex;align-items:center;${coverSB ? '' : `background:${bg};`}border-bottom:${st.navbar__border_bottom_thickness}px solid ${st.navbar__border_bottom_color}">
+        ${leftImg ? `<div style="flex:none;z-index:1">${img(leftImg, as.asset_width, as.asset_height)}</div>` : ''}
+        <div style="position:absolute;top:0;bottom:0;left:${st.navbar_padding_left + (st.style === 'center' ? side : leftW)}px;right:${st.navbar_padding_right + (st.style === 'center' ? side : rightW)}px;display:flex;align-items:center;justify-content:${st.style === 'center' ? 'center' : 'flex-start'};overflow:hidden">${centre}</div>
+        <div style="margin-left:auto;display:flex;gap:${st.navbar_buttons__horizontal_gutter}px;z-index:1">${v.conv.navItems.map(n => img(n.image, as.asset_width, as.asset_height)).join('')}</div>
+      </div></div>`;
+  }
+  function tabBarHtml(scr, F, sel) {
+    const t = F.t; if (!t) return '';
+    const st = t.conv.styles, cur = (scr.navigation.tabBar.tabs || []).findIndex(x => x.selected);
+    return `<div class="cmp tabb${sel === 'tabs' ? ' on' : ''}" role="button" tabindex="0" aria-pressed="${sel === 'tabs'}" aria-label="Bottom tab bar" data-pick="${esc(scr.id)}:tabs"
+        style="position:absolute;left:0;right:0;bottom:0;height:${F.bottom}px;background:${st.bar_background_color};z-index:3;border-top:${st.top_border_width}px solid ${st.top_border_color};box-sizing:border-box">
+      <div style="display:flex;height:${C.TAB.height.ios}px;justify-content:center">${t.conv.tabs.map((x, i) => {
+        const on = cur >= 0 ? i === cur : x.selected, u = navImg(on ? x.iconSelected : x.icon);
+        return `<div style="flex:1;${scr.device === 'tablet' ? 'min-width:80px;max-width:180px;' : ''}display:flex;flex-direction:column;align-items:center;justify-content:center">
+          ${u ? `<img src="${u}" alt="" style="width:32px;height:32px">` : '<span style="width:32px;height:32px"></span>'}
+          ${st.title_label_toggle ? `<span style="font-size:${st.title_ios_font_size}px;line-height:14px;color:${on ? st.title_active_font_color : st.title_default_font_color};white-space:nowrap">${esc(x.label)}</span>` : ''}</div>`; }).join('')}</div></div>`;
+  }
+  // a row in a settings list; `set` marks a value that differs from the plugin's own default
+  const nrow = (label, value, set) => `<div class="srow"><span>${label}</span><b>${value}</b>${set == null ? '' : `<span class="tg ${set ? 'ov' : ''}">${set ? 'Set' : 'Default'}</span>`}</div>`;
+  const swatch = c => `<i class="sw" style="background:${esc(c)}"></i>${esc(String(c).replace(/\s/g, ''))}`;
+  const thumbs = list => `<div class="nthumbs">${list.map(([im, label]) => `<figure>${navImg(im) ? `<img src="${navImg(im)}" alt="" style="aspect-ratio:${im.width}/${im.height}">` : '<span></span>'}<figcaption>${esc(label)}</figcaption></figure>`).join('')}</div>`;
+  const notesHtml = n => (n.length ? `<ul class="left">${n.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '');
+  const POS = { on_bottom_navbar: 'Below the bar', on_bottom_status_bar: 'Below the status bar (under the bar)', on_top_screen: 'Top of the screen (under both bars)' };
+  const DISPLAY = { logo: 'Logo', title: 'Screen title', hidden: 'Nothing', 'logo-title': 'Logo, then title' };
+  function navBarRows(v) {
+    const st = v.conv.styles, as = v.conv.assets, D = C.NAV_DEFAULT;
+    return [
+      nrow('Height', `${v.conv.height} <span class="hint">(tallest item ${v.conv.height - st.navbar_padding_top - st.navbar_padding_bottom} + padding)</span>`),
+      nrow('Logo display', DISPLAY[st.presentation_style], st.presentation_style !== 'logo'),
+      nrow('Alignment', st.style === 'center' ? 'Centre' : 'Left', st.style !== 'center'),
+      nrow('Content position', POS[st.content_position], st.content_position !== 'on_bottom_navbar'),
+      nrow('Background', st.background_type === 'Gradient' ? `${swatch(st.navbar_gradient__top_background_color)} → ${swatch(st.navbar_gradient__bottom_background_color)}` : swatch(st.background_color), true),
+      nrow('Status bar', `${st.status_bar__background_color === 'rgba(0, 0, 0, 0)' ? 'Clear' : swatch(st.status_bar__background_color)} · ${st.status_bar__theme === 'light-content' ? 'light text' : 'dark text'}`, true),
+      nrow('Padding', [st.navbar_padding_top, st.navbar_padding_right, st.navbar_padding_bottom, st.navbar_padding_left].join(' · '), [st.navbar_padding_top, st.navbar_padding_right, st.navbar_padding_bottom, st.navbar_padding_left].join() !== D.padding.join()),
+      nrow('Button image size', `${as.asset_width} × ${as.asset_height}`, as.asset_width !== D.button[0] || as.asset_height !== D.button[1]),
+      ...(st.presentation_style === 'logo' ? [nrow('Logo size', `${as.logo_asset_width} × ${as.logo_asset_height}`, as.logo_asset_width !== D.logo[0] || as.logo_asset_height !== D.logo[1])] : []),
+      ...(st.presentation_style === 'title' ? [nrow('Title', `${esc(st.navbar_title__ios_font_family)} ${st.navbar_title__ios_font_size}/${st.navbar_title__ios_line_height} · ${swatch(st.title_color)}`, true)] : []),
+      ...(st.navbar__border_bottom_thickness ? [nrow('Bottom border', `${st.navbar__border_bottom_thickness} · ${swatch(st.navbar__border_bottom_color)}`, true)] : []),
+      ...(v.conv.navItems.length ? [nrow('Right buttons', v.conv.navItems.map(n => `${esc(n.label)} → ${esc(n.target || 'set a screen')}`).join('<br>'), true)] : []),
+    ].join('');
+  }
+  function tabBarRows(t) {
+    const st = t.conv.styles;
+    return [
+      nrow('Height', `${C.TAB.height.ios} (iPhone) · ${C.TAB.height.android} (Android) <span class="hint">fixed</span>`),
+      nrow('Tabs', `${t.conv.tabs.length} of ${C.TAB.maxTabs}: ${t.conv.tabs.map(x => esc(x.label)).join(', ')}`),
+      nrow('Background', swatch(st.bar_background_color), true),
+      nrow('Top border', st.top_border_width ? `${st.top_border_width} · ${swatch(st.top_border_color)}` : 'None', !!st.top_border_width),
+      nrow('Labels', st.title_label_toggle ? `${esc(st.title_ios_font_selector)} ${st.title_ios_font_size}` : 'Off', !st.title_label_toggle),
+      nrow('Selected colour', swatch(st.title_active_font_color), true),
+      nrow('Other tabs colour', swatch(st.title_default_font_color), true),
+    ].join('');
+  }
+  const tabThumbs = t => thumbs(t.conv.tabs.flatMap(x => [[x.icon, x.label], [x.iconSelected, 'selected']]));
+  const navVariantThumbs = v => thumbs([...v.conv.images.map(i => [i, { app_logo: 'Logo', back_button: 'Back', menu_button: 'Menu' }[i.field]]), ...v.conv.navItems.map(n => [n.image, n.label])]);
+  function navSideHtml(scr, which, M) {
+    const back = `<div class="row" style="justify-content:space-between"><button class="btn small ghost" type="button" data-back="${esc(scr.id)}">← ${esc(scr.name)}</button><button class="btn small" type="button" data-copy-nav="${which === 'nav' ? 'nav:' + esc(M.variantOf(scr)?.name || '') : 'tabs'}">Copy JSON</button></div>`;
+    if (which === 'nav') {
+      const v = M.variantOf(scr); if (!v) return back;
+      return `${back}<h3 class="ctitle">Navigation bar <span class="hint">${esc(v.name)}</span></h3>
+        <p class="hint">Used on ${esc(v.screens.map(s => s.name).join(', '))}. Set on each of those screens.</p>
+        <div class="srows">${navBarRows(v)}</div>${navVariantThumbs(v)}${notesHtml(v.conv.notes)}
+        <p class="hint">Default: the plugin's own value. Set: change it on the plugin.</p>`;
+    }
+    const t = M.tabs; if (!t) return back;
+    return `${back}<h3 class="ctitle">Bottom tab bar</h3><p class="hint">One for the whole app.</p>
+      <div class="srows">${tabBarRows(t)}</div>${tabThumbs(t)}${notesHtml(t.conv.notes)}`;
+  }
+  function navCardHtml(M) {
+    if (!M.variants.length && !M.tabs) return navScreens().length || !S.screens.some(s => (s.layout || []).length) ? '' : `<section class="theme"><h2>Navigation</h2><p class="hint">The navigation bar and tab bar are read when cells are found; find cells again to set them up.</p></section>`;
+    return `<section class="theme"><h2>Navigation</h2>
+      <p class="hint">The navigation bar and bottom tab bar are plugins, set up from the design. Tap a bar in a preview for its settings.</p>
+      <div class="ngrid">
+        ${M.variants.length ? `<div class="ncol"><div class="row" style="justify-content:space-between"><span class="lab">Navigation bar · ${M.variants.length} version${M.variants.length === 1 ? '' : 's'}</span></div>
+          ${M.variants.map(v => `<div class="nvar"><div class="row" style="justify-content:space-between"><b>${esc(v.name)}</b><button class="btn small" type="button" data-copy-nav="nav:${esc(v.name)}">Copy JSON</button></div>
+            <span class="hint">${esc(v.screens.map(s => s.name).join(', '))} · ${esc(DISPLAY[v.conv.styles.presentation_style])}, ${v.conv.styles.style === 'center' ? 'centred' : 'left'} · ${v.conv.height} tall${v.conv.styles.background_type === 'Gradient' ? ' · gradient, content under the bar' : ''}</span>
+            ${navVariantThumbs(v)}</div>`).join('')}</div>` : ''}
+        ${M.tabs ? `<div class="ncol"><div class="row" style="justify-content:space-between"><span class="lab">Bottom tab bar</span><button class="btn small" type="button" data-copy-nav="tabs">Copy JSON</button></div>
+          <div class="srows">${tabBarRows(M.tabs)}</div>${tabThumbs(M.tabs)}${notesHtml(M.tabs.conv.notes)}</div>` : ''}
+      </div></section>`;
+  }
+  // the plugin settings as they're entered, plus the images and items to add
+  const navJson = v => ({ plugin: NAV_ID, variant: v.name, screens: v.screens.map(s => s.name), styles: v.conv.styles, assets: { ...v.conv.assets, ...Object.fromEntries(v.conv.images.map(i => [i.field, i.file])) },
+    nav_items: v.conv.navItems.map(n => ({ title: n.label, target_screen: n.target, presentation: n.modal ? 'modal' : 'push', assets: { icon: n.image.file } })), notes: v.conv.notes });
+  const tabsJson = t => ({ plugin: TABS_ID, styles: t.conv.styles, nav_items: t.conv.tabs.map(x => ({ title: x.label, target_screen: x.target, presentation: x.modal ? 'modal' : 'push', assets: { icon: x.icon.file, icon_selected: x.iconSelected.file } })),
+    hide_menu_on: t.hidden.map(s => s.name), notes: t.conv.notes });
+  // for the screen outline: each screen's navigations, as in a Zapp layout
+  function screenNavigations(scr, M) {
+    const out = [], v = M.variantOf(scr);
+    if (v) { const j = navJson(v); out.push({ category: 'nav_bar', navigation_type: NAV_ID, variant: v.name, styles: j.styles, assets: j.assets, nav_items: j.nav_items }); }
+    if (M.tabs) out.push({ category: 'menu', navigation_type: TABS_ID });
+    return out;
+  }
+  async function navZip(zip) {
+    const M = navModel(); if (!M.variants.length && !M.tabs) return;
+    await Promise.all(navImages(M).map(makeNavImg));
+    const put = (folder, im) => { const u = navImg(im); if (u) folder.file(im.file, bytes(u)); };
+    const nz = zip.folder('navigation'), L = ['Navigation', ''];
+    for (const v of M.variants) {
+      const f = nz.folder(`navigation_bar/${C.slug(v.name)}`);
+      f.file('navigation_bar.json', JSON.stringify(navJson(v), null, 2));
+      v.conv.images.forEach(i => put(f, i)); v.conv.navItems.forEach(n => put(f, n.image));
+      L.push(`Navigation bar "${v.name}" (navigation_bar/${C.slug(v.name)}/): set on ${v.screens.map(s => s.name).join(', ')}.`,
+        ...v.conv.images.map(i => `  - Upload ${i.file} to ${({ app_logo: 'Logo', back_button: 'Back button', menu_button: 'Menu button' })[i.field]}.`),
+        ...v.conv.navItems.map(n => `  - Add a nav item "${n.label}" opening ${n.target || 'its screen'}, icon ${n.image.file}.`),
+        ...v.conv.notes.map(x => `  - ${x}`), '');
+    }
+    if (M.tabs) {
+      const f = nz.folder('bottom_tab_bar');
+      f.file('bottom_tab_bar.json', JSON.stringify(tabsJson(M.tabs), null, 2));
+      for (const x of M.tabs.conv.tabs) { put(f, x.icon); put(f, x.iconSelected); }
+      L.push('Bottom tab bar (bottom_tab_bar/): add one nav item per tab, in this order:',
+        ...M.tabs.conv.tabs.map((x, i) => `  ${i + 1}. ${x.label}: icon ${x.icon.file}, selected icon ${x.iconSelected.file}, opens ${x.target || 'its screen'}.`),
+        ...M.tabs.conv.notes.map(x => `  - ${x}`), '');
+    }
+    L.push('Images are @3x PNGs of each button\'s or tab\'s whole box, with the glyph at its designed size in the middle.', 'The .json files list each plugin field to set, by its key.');
+    nz.file('README.txt', L.join('\n') + '\n');
   }
 
   /* ---------- downloads ---------- */
@@ -1157,6 +1374,7 @@ return { icons: out, specs };`;
       const T = themeValues();
       for (const scr of laid) sz.file(`${C.slug(scr.name)}.json`, JSON.stringify(screenOutline(scr, T), null, 2));
       sz.file('theme.json', JSON.stringify(themeJson(T), null, 2));
+      await navZip(zip);
       sz.file('README.txt', ['Screen outlines', '', 'Each file describes one screen as Zapp components, in the same shape as a Zapp layout (ui_components).', '',
         '- component_type: hero-qb (full-width cells stacked), horizontal_list_qb (rail), list-qb, grid-qb, group-qb (holds a feed shared by its',
         '  Group Info header and the component below it), group-info-qb (the header).',
@@ -1164,6 +1382,8 @@ return { icons: out, specs };`;
         '  the id Zapp gives each one.',
         '- data.source is empty: set each component\'s (or group\'s) feed. Group names are the header text from the design.',
         '- theme.json holds the suggested values for the Zapp theme plugin: the spacing and colours most components and screens use.',
+        '- navigations lists the screen\'s navigation bar settings and its bottom tab bar (the navigation/ folder has the images and an upload list).',
+        '- general.hide_menu: true marks a screen without the tab bar.',
         '- Only settings that differ from theme.json are listed, on the component or (for screen padding) on the screen. A header always sets its',
         '  bottom margin to 0 so it sits on its list.',
         '- Detail screens (show, movie) are opened by the item\'s type: map each type to its screen; the screen then shows the tapped item.', ''].join('\n'));
