@@ -41,7 +41,8 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
    Cell badges are drawn to the design's size and shape (square, rounded or round plate behind the icon).
    Button labels use the design's wording; the zip lists the label to set on each action plugin.
    After each run, headers that sit a few points off the first item of the rail below are lined up with it.
-8. **Screens**: each screen mocked up from the built cells, laid out as the components Claude described
+8. **Screens**: each screen as an outline of Zapp components (Hero, Horizontal List, List, Grid, Group with Group
+   Info) with their settings, in the layout's own format (`screens/*.json` in the zip), and mocked up from the built cells, laid out as the components Claude described
    (single, rail, list, grid), next to the original. Each item is drawn with the text the design shows there.
 9. **Download**: a zip (one folder per cell: JSON, README with the decisions and the upload field for each
    asset, 500x280@2x thumbnail, overlay PNG when there's a gradient, `assets/` icons; plus a `plugin assets`

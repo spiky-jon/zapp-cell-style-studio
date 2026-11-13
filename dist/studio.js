@@ -826,6 +826,68 @@ return { icons: out, specs };`;
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
   // the Zapp component each placement becomes
+  /* ---------- screen outline: the screen as Zapp components, in the layout's own format ---------- */
+  const ZAPP_TYPE = { single: 'hero-qb', rail: 'horizontal_list_qb', list: 'list-qb', grid: 'grid-qb' };
+  const ZAPP_NAME = { 'hero-qb': 'Hero', horizontal_list_qb: 'Horizontal List', 'list-qb': 'List', 'grid-qb': 'Grid', 'group-qb': 'Group', 'group-info-qb': 'Group Info' };
+  const THEME = { padding: 20, gutter: 12 };
+  // the component settings for one placement; theme defaults are left out so the theme still applies
+  function componentStyles(item, c) {
+    const L = c.spec?.layout || {}, d = c.desc.layout || {}, comp = item.component || L.type || 'single', st = {};
+    const pad = comp === 'single' ? d.padding : L.padding ?? d.padding;
+    if (pad != null && num(pad) !== THEME.padding) Object.assign(st, { component_padding_left: num(pad), component_padding_right: num(pad) });
+    if (comp === 'rail') {
+      if (L.cellsPerView) Object.assign(st, { horizontal_list_scaled_switch: true, horizontal_list_cells_per_view: L.cellsPerView, horizontal_list_next_offset: L.peek });
+      else Object.assign(st, { horizontal_list_scaled_switch: false, horizontal_list_cell_width: L.itemWidth });
+      if (num(L.gap, THEME.gutter) !== THEME.gutter) st.component_gutter_horizontal = num(L.gap);
+    }
+    if (comp === 'list') st.component_gutter_vertical = num(L.rowGap ?? d.rowGap, 0);
+    if (comp === 'grid') {
+      st.component_columns = +item.columns || d.columns || 2;
+      const g = num(d.gap, THEME.gutter); if (g !== THEME.gutter) Object.assign(st, { component_gutter_horizontal: g, component_gutter_vertical: g });
+    }
+    return st;
+  }
+  const feedName = (item, c) => String((item.texts || [])[0]?.title || c.desc.header?.title?.sample || c.desc.name);
+  function screenOutline(scr) {
+    const items = scr.layout || [], out = [];
+    const component = (item, c, inGroup) => {
+      const type = ZAPP_TYPE[item.component] || 'hero-qb';
+      return { component_type: type, name: ZAPP_NAME[type], cell_style: c.desc.name,
+        styles: { cell_plugin_configuration_id: c.output, ...componentStyles(item, c) },
+        ...(inGroup ? {} : { data: { source: '', type: '' } }), rules: { component_cells_selectable: true } };
+    };
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i], c = findCell(it.cell); if (!c || !c.output) continue;
+      if (c.desc.plugin === 'cell_info') {
+        // a header and the rail, list or grid under it share one feed: a Group holding Group Info and that component
+        const next = items[i + 1], nc = next && findCell(next.cell);
+        const group = { component_type: 'group-qb', name: feedName(it, c), data: { source: '', type: '' }, rules: { hide_component_if_data_is_empty: true },
+          ui_components: [{ component_type: 'group-info-qb', name: 'Group Info', cell_style: c.desc.name, styles: { cell_plugin_configuration_id: c.output }, rules: { hide_component_if_data_is_empty: true } }] };
+        if (nc && nc.output && nc.desc.plugin !== 'cell_info' && ['rail', 'list', 'grid'].includes(next.component)) { group.ui_components.push(component(next, nc, true)); i++; }
+        out.push(group);
+      } else out.push(component(it, c, false));
+    }
+    return { name: scr.name, type: 'general_content', ui_components: out };
+  }
+  // what a person reads: one line per component, settings in plain words
+  const SETTING = { component_padding_left: v => `side padding ${v}`, horizontal_list_scaled_switch: v => v ? 'scaled' : 'fixed width', horizontal_list_cells_per_view: v => `${v} cells per view`,
+    horizontal_list_next_offset: v => `next cell offset ${v}`, horizontal_list_cell_width: v => `cell width ${v}`, component_gutter_horizontal: v => `gap ${v}`, component_gutter_vertical: v => `vertical gap ${v}`, component_columns: v => `${v} columns` };
+  const settingsText = st => Object.entries(st).filter(([k, v]) => SETTING[k] && v !== undefined).map(([k, v]) => SETTING[k](v)).join(' · ');
+  function outlineHtml(scr) {
+    const o = screenOutline(scr);
+    const row = (comp, depth) => `<li class="oc d${depth}"><b>${esc(ZAPP_NAME[comp.component_type] || comp.component_type)}</b>${comp.component_type === 'group-qb' ? ` <span class="feed">${esc(comp.name)}</span> <span class="hint">· one feed for the group</span>`
+      : ` <span class="hint">·</span> ${esc(comp.cell_style)}${settingsText(comp.styles) ? ` <span class="hint">· ${esc(settingsText(comp.styles))}</span>` : ''}${comp.data ? ' <span class="hint">· own feed</span>' : ''}`}
+      ${comp.ui_components ? `<ul>${comp.ui_components.map(ch => row(ch, depth + 1)).join('')}</ul>` : ''}</li>`;
+    return `<div class="outline"><div class="row" style="justify-content:space-between"><span class="lab">Screen outline (Zapp components)</span><button class="btn small" type="button" data-copy-outline="${esc(scr.id)}">Copy JSON</button></div>
+      <ul class="otree">${o.ui_components.map(cpt => row(cpt, 0)).join('')}</ul>
+      <p class="hint">Theme defaults (side padding 20, gaps 12) are left to the theme. Cell styles are named by file: point each component at the id Zapp gives that cell style when it's imported, then set the feeds.</p></div>`;
+  }
+  $('mock').addEventListener('click', async e => {
+    const b = e.target.closest('[data-copy-outline]'); if (!b) return;
+    const scr = S.screens.find(x => x.id === b.dataset.copyOutline); if (!scr) return;
+    const txt = JSON.stringify(screenOutline(scr), null, 2);
+    try { await navigator.clipboard.writeText(txt); toast(`Copied the ${scr.name} outline`); } catch (err) { toast("Couldn't copy here; the outline is in the cells download too."); }
+  });
   const zappComponent = i => findCell(i.cell)?.desc.plugin === 'cell_info' ? 'Group Info (in a Group)' : ({ rail: 'Horizontal List', list: 'List', grid: `Grid${i.columns ? `, ${i.columns} columns` : ''}` })[i.component] || 'Hero';
   function drawMock(itemImgs) {
     const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
@@ -842,7 +904,7 @@ return { icons: out, specs };`;
           <div class="mcol"><span class="lab">Original</span><div class="phone ${tablet ? 'tablet' : ''}"><img src="${scr.url}" alt="Original ${esc(scr.name)}"></div></div>
           <div class="mcol"><span class="lab">Built from cells</span><div class="phone ${tablet ? 'tablet' : ''}" style="height:${Math.round(Math.max(H, contentH) * k)}px;background:${esc(bg)}">
             <div class="inner" style="width:${W}px;transform:scale(${k})">${blocks.map(b => b.html).join('')}</div></div></div>
-          <div class="mside"><span class="lab">Components, top to bottom</span><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(zappComponent(i))}${i.count && (i.component || 'single') !== 'single' ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol>
+          <div class="mside">${outlineHtml(scr)}<details class="olist"><summary>Cells top to bottom</summary><ol>${scr.layout.map(i => `<li>${esc(i.cell)} <span class="hint">· ${esc(zappComponent(i))}${i.count && (i.component || 'single') !== 'single' ? ` × ${i.count}` : ''}${findCell(i.cell) ? '' : ' · removed'}</span></li>`).join('')}</ol></details>
             ${(scr.inventory || []).some(i => !i.cell) ? `<span class="lab">Left out</span><ul class="left">${scr.inventory.filter(i => !i.cell).map(i => `<li>${esc(i.element)}${i.reason ? ` <span class="hint">· ${esc(i.reason)}</span>` : ''}</li>`).join('')}</ul>` : ''}
             ${missing.length ? `<p class="hint">Not drawn: ${esc(missing.join(', '))} (removed or not built).</p>` : ''}
             <p class="hint">Sample text and placeholder artwork. The status bar, navigation and tab bars aren't cells, so they're left out.</p></div>
@@ -952,6 +1014,19 @@ return { icons: out, specs };`;
         }
       }
       pa.file('README.txt', L.join('\n') + '\n');
+    }
+    const laid = S.screens.filter(scr => (scr.layout || []).some(it => ok.some(c => c.desc.name.toLowerCase() === String(it.cell).toLowerCase())));
+    if (list === S.cells && laid.length) {
+      const sz = zip.folder('screens');
+      for (const scr of laid) sz.file(`${C.slug(scr.name)}.json`, JSON.stringify(screenOutline(scr), null, 2));
+      sz.file('README.txt', ['Screen outlines', '', 'Each file describes one screen as Zapp components, in the same shape as a Zapp layout (ui_components).', '',
+        '- component_type: hero-qb (full-width cells stacked), horizontal_list_qb (rail), list-qb, grid-qb, group-qb (holds a feed shared by its',
+        '  Group Info header and the component below it), group-info-qb (the header).',
+        '- styles.cell_plugin_configuration_id holds the cell style\'s file name from this download. After importing the cell styles, replace it with',
+        '  the id Zapp gives each one.',
+        '- data.source is empty: set each component\'s (or group\'s) feed. Group names are the header text from the design.',
+        '- Only settings that differ from the theme are listed (theme defaults: side padding 20, gaps 12, space between components 20).',
+        '- Detail screens (show, movie) are opened by the item\'s type: map each type to its screen; the screen then shows the tapped item.', ''].join('\n'));
     }
     const fn = fontNames(ok);
     if (fn.length) {
