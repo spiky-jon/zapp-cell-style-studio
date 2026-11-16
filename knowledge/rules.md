@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 21 · phone and tablet · cell plugins 16.0.0-alpha
+Version 22 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something

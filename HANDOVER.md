@@ -14,7 +14,7 @@ first; this note covers status and what's next.
 
 ## What the studio does now
 
-- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 21).
+- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 22).
 - From Figma: a read-only `use_figma` script returns each screen's layer details (padding, gaps, fonts, colours,
   text) and exports the icons used (instances followed to their components, as SVG).
 - Cells built with the cell preview engine; gallery, inspector, icon panel (Figma icons or a matched library),
@@ -76,6 +76,13 @@ component in `figmaLayer`, and `Convert.fixInsets` corrects a cell whose top/bot
 it's built (text-only cells and headers exactly; image cells only when space is missing; Cell 3 left alone),
 also undoing space moved into label margins or line height. Logged per cell. Checked by
 `tools/inset-fixture.json`. Ch4 Category Row measures 10 top, 9 bottom; Search page title 20/20.
+
+Uploaded fonts: faces are named by their PostScript name, as Zapp lists them. The weight comes from the style name
+(Regular 400, Medium 500, Bold 700…) because some files carry a wrong weight number (the Ch4 files all say 500);
+the fonts list says so per family. Each font in a description carries `postscript` for an uploaded face (stamped
+on analysis and every build: the PostScript name decides, family and weight follow). The Designs tab lists every
+face with its PostScript name, style, preview and the cells using it, with remove per face or family (cells move
+to the nearest face left).
 
 ## Open questions
 

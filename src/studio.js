@@ -45,6 +45,21 @@
     })(desc);
     return out;
   };
+  // every font object in a description (a label's font, a button's font…)
+  const fontObjs = desc => { const out = []; (function walk(o) { if (!o || typeof o !== 'object') return;
+    if (typeof o.family === 'string' && ('weight' in o || 'size' in o)) out.push(o); for (const v of Object.values(o)) walk(v); })(desc); return out; };
+  const allFaces = () => Object.values(S.fonts.uploads).flatMap(u => u.faces);
+  const faceByPs = ps => (ps ? allFaces().find(f => f.ps.toLowerCase() === String(ps).toLowerCase()) : null) || null;
+  // Uploaded fonts are named by their PostScript name, as Zapp lists them. Each font in an uploaded family is pinned to one
+  // face: its "postscript" decides (family and weight follow it); without one, the nearest weight in the family.
+  function stampFonts(desc) {
+    for (const o of fontObjs(desc)) {
+      const face = faceByPs(o.postscript) || (S.fonts.uploads[o.family] ? faceFor(o.family, +o.weight || 400) : null);
+      if (face) { o.family = face.family; o.weight = face.weight; o.postscript = face.ps; } else if (o.postscript) delete o.postscript;
+    }
+    return desc;
+  }
+  const facesUsed = desc => new Set(fontObjs(desc).map(o => o.postscript).filter(ps => faceByPs(ps)));
   const googleCss = (fam, weights) => `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fam).replace(/%20/g, '+')}${weights ? `:wght@${weights.join(';')}` : ''}&display=swap`;
   // loads a stylesheet into a document; resolves true when it loaded, false on an error (Google answers 400 for unknown families or weights)
   const linkCss = (doc, href) => new Promise(ok => {
@@ -76,8 +91,11 @@
     const up = u.faces.filter(f => !f.italic), pool = up.length ? up : u.faces;
     return pool.reduce((a, f) => Math.abs(f.weight - weight) < Math.abs(a.weight - weight) ? f : a);
   };
-  C.setFontResolver((family, weight) => faceFor(family, weight)?.ps || null);
+  C.setFontResolver((family, weight, ps) => faceByPs(ps)?.ps || faceFor(family, weight)?.ps || null);
 
+  const STYLE_WEIGHT = [[/thin|hairline/i, 100], [/(extra|ultra)\s*-?light/i, 200], [/light/i, 300], [/(semi|demi)\s*-?bold/i, 600], [/(extra|ultra)\s*-?bold/i, 800],
+    [/black|heavy/i, 900], [/bold/i, 700], [/medium/i, 500], [/regular|book|normal|roman|plain|^italic$/i, 400]];
+  const styleWeight = name => { const s = String(name || ''); if (!s) return null; for (const [re, w] of STYLE_WEIGHT) if (re.test(s)) return w; return null; };
   // reads family, PostScript name, weight and italic from a TrueType / OpenType file (name and OS/2 tables)
   function parseFont(buf) {
     const v = new DataView(buf), tag = o => String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
@@ -98,13 +116,18 @@
         if (s) names[id] = s;
       }
     }
-    let weight = 400, italic = false;
-    if (tables['OS/2']) { const o = tables['OS/2'].off; weight = v.getUint16(o + 4) || 400; italic = !!(v.getUint16(o + 62) & 1); }
-    const sub = names[17] || names[2] || '';
+    let fileWeight = null, italic = false;
+    if (tables['OS/2']) { const o = tables['OS/2'].off; fileWeight = v.getUint16(o + 4) || null; italic = !!(v.getUint16(o + 62) & 1); }
+    const sub = (names[17] || names[2] || '').trim();
     if (/italic|oblique/i.test(sub)) italic = true;
-    const family = (names[16] || names[1] || '').trim();
+    const family = (names[16] || names[1] || '').trim().replace(/\s+/g, ' ');
     if (!family) throw new Error('the font has no family name');
-    return { family, ps: (names[6] || `${C.famPrefix(family)}-${sub.replace(/\s+/g, '') || 'Regular'}`).trim(), weight: Math.min(1000, Math.max(100, weight)), italic, sub };
+    const ps = (names[6] || `${C.famPrefix(family)}-${sub.replace(/\s+/g, '') || 'Regular'}`).trim();
+    // the style name (Regular, Medium, Bold…) decides the weight: some files carry a wrong weight number
+    const named = styleWeight(sub) ?? styleWeight(ps.replace(/^.*?[-_]/, '')) ?? styleWeight(ps.slice(C.famPrefix(family).length));
+    const weight = Math.min(1000, Math.max(100, named ?? fileWeight ?? 400));
+    const note = named != null && fileWeight && fileWeight !== named ? `The file says weight ${fileWeight}, but its name says ${sub || 'otherwise'}, so it's treated as ${named}.` : '';
+    return { family, ps, weight, italic, sub: sub || 'Regular', note };
   }
   const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   async function addFontFiles(files) {
@@ -118,12 +141,14 @@
         const face = { ...info, ext, file: f.name, data: new Uint8Array(buf) };
         u.faces.push(face); u.faces.sort((a, b) => a.weight - b.weight || a.italic - b.italic);
         // an @font-face rule with the file inline, in both documents (the engine's snapshots copy stylesheets, not FontFace objects)
-        const css = `@font-face{font-family:"${info.family}";src:url(data:font/${ext === 'otf' ? 'otf' : 'ttf'};base64,${b64(face.data)});font-weight:${info.weight};font-style:${info.italic ? 'italic' : 'normal'};font-display:block}`;
+        const src = `url(data:font/${ext === 'otf' ? 'otf' : 'ttf'};base64,${b64(face.data)})`;
+        // the family at its weight (what cells draw with), and the face on its own under its PostScript name (for previews)
+        const css = `@font-face{font-family:"${info.family}";src:${src};font-weight:${info.weight};font-style:${info.italic ? 'italic' : 'normal'};font-display:block}@font-face{font-family:"ps-${info.ps}";src:${src};font-display:block}`;
         for (const doc of [document, engine?.document].filter(Boolean)) { const st = doc.createElement('style'); st.dataset.font = info.ps; st.textContent = css; doc.head.append(st); }
         engine?.CellEngine.registerFace(info.ps, info.family, info.weight);
         fontStatus[info.family] = 'uploaded';
         try { await engine?.document.fonts.load(`${info.italic ? 'italic ' : ''}${info.weight} 16px "${info.family}"`); } catch (e) {}
-        added.push(`${info.family} ${info.sub || info.weight}`);
+        added.push(info.ps);
       } catch (e) { toast(`${f.name}: ${e.message}.`); }
     }
     renderFontFiles(); renderFontPanel();
@@ -131,19 +156,42 @@
       toast(`Added ${added.length} font${added.length > 1 ? 's' : ''}`);
       // cells already using an uploaded family pick up its real file names
       const fams = new Set(Object.keys(S.fonts.uploads));
-      for (const c of S.cells) if ([...fontsIn(c.desc).keys()].some(f => fams.has(f))) await buildCell(c);
+      for (const c of S.cells) if ([...fontsIn(c.desc).keys()].some(f => fams.has(f))) { stampFonts(c.desc); await buildCell(c); }
       renderAll();
     }
   }
   function renderFontFiles() {
     const box = $('fontFiles'), fams = Object.entries(S.fonts.uploads);
-    box.innerHTML = fams.map(([fam, u]) => `<div class="ff"><b style="font-family:'${esc(fam)}',var(--f-ui)">${esc(fam)}</b>
-      <span class="hint">${u.faces.map(f => `${f.weight}${f.italic ? ' italic' : ''}`).join(', ')}</span><button class="btn ghost small" type="button" data-rmfont="${esc(fam)}">Remove</button></div>`).join('');
-    box.querySelectorAll('[data-rmfont]').forEach(b => b.onclick = () => {
-      const fam = b.dataset.rmfont;
-      for (const f of S.fonts.uploads[fam].faces) for (const doc of [document, engine?.document].filter(Boolean)) doc.querySelectorAll(`style[data-font="${CSS.escape(f.ps)}"]`).forEach(x => x.remove());
-      delete S.fonts.uploads[fam]; delete fontStatus[fam]; renderFontFiles(); renderFontPanel();
-    });
+    const users = ps => S.cells.filter(c => facesUsed(c.desc).has(ps)).map(c => c.desc.name);
+    // one note per family when its files carry wrong weight numbers (the style names decide instead)
+    const famNote = u => { const n = u.faces.filter(f => f.note); if (!n.length) return '';
+      const w = [...new Set(n.map(f => f.note.match(/weight (\d+)/)?.[1]).filter(Boolean))];
+      const who = n.length === 1 ? (u.faces.length === 1 ? 'This file says' : `${n[0].ps} says`) : n.length === u.faces.length ? 'These files all say' : `${n.length} of these files say`;
+      return `${who} weight ${w.join(' or ')} whatever the style, so the style name decides the weight.`; };
+    box.innerHTML = fams.map(([fam, u]) => `<div class="ffam"><div class="row" style="justify-content:space-between"><span class="lab">${esc(fam)}</span>${u.faces.length > 1 ? `<button class="btn ghost small" type="button" data-rmfam="${esc(fam)}">Remove all</button>` : ''}</div>
+      ${u.faces.map(f => { const by = users(f.ps), file = f.file.replace(/\.[^.]+$/, '') === f.ps ? '' : ` · ${esc(f.file)}`; return `<div class="ff">
+        <span class="ffs" style="font-family:'ps-${esc(f.ps)}',var(--f-ui)" aria-hidden="true">Ag</span>
+        <div class="ffm"><b class="ffps" title="PostScript name: choose this in Zapp">${esc(f.ps)}</b>
+          <span class="hint">${esc(f.sub)}${f.italic && !/italic/i.test(f.sub) ? ' italic' : ''} · ${f.weight}${file}</span>
+          <span class="hint" title="${esc(by.join(', '))}">${by.length ? `${by.length} cell${by.length > 1 ? 's' : ''}: ${esc(by.slice(0, 3).join(', '))}${by.length > 3 ? '…' : ''}` : 'Not used yet'}</span></div>
+        <button class="ffx" type="button" data-rmface="${esc(f.ps)}" aria-label="Remove ${esc(f.ps)}" title="Remove">×</button></div>`; }).join('')}
+      ${famNote(u) ? `<p class="hint">${esc(famNote(u))}</p>` : ''}</div>`).join('');
+    box.querySelectorAll('[data-rmface]').forEach(b => b.onclick = () => removeFaces([b.dataset.rmface]));
+    box.querySelectorAll('[data-rmfam]').forEach(b => b.onclick = () => removeFaces(S.fonts.uploads[b.dataset.rmfam].faces.map(f => f.ps)));
+  }
+  // removes uploaded faces; cells that used them move to the nearest face left in the family (or its Google match)
+  async function removeFaces(list) {
+    const gone = new Set(list.map(x => x.toLowerCase())), hit = S.cells.filter(c => [...facesUsed(c.desc)].some(ps => gone.has(ps.toLowerCase())));
+    for (const [fam, u] of Object.entries(S.fonts.uploads)) {
+      for (const f of u.faces.filter(f => gone.has(f.ps.toLowerCase()))) for (const doc of [document, engine?.document].filter(Boolean)) doc.querySelectorAll(`style[data-font="${CSS.escape(f.ps)}"]`).forEach(x => x.remove());
+      u.faces = u.faces.filter(f => !gone.has(f.ps.toLowerCase()));
+      if (!u.faces.length) { delete S.fonts.uploads[fam]; delete fontStatus[fam]; }
+    }
+    for (const c of hit) for (const o of fontObjs(c.desc)) if (o.postscript && gone.has(o.postscript.toLowerCase())) delete o.postscript;
+    renderFontFiles(); renderFontPanel();
+    toast(`Removed ${list.length === 1 ? list[0] : `${list.length} fonts`}${hit.length ? `; rebuilding ${hit.length} cell${hit.length > 1 ? 's' : ''}` : ''}`);
+    for (const c of hit) { stampFonts(c.desc); await ensureFonts(c.desc); await buildCell(c); }
+    if (hit.length) renderAll();
   }
   $('fontInput').addEventListener('change', async e => { await addFontFiles([...e.target.files]); e.target.value = ''; });
 
@@ -207,6 +255,7 @@
     c.error = null; c.warnings = [];
     try {
       const scr = S.screens.find(s => s.id === c.screenId);
+      stampFonts(c.desc);
       const conv = C.toSpec(c.desc, { device: scr?.device || c.desc.device, screenW: scr?.screenW, collection: collection() });
       c.spec = conv.spec; c.base = conv.base; c.warnings = conv.warnings; c.labels = conv.labels || [];
       await ensureFonts(c.desc);
@@ -571,7 +620,7 @@ return { icons: out, specs, cells };`;
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
       'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts"), spacing (the screen padding, the gap between components and its background), navigation (the status bar, navigation bar and bottom tab bar, as plugins) and icons.',
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
-      Object.keys(S.fonts.uploads).length ? `UPLOADED FONTS (the design's own font files; wherever the design's type matches one, use its family name exactly and set "source": "uploaded"): ${Object.entries(S.fonts.uploads).map(([f, u]) => `${f} (weights ${[...new Set(u.faces.filter(x => !x.italic).map(x => x.weight))].join(', ')})`).join('; ')}` : '',
+      allFaces().length ? `UPLOADED FONTS (the design's own font files, by PostScript name): ${allFaces().map(f => `${f.ps} = ${f.family} ${f.sub}${f.italic && !/italic/i.test(f.sub) ? ' italic' : ''}, weight ${f.weight}`).join('; ')}. Wherever the design's type matches one (Figma layer details name the family and style), set the font's "postscript" to that PostScript name exactly, with its family and weight, and list the family in "fonts" with "source": "uploaded".` : '',
       S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
       (scr.figmaIcons || []).length ? `ICONS FROM THE FIGMA FILE${scr.sheet ? ' (the second image shows them, numbered in this order)' : ''}: ${scr.figmaIcons.map((r, i) => `${i + 1}. ${r} "${S.figmaIcons[r]?.name}" ${S.figmaIcons[r]?.w}x${S.figmaIcons[r]?.h}${S.figmaIcons[r]?.mono ? '' : ' (multi-colour)'}`).join('; ')}. These are the design's own icons: wherever a cell uses one (badges, action icons, header buttons, button icons), set the icon to its exact ref (e.g. "${scr.figmaIcons[0]}") instead of a role name. Use a role only for an icon that isn't in this list. If a Figma icon already includes its background shape (a filled square or circle behind the glyph), set the badge background to null so it isn't drawn twice.` : '',
       'Work in this order: write the inventory first (every visible element, top to bottom), then fonts, then the cells that build every inventory element, then seen, screen and icons.',
@@ -593,6 +642,7 @@ return { icons: out, specs, cells };`;
           if (!d || !d.name) continue;
           if (S.cells.some(c => c.desc.name.toLowerCase() === d.name.toLowerCase())) continue;
           const fixed = fixInsets(d, scr); if (fixed) log(`  ${d.name}: ${fixed}`);
+          stampFonts(d);
           const c = { id: uid(), desc: d, screenId: scr.id, screens: [scr.name], crop: cropOf(scr, d.bbox) };
           S.cells.push(c);
           log(`  ${d.name}: building (${TYPE[d.plugin] || d.plugin})`);
@@ -688,7 +738,7 @@ return { icons: out, specs, cells };`;
       <div class="thumbs"><div style="background:var(--chip)">${c.crop ? `<img src="${c.crop}" alt="">` : '<span class="hint">No original</span>'}</div><div style="background:${esc(cellBg(c))}">${c.snap ? `<img src="${c.snap}" alt="">` : ''}</div></div>
       <div class="t"><b>${esc(c.desc.name)}</b><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span></div></button>`).join('');
     $('grid').querySelectorAll('.card').forEach(b => b.onclick = () => { S.sel = b.dataset.id; renderAll(); $('stage').scrollIntoView({ block: 'nearest' }); });
-    renderStage(); renderInspector(); renderFontPanel();
+    renderStage(); renderInspector(); renderFontPanel(); renderFontFiles();
   }
   function decisionsHtml(d) {
     const icon = { works: '✓', changed: '!', alternative: '→' };
@@ -780,7 +830,9 @@ return { icons: out, specs, cells };`;
       [...use].sort((a, b) => b[1] - a[1]).map(([fam, n]) => {
         const pick = S.fonts.picks.find(p => p.family === fam) || {}, st = fontStatus[fam] || 'google';
         const opts = [...new Set([fam, ...(pick.alternatives || []), ...uploads])];
+        const faces = st === 'uploaded' ? [...new Set(S.cells.flatMap(c => [...facesUsed(c.desc)]))].filter(ps => faceByPs(ps)?.family === fam) : [];
         return `<div class="fr"><div class="fs" style="font-family:'${esc(fam)}',var(--f-ui)">Ag<span>${esc(fam)}</span></div>
+          ${faces.length ? `<span class="hint">${faces.map(ps => `<code class="ffps">${esc(ps)}</code>`).join(' ')}</span>` : ''}
           <select class="inp" data-fam="${esc(fam)}" aria-label="Font used instead of ${esc(fam)}">${opts.map(o => `<option ${o === fam ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Another Google font…</option></select>
           <span class="hint${st === 'missing' ? ' bad' : ''}">${esc(NOTE[st])} · ${n} cell${n > 1 ? 's' : ''}${pick.seen ? ` · ${esc(pick.seen)}` : ''}${pick.why ? `. ${esc(pick.why)}` : ''}</span></div>`;
       }).join('');
@@ -1352,9 +1404,9 @@ return { icons: out, specs, cells };`;
   // every font face the cells name: { ps, family, weight, face (uploaded file) | null, status }
   function fontNames(list) {
     const out = new Map();
-    for (const c of list) for (const [fam, ws] of fontsIn(c.desc)) for (const w of ws) {
-      const face = faceFor(fam, w), ps = face ? face.ps : C.psName({ family: fam, weight: w });
-      if (!out.has(ps)) out.set(ps, { ps, family: fam, weight: face ? face.weight : w, face, status: face ? 'uploaded' : fontStatus[fam] || 'google' });
+    for (const c of list) for (const o of fontObjs(c.desc)) {
+      const w = Math.round((+o.weight || 400) / 100) * 100, face = faceByPs(o.postscript) || faceFor(o.family, w), ps = face ? face.ps : C.psName({ family: o.family, weight: w });
+      if (!out.has(ps)) out.set(ps, { ps, family: face ? face.family : o.family, weight: face ? face.weight : w, face, status: face ? 'uploaded' : fontStatus[o.family] || 'google' });
     }
     return [...out.values()].sort((a, b) => a.family.localeCompare(b.family) || a.weight - b.weight);
   }
@@ -1363,7 +1415,7 @@ return { icons: out, specs, cells };`;
     const L = ['Fonts these cell styles use', '',
       'Cell styles name each font by its PostScript name (iOS) and font file name (Android). Add each font to the app with',
       'the file named exactly as listed, so the same name works on both.', ''];
-    if (up.length) L.push('Your font files (included here, renamed to match):', ...up.map(f => `  ${f.ps}.${f.face.ext}  (${f.family} ${f.weight}${f.face.italic ? ' italic' : ''}, from ${f.face.file})`), '');
+    if (up.length) L.push('Your font files (included here, renamed to match):', ...up.map(f => `  ${f.ps}.${f.face.ext}  (${f.family} ${f.face.sub}, weight ${f.weight}, from ${f.face.file})`), '');
     if (gf.length) {
       L.push('Google Fonts (free and open-licensed; download the family, then name each static file as listed):');
       for (const fam of [...new Set(gf.map(f => f.family))]) L.push(`  ${fam}${gf.some(f => f.family === fam && f.status === 'missing') ? ' (not found on Google Fonts: choose another family or supply the file)' : ''}: https://fonts.google.com/specimen/${encodeURIComponent(fam).replace(/%20/g, '+')}`,

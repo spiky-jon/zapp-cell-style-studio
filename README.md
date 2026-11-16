@@ -26,7 +26,8 @@ Published studio: https://claude.ai/artifact/Aunc4iaEei9ubCxUiQr9cs (private unt
    the look, then use the fewest cells. Anything left out is listed with its reason in the log and the Screens tab.
 6. **Fonts**: Claude matches each typeface to the closest Google Fonts family, with alternatives the Fonts panel
    can switch to (or any Google family typed in). Designers can add their own .ttf or .otf files on the Designs tab:
-   the studio reads each file's family, PostScript name and weight, uses them in the preview and the cell JSON,
+   the studio reads each file's family, PostScript name and style (the style name decides the weight, as some files
+   carry a wrong weight number), names each face by its PostScript name in the cell JSON, as Zapp does,
    and includes them in the download's `fonts/` folder.
 7. **Icons**: Claude picks the icon library closest to the design's icon style (Lucide, Phosphor, Tabler,
    Heroicons, Material Symbols, from `knowledge/icons.json`); the icon panel switches library and colours.
