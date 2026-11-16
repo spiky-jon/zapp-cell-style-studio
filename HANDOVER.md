@@ -14,7 +14,7 @@ first; this note covers status and what's next.
 
 ## What the studio does now
 
-- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 19).
+- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 20).
 - From Figma: a read-only `use_figma` script returns each screen's layer details (padding, gaps, fonts, colours,
   text) and exports the icons used (instances followed to their components, as SVG).
 - Cells built with the cell preview engine; gallery, inspector, icon panel (Figma icons or a matched library),
@@ -62,6 +62,12 @@ title is the screen name; tab bar height fixed (49 iOS / 56 Android) plus safe a
 5 tabs, no selected indicator or badges; tab bar hides on player screens, the search screen plugin and screens
 with "hide menu". Ch4: three bar versions (Top Level logo left, Second Level back + centred title, Gradient over
 the Show hero with content under the bar); tab bar #1E1E1E with a 0.5 top border, no labels, Category has none.
+Scroll reveal (from the code): a gradient bar's own background is transparent, and the plugin animates its
+gradient colours to the reveal colours (colour to colour, or gradient to gradient only) and fades the title in.
+Ch4 Show bar (agreed with Jon): starts fully transparent, reveals #1E1E1E 100% to 0% with the title; trigger
+suggested as the hero height minus the bars (523 - 123 = 400). A pushed screen's title is the tapped item's
+title (one Category screen serves every category) unless a localised screen title is set. The Account button
+opens a second-level screen not designed yet; the studio flags button targets missing from the designs.
 Tested with canned screens in headless Chrome and `tools/nav-fixture.json`; not yet a live run.
 
 ## Open questions

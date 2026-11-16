@@ -143,6 +143,12 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       "right": [ { "icon": "figma:25:1357", "label": "Account", "target": "Account" } ],   // left to right; target = the screen it opens
       "buttonGap": 4,
       "blur": false,                          // false | light | medium | strong
+      "scrollReveal": null,                   // how the bar changes as the screen scrolls, when the design shows or describes it:
+                                              //   { "trigger": 400, "background": { "type": "gradient", "top": "#1E1E1E", "bottom": "rgba(30,30,30,0)" },
+                                              //     "showTitle": true, "borderColor": null, "blur": false }
+                                              //   background/border/blur = the scrolled look (background, border and blur above are the look
+                                              //   before scrolling); showTitle = the title fades in (set centre to "title"); trigger = the scroll
+                                              //   distance to the full change: over a hero, the hero's height minus the status bar and bar; else 150
       "unsupported": []                       // what the bar shows that the plugin can't, one plain sentence each
     },
     "tabBar": {                               // null when the screen has no bottom tab bar

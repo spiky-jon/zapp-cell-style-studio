@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 19 · phone and tablet · cell plugins 16.0.0-alpha
+Version 20 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -272,6 +272,12 @@ Choosing:
 - **Navigation bar background**: a colour or a two-colour vertical gradient, optional bottom border, optional
   blur. A gradient fading over a hero covers the status bar too. When content runs behind the bar (a hero under
   a see-through bar), set `contentPosition` to `under_bar`.
+- **Navigation bar scroll reveal**: as the screen scrolls, the bar can change its background (colour to colour, or
+  gradient to gradient), its border colour and blur, and fade the title in. A see-through bar over a hero that
+  turns solid as the hero scrolls away is a gradient bar that starts fully transparent and reveals the gradient,
+  usually with the title fading in. Describe the scrolled look in `scrollReveal`.
+- **Navigation bar title on a pushed screen** is the tapped item's title (the category or show), so one screen
+  serves every category. A localised screen title set on the screen replaces it.
 - **Bottom tab bar** (fixed by the plugin): 49 tall on iPhone (56 on Android) plus the home indicator area, up
   to 5 tabs of equal width, each an icon in a 32x32 box with an optional one-line label (14 tall) under it, a
   background colour and a top border. Colours: one for the selected tab, one for the rest. A selected pill or

@@ -1042,12 +1042,15 @@ return { icons: out, specs };`;
     else if (at('[data-copy-theme]')) copy(JSON.stringify(themeJson(themeValues()), null, 2), 'Copied the theme values');
     else if ((b = at('[data-back]'))) pick(b.dataset.back, S.pick?.[b.dataset.back]);
     else if ((b = at('[data-open-cell]'))) { S.sel = b.dataset.openCell; show('cells'); renderAll(); }
+    else if ((b = at('[data-navstate]'))) { const k = b.dataset.navstate.lastIndexOf(':'), sid = b.dataset.navstate.slice(0, k); (S.navState ||= {})[sid] = b.dataset.navstate.slice(k + 1); drawMock(lastItemImgs); }
     else if ((b = at('[data-copy-nav]'))) { const M = navModel(), w = b.dataset.copyNav, v = w.startsWith('nav:') && M.variants.find(x => x.name === w.slice(4));
       if (v) copy(JSON.stringify(navJson(v), null, 2), `Copied the ${v.name} navigation bar`); else if (w === 'tabs' && M.tabs) copy(JSON.stringify(tabsJson(M.tabs), null, 2), 'Copied the tab bar'); }
     else if ((b = at('[data-pick]'))) { const k = b.dataset.pick.lastIndexOf(':'), id = b.dataset.pick.slice(k + 1); pick(b.dataset.pick.slice(0, k), /^\d+$/.test(id) ? +id : id); }
   });
   $('mock').addEventListener('keydown', e => { const b = e.target.closest('.cmp'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click(); } });
+  let lastItemImgs = null;
   function drawMock(itemImgs) {
+    lastItemImgs = itemImgs;
     const box = $('mock'), done = S.screens.filter(s => (s.layout || []).length);
     if (!done.length) { box.innerHTML = `<div class="empty"><b>No screens to mock up yet</b><span>Find cells from your designs; each screen is rebuilt here from its cells.</span></div>`; return; }
     const T = themeValues(), M = navModel();
@@ -1101,6 +1104,10 @@ return { icons: out, specs };`;
       if (withTabs.some(s => names(s.navigation.tabBar) !== names(tabDesc))) tabs.conv.notes.unshift(`The tab bar is the same on every screen, so it uses the tabs drawn on ${withTabs.find(s => s.navigation.tabBar === tabDesc).name}.`);
       if (tabs.hidden.length) tabs.conv.notes.unshift(`${tabs.hidden.map(s => s.name).join(', ')} ${tabs.hidden.length === 1 ? 'has' : 'have'} no tab bar: turn on "hide menu" on ${tabs.hidden.length === 1 ? 'that screen' : 'those screens'}.`);
     }
+    // buttons and tabs that open a screen the designs don't include yet
+    const names = new Set(S.screens.map(s => s.name.toLowerCase()));
+    for (const v of variants) for (const n of v.conv.navItems)
+      if (n.target && !names.has(n.target.toLowerCase())) v.conv.notes.push(`${n.target} isn't in the designs: create a screen for it (blank for now) and point the ${n.label} button at it.`);
     return { variants, tabs, variantOf: s => variants.find(v => v.screens.includes(s)) || null };
   }
   // images for the plugins: each button or tab image is its whole box with the glyph at its designed size in the middle
@@ -1134,19 +1141,23 @@ return { icons: out, specs };`;
   function navBarHtml(scr, F, sel) {
     const v = F.v; if (!v) return '';
     const st = v.conv.styles, as = v.conv.assets, d = v.desc;
-    const bg = st.background_type === 'Gradient' ? `linear-gradient(${st.navbar_gradient__top_background_color}, ${st.navbar_gradient__bottom_background_color})` : st.background_color;
+    // scroll reveal: drawn before scrolling, or scrolled (chosen in the side panel)
+    const reveal = !!st.navbar_effects_scroll_reveal__enabled, scrolled = reveal && S.navState?.[scr.id] === 'scrolled', rc = scrolled && st.navbar_effects_scroll_reveal__change_background_color;
+    const bg = st.background_type === 'Gradient' ? `linear-gradient(${rc ? st.navbar_effects_scroll_reveal__scroll_top_gradient_color : st.navbar_gradient__top_background_color}, ${rc ? st.navbar_effects_scroll_reveal__scroll_bottom_gradient_color : st.navbar_gradient__bottom_background_color})`
+      : rc ? st.navbar_effects_scroll_reveal__scroll_background_color : st.background_color;
+    const titleOn = !(reveal && st.navbar_effects_scroll_reveal__show_title_on_scroll && !scrolled);
     const coverSB = st.background_type === 'Gradient' && st.navbar_gradient__mode === 'on_top_screen';
     const img = (im, w, h) => { const u = navImg(im); return u ? `<img src="${u}" alt="" style="width:${w}px;height:${h}px">` : `<span style="width:${w}px;height:${h}px;display:block"></span>`; };
     const leftImg = v.conv.images.find(i => i.field === 'back_button' || i.field === 'menu_button'), logo = v.conv.images.find(i => i.field === 'app_logo');
     const centre = st.presentation_style === 'logo' ? (logo ? img(logo, as.logo_asset_width, as.logo_asset_height) : '')
-      : st.presentation_style === 'title' ? `<span style="color:${st.title_color};font-size:${st.navbar_title__ios_font_size}px;line-height:${st.navbar_title__ios_line_height}px;letter-spacing:${st.navbar_title__ios_letter_spacing}px;${titleFont(st)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:${st.title_text_transform === 'default' ? 'none' : st.title_text_transform}">${esc(d.title?.sample || scr.name)}</span>` : '';
+      : st.presentation_style === 'title' ? `<span style="opacity:${titleOn ? 1 : 0};color:${st.title_color};font-size:${st.navbar_title__ios_font_size}px;line-height:${st.navbar_title__ios_line_height}px;letter-spacing:${st.navbar_title__ios_letter_spacing}px;${titleFont(st)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:${st.title_text_transform === 'default' ? 'none' : st.title_text_transform}">${esc(d.title?.sample || scr.name)}</span>` : '';
     const leftW = leftImg ? as.asset_width + st.navbar_h_gutter : 0, rightW = v.conv.navItems.length ? v.conv.navItems.length * as.asset_width + (v.conv.navItems.length - 1) * st.navbar_buttons__horizontal_gutter + st.navbar_h_gutter : 0;
     const side = st.style === 'center' ? Math.max(leftW, rightW) : 0;
     return `<div class="cmp navb${sel === 'nav' ? ' on' : ''}" role="button" tabindex="0" aria-pressed="${sel === 'nav'}" aria-label="Navigation bar: ${esc(v.name)}" data-pick="${esc(scr.id)}:nav"
         style="position:absolute;left:0;right:0;top:0;height:${F.sb + F.barH}px;z-index:3">
       <div style="height:${F.sb}px;background:${coverSB ? 'transparent' : st.status_bar__background_color}"></div>
       ${coverSB ? `<div style="position:absolute;inset:0;background:${bg};z-index:-1"></div>` : ''}
-      <div style="position:relative;height:${v.conv.height}px;box-sizing:border-box;padding:${st.navbar_padding_top}px ${st.navbar_padding_right}px ${st.navbar_padding_bottom}px ${st.navbar_padding_left}px;display:flex;align-items:center;${coverSB ? '' : `background:${bg};`}border-bottom:${st.navbar__border_bottom_thickness}px solid ${st.navbar__border_bottom_color}">
+      <div style="position:relative;height:${v.conv.height}px;box-sizing:border-box;padding:${st.navbar_padding_top}px ${st.navbar_padding_right}px ${st.navbar_padding_bottom}px ${st.navbar_padding_left}px;display:flex;align-items:center;${coverSB ? '' : `background:${bg};`}border-bottom:${st.navbar__border_bottom_thickness}px solid ${scrolled && st.navbar_effects_scroll_reveal__change_border_color ? st.navbar_effects_scroll_reveal__scroll_border_color : st.navbar__border_bottom_color}">
         ${leftImg ? `<div style="flex:none;z-index:1">${img(leftImg, as.asset_width, as.asset_height)}</div>` : ''}
         <div style="position:absolute;top:0;bottom:0;left:${st.navbar_padding_left + (st.style === 'center' ? side : leftW)}px;right:${st.navbar_padding_right + (st.style === 'center' ? side : rightW)}px;display:flex;align-items:center;justify-content:${st.style === 'center' ? 'center' : 'flex-start'};overflow:hidden">${centre}</div>
         <div style="margin-left:auto;display:flex;gap:${st.navbar_buttons__horizontal_gutter}px;z-index:1">${v.conv.navItems.map(n => img(n.image, as.asset_width, as.asset_height)).join('')}</div>
@@ -1184,6 +1195,9 @@ return { icons: out, specs };`;
       ...(st.presentation_style === 'logo' ? [nrow('Logo size', `${as.logo_asset_width} × ${as.logo_asset_height}`, as.logo_asset_width !== D.logo[0] || as.logo_asset_height !== D.logo[1])] : []),
       ...(st.presentation_style === 'title' ? [nrow('Title', `${esc(st.navbar_title__ios_font_family)} ${st.navbar_title__ios_font_size}/${st.navbar_title__ios_line_height} · ${swatch(st.title_color)}`, true)] : []),
       ...(st.navbar__border_bottom_thickness ? [nrow('Bottom border', `${st.navbar__border_bottom_thickness} · ${swatch(st.navbar__border_bottom_color)}`, true)] : []),
+      ...(st.navbar_effects_scroll_reveal__enabled ? [nrow('Scroll reveal', [`over ${st.navbar_effects_scroll_reveal__y_axis_trigger}`,
+        st.navbar_effects_scroll_reveal__change_background_color ? (st.navbar_effects_scroll_reveal__scroll_background_color ? `to ${swatch(st.navbar_effects_scroll_reveal__scroll_background_color)}` : `to ${swatch(st.navbar_effects_scroll_reveal__scroll_top_gradient_color)} → ${swatch(st.navbar_effects_scroll_reveal__scroll_bottom_gradient_color)}`) : '',
+        st.navbar_effects_scroll_reveal__show_title_on_scroll ? 'title fades in' : '', st.navbar_effects_scroll_reveal__change_border_color ? 'border changes' : '', st.navbar_effects_scroll_reveal__change_background_blur ? 'blur changes' : ''].filter(Boolean).join(' · '), true)] : []),
       ...(v.conv.navItems.length ? [nrow('Right buttons', v.conv.navItems.map(n => `${esc(n.label)} → ${esc(n.target || 'set a screen')}`).join('<br>'), true)] : []),
     ].join('');
   }
@@ -1205,7 +1219,9 @@ return { icons: out, specs };`;
     const back = `<div class="row" style="justify-content:space-between"><button class="btn small ghost" type="button" data-back="${esc(scr.id)}">← ${esc(scr.name)}</button><button class="btn small" type="button" data-copy-nav="${which === 'nav' ? 'nav:' + esc(M.variantOf(scr)?.name || '') : 'tabs'}">Copy JSON</button></div>`;
     if (which === 'nav') {
       const v = M.variantOf(scr); if (!v) return back;
-      return `${back}<h3 class="ctitle">Navigation bar <span class="hint">${esc(v.name)}</span></h3>
+      const ns = S.navState?.[scr.id] === 'scrolled' ? 'scrolled' : 'top';
+      const toggle = v.conv.styles.navbar_effects_scroll_reveal__enabled ? `<div class="seg" role="group" aria-label="Preview the bar">${[['top', 'Before scrolling'], ['scrolled', 'Scrolled']].map(([k, l]) => `<button type="button" class="btn small${ns === k ? ' primary' : ''}" aria-pressed="${ns === k}" data-navstate="${esc(scr.id)}:${k}">${l}</button>`).join('')}</div>` : '';
+      return `${back}<h3 class="ctitle">Navigation bar <span class="hint">${esc(v.name)}</span></h3>${toggle}
         <p class="hint">Used on ${esc(v.screens.map(s => s.name).join(', '))}. Set on each of those screens.</p>
         <div class="srows">${navBarRows(v)}</div>${navVariantThumbs(v)}${notesHtml(v.conv.notes)}
         <p class="hint">Default: the plugin's own value. Set: change it on the plugin.</p>`;

@@ -372,9 +372,36 @@
       image: { field: 'icon', file: `nav_item_${slug(r.label || `button-${i + 1}`)}.png`, icon: r.icon, width: btn[0], height: btn[1], iconSize: glyph, color: color(r.color, tint) } }));
     if (d.left === 'menu') notes.push('The menu button shows only when the app uses the side menu, or when this screen sets a menu target screen.');
     if (d.left === 'back') notes.push('The back button shows by itself whenever there is a screen to go back to; nothing to set on the screen.');
-    if (centre === 'title') notes.push('The title is the screen\'s name (or its localised title), so name each screen as the bar should read.');
+    if (centre === 'title') notes.push('The title is the tapped item\'s title on a screen opened from an item (a category, a show), otherwise the screen\'s name; leave the screen\'s localised title empty, or it replaces both.');
     if (contentPosition === 'on_top_screen') notes.push('Content starts at the top of the screen, under the status bar and the navigation bar, so a hero can run behind them.');
     if (right.length > 1 && right.some(r => num(r.width, btn[0]) !== btn[0])) notes.push('All buttons share one image size, so they are all drawn at the size of the first.');
+    // scroll reveal: the bar changes as the screen scrolls (background, border, blur, the title fading in)
+    const sr = d.scrollReveal;
+    if (sr && typeof sr === 'object') {
+      const trigger = num(sr.trigger, 150), rb = sr.background || null;
+      Object.assign(styles, { navbar_effects_scroll_reveal__enabled: true, navbar_effects_scroll_reveal__y_axis_trigger: trigger });
+      if (rb) {
+        // the plugin only animates within one background type, so both states use the same type
+        if (grad) {
+          const top = rb.type === 'gradient' ? solid(rb.top) : solid(rb.color), bot = rb.type === 'gradient' ? solid(rb.bottom) : solid(rb.color);
+          Object.assign(styles, { navbar_effects_scroll_reveal__change_background_color: true, navbar_effects_scroll_reveal__scroll_top_gradient_color: top || 'rgba(0, 0, 0, 0)', navbar_effects_scroll_reveal__scroll_bottom_gradient_color: bot || 'rgba(0, 0, 0, 0)' });
+          if (rb.type !== 'gradient') notes.push('The scrolled bar is drawn as a gradient of one colour: a gradient bar can only change into another gradient.');
+        } else if (rb.type === 'gradient') {
+          const base = styles.background_color;
+          delete styles.background_color;
+          Object.assign(styles, { background_type: 'Gradient', navbar_gradient__top_background_color: base, navbar_gradient__bottom_background_color: base, navbar_gradient__mode: 'on_top_screen',
+            navbar_effects_scroll_reveal__change_background_color: true, navbar_effects_scroll_reveal__scroll_top_gradient_color: solid(rb.top) || base, navbar_effects_scroll_reveal__scroll_bottom_gradient_color: solid(rb.bottom) || base });
+          notes.push('The bar is set as a gradient of its one colour, so it can change into the scrolled gradient: a colour bar can only change into another colour.');
+        } else Object.assign(styles, { navbar_effects_scroll_reveal__change_background_color: true, navbar_effects_scroll_reveal__scroll_background_color: solid(rb.color) || 'rgba(0, 0, 0, 0)' });
+      }
+      if (sr.borderColor) Object.assign(styles, { navbar_effects_scroll_reveal__change_border_color: true, navbar_effects_scroll_reveal__scroll_border_color: solid(sr.borderColor) });
+      if (sr.blur) Object.assign(styles, { navbar_effects_scroll_reveal__change_background_blur: true, navbar_effects_scroll_reveal__new_background_blur_amount: ['light', 'medium', 'strong'].includes(sr.blur) ? sr.blur : 'medium' });
+      if (sr.showTitle) {
+        styles.navbar_effects_scroll_reveal__show_title_on_scroll = true;
+        if (centre !== 'title') notes.push('The title fades in only when the bar shows the title: set the logo display to the screen title.');
+      }
+      notes.push(`As the screen scrolls, the bar changes over the first ${trigger} points${sr.showTitle ? ' and the title fades in' : ''}${sr.trigger == null ? ' (the plugin\'s default distance)' : ''}.`);
+    }
     for (const x of Array.isArray(d.unsupported) ? d.unsupported : []) notes.push(String(x));
     return { styles, assets, images, navItems, notes, height: content + top + bottom };
   }
