@@ -402,7 +402,7 @@
   // Preferred: one read-only script in the file finds every icon instance in the screens, follows it to its component,
   // and exports that component as SVG (vector, any size). Layer data alone can't see inside component instances.
   const ICON_SCRIPT = ids => `const frameIds = ${JSON.stringify(ids)};
-const icons = new Map(), specs = {};
+const icons = new Map(), specs = {}, cells = {};
 const r1 = v => Math.round(v * 10) / 10;
 const hex = p => { const c = p.color, h = v => Math.round(v * 255).toString(16).padStart(2, '0'); return '#' + h(c.r) + h(c.g) + h(c.b) + (p.opacity != null && p.opacity < 1 ? h(p.opacity) : ''); };
 const paint = ps => { if (!Array.isArray(ps)) return ''; const p = ps.find(x => x.visible !== false); if (!p) return ''; return p.type === 'SOLID' ? hex(p) : p.type === 'IMAGE' ? 'image' : p.type.indexOf('GRADIENT') === 0 ? 'gradient(' + p.gradientStops.map(g => hex({ color: g.color, opacity: g.color.a }) + ' ' + r1(g.position)).join(', ') + ')' : p.type.toLowerCase(); };
@@ -412,6 +412,19 @@ const innerIcons = n => n.findAllWithCriteria({ types: ['INSTANCE'] }).filter(k 
 const glyphOf = n => { const kids = innerIcons(n).filter(k => !innerIcons(k).length); return kids.length === 1 ? kids[0] : null; };
 const isStatus = n => /status ?bar/i.test(n.name) && n.height <= 70;
 const underStatus = (n, stop) => { for (let p = n; p && p !== stop; p = p.parent) if (isStatus(p)) return true; return false; };
+// how far a component's content (text, icons, images, shapes) sits from its edges: the cell's own padding
+const contentBox = n => { const b = n.absoluteBoundingBox; if (!b) return null; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; const texts = [];
+  const visit = k => { if (k.visible === false) return; const kb = k.absoluteBoundingBox; if (!kb) return;
+    const filled = Array.isArray(k.fills) && k.fills.some(f => f.visible !== false && (f.opacity == null || f.opacity > 0));
+    // content: text, icons, images (an image fill, or an artwork placeholder: a filled frame named like an image), shapes
+    const leaf = k.type === 'TEXT' || (k.type === 'INSTANCE' && isIcon(k)) || (Array.isArray(k.fills) && k.fills.some(f => f.visible !== false && f.type === 'IMAGE'))
+      || (filled && /image|img|thumb|poster|artwork|picture|photo|still|cover/i.test(k.name)) || (filled && k.type === 'RECTANGLE') || ['VECTOR', 'BOOLEAN_OPERATION', 'ELLIPSE', 'POLYGON', 'STAR'].indexOf(k.type) >= 0;
+    const spans = kb.width >= b.width * 0.95 && kb.height >= b.height * 0.95;
+    if (leaf && !spans) { x0 = Math.min(x0, kb.x); y0 = Math.min(y0, kb.y); x1 = Math.max(x1, kb.x + kb.width); y1 = Math.max(y1, kb.y + kb.height); if (k.type === 'TEXT') texts.push({ h: r1(kb.height), lines: k.characters.split('\\n').length }); return; }
+    if ('children' in k) for (const c of k.children) visit(c); };
+  if ('children' in n) for (const c of n.children) visit(c);
+  if (x0 === Infinity) return null;
+  return { inset: [y0 - b.y, b.x + b.width - x1, b.y + b.height - y1, x0 - b.x].map(v => Math.max(0, Math.round(v))), w: r1(b.width), h: r1(b.height), texts }; };
 const glyphColour = n => { const v = n.findAll(x => x.visible && ['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'ELLIPSE', 'POLYGON'].indexOf(x.type) >= 0 && Array.isArray(x.fills) && x.fills.some(f => f.visible !== false && f.type === 'SOLID'));
   if (!v.length) return ''; const f = v[v.length - 1].fills.find(f => f.visible !== false && f.type === 'SOLID'); return f ? hex(f) : ''; };
 const textOf = n => { const fn = n.fontName, lh = n.lineHeight, ls = n.letterSpacing;
@@ -450,6 +463,11 @@ for (const fid of frameIds) {
       const main = await n.getMainComponentAsync();
       if (main && isIcon(n) && !glyphOf(n)) { const c = glyphColour(n); line += ' icon=figma:' + main.id + (c ? ' colour=' + c : ''); lines.push(line); size += line.length; return; }
       if (main && isIcon(n)) line += ' (wraps the icon below)';
+      if (main && !isIcon(n) && n.findAllWithCriteria({ types: ['TEXT'] }).some(t => t.visible)) {
+        const cb = contentBox(n);
+        if (cb) { line += ' inset=' + cb.inset.join(',') + ' (content to edges, top,right,bottom,left: the cell padding)';
+          const rec = cells[fid] || (cells[fid] = {}); for (const k of [main.name, n.name, main.parent && main.parent.type === 'COMPONENT_SET' ? main.parent.name : null]) if (k && !rec[k]) rec[k] = cb; }
+      }
       if (main && seenMain.has(main.id)) {
         const texts = n.findAllWithCriteria({ types: ['TEXT'] }).filter(t => t.visible).map(t => '"' + t.characters.slice(0, 60).replace(/\\n/g, ' ') + '"').join(' ');
         const glyphs = innerIcons(n).filter(k => !innerIcons(k).length), refs = [];
@@ -470,7 +488,7 @@ for (const ic of icons.values()) {
   try { svg = await ic.node.exportAsync({ format: 'SVG_STRING' }); } catch (e) { svg = null; }
   if (svg && svg.length < 60000) out.push({ id: ic.id, name: ic.name, w: ic.w, h: ic.h, frames: ic.frames, svg });
 }
-return { icons: out, specs };`;
+return { icons: out, specs, cells };`;
   const svgColours = svg => [...new Set([...svg.replace(/<defs>[\s\S]*?<\/defs>/g, '').matchAll(/(?:fill|stroke)(?:=|:\s*)"?(#[0-9a-f]{3,8}|rgba?\([^)]*\)|[a-z]+)/gi)].map(m => m[1].toLowerCase()).filter(c => c !== 'none' && c !== 'transparent' && !c.startsWith('url')))];
   async function figmaIconsViaPlugin(fileKey, sid, added) {
     if (!mcp || !added.length) return false;
@@ -479,7 +497,7 @@ return { icons: out, specs };`;
     try { data = JSON.parse(txt); } catch (e) { const a = txt.indexOf('{'), z = txt.lastIndexOf('}'); data = a >= 0 ? JSON.parse(txt.slice(a, z + 1)) : null; }
     const list = Array.isArray(data) ? data : data?.icons;
     if (!Array.isArray(list)) return false;
-    for (const { scr, f } of added) if (data?.specs?.[f.id]) scr.figmaSpec = data.specs[f.id];
+    for (const { scr, f } of added) { if (data?.specs?.[f.id]) scr.figmaSpec = data.specs[f.id]; if (data?.cells?.[f.id]) scr.figmaCells = data.cells[f.id]; }
     for (const ic of list) {
       if (!ic || !ic.svg) continue;
       const ref = `figma:${ic.id}`;
@@ -574,6 +592,7 @@ return { icons: out, specs };`;
         for (const d of found) {
           if (!d || !d.name) continue;
           if (S.cells.some(c => c.desc.name.toLowerCase() === d.name.toLowerCase())) continue;
+          const fixed = fixInsets(d, scr); if (fixed) log(`  ${d.name}: ${fixed}`);
           const c = { id: uid(), desc: d, screenId: scr.id, screens: [scr.name], crop: cropOf(scr, d.bbox) };
           S.cells.push(c);
           log(`  ${d.name}: building (${TYPE[d.plugin] || d.plugin})`);
@@ -610,6 +629,15 @@ return { icons: out, specs };`;
     if (S.cells.length) { S.sel = S.sel || S.cells[0].id; show('cells'); toast(`${S.cells.length} cell styles ready`); }
   }
   $('analyse').addEventListener('click', analyse);
+
+  // The space between a cell's edges and its content belongs in the cell's own padding. Claude sometimes drops it (or
+  // moves it into gaps or line height), so when the cell came from a Figma component, the measured inset decides.
+  function figmaLayerFor(d, scr) {
+    const rec = scr.figmaCells; if (!rec) return null;
+    const names = [d.figmaLayer, d.name].filter(Boolean).map(x => String(x).toLowerCase());
+    const k = Object.keys(rec).find(k => names.includes(k.toLowerCase())); return k ? rec[k] : null;
+  }
+  const fixInsets = (d, scr) => C.fixInsets(d, figmaLayerFor(d, scr));
 
   // Headers usually line up with the first item of the rail, list or grid under them. When a header's title starts a
   // few points off that edge (a measuring slip), move it onto the edge; bigger differences are left as designed.

@@ -14,7 +14,7 @@ first; this note covers status and what's next.
 
 ## What the studio does now
 
-- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 20).
+- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 21).
 - From Figma: a read-only `use_figma` script returns each screen's layer details (padding, gaps, fonts, colours,
   text) and exports the icons used (instances followed to their components, as SVG).
 - Cells built with the cell preview engine; gallery, inspector, icon panel (Figma icons or a matched library),
@@ -69,6 +69,13 @@ suggested as the hero height minus the bars (523 - 123 = 400). A pushed screen's
 title (one Category screen serves every category) unless a localised screen title is set. The Account button
 opens a second-level screen not designed yet; the studio flags button targets missing from the designs.
 Tested with canned screens in headless Chrome and `tools/nav-fixture.json`; not yet a live run.
+
+Cell padding from Figma: the import script measures each text-bearing component's content inset (text, icons,
+images and artwork placeholders to its edges) and returns it per screen (`scr.figmaCells`); Claude names the
+component in `figmaLayer`, and `Convert.fixInsets` corrects a cell whose top/bottom padding doesn't match before
+it's built (text-only cells and headers exactly; image cells only when space is missing; Cell 3 left alone),
+also undoing space moved into label margins or line height. Logged per cell. Checked by
+`tools/inset-fixture.json`. Ch4 Category Row measures 10 top, 9 bottom; Search page title 20/20.
 
 ## Open questions
 

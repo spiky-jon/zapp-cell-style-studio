@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 20 · phone and tablet · cell plugins 16.0.0-alpha
+Version 21 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -194,6 +194,12 @@ Choosing:
   puts the space above and below its text into the cell's own top and bottom padding (equal, as designed), and
   the list has no gap between rows. That keeps the whole row tappable (a good hit area) and the divider in the
   right place. Use a list gap only when the design shows real space between separate cards.
+- **Every cell keeps the space inside its edges.** Before finishing a cell, check the gap between its top edge
+  (or top divider) and its first content, and between its last content and its bottom edge: that space is the
+  cell's top and bottom padding, never a list gap, a label margin or extra line height. A text row with a line
+  between rows always has space above and below its text. From Figma, the layer details give each component's
+  `inset` (content to edges): use it as the cell padding, and name the component in `figmaLayer`; the studio
+  corrects a cell whose padding doesn't match its Figma layer.
 - Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
   **dividers** (thickness, colour). Each divider has **its own margins** (top, right, bottom, left), added inside
   the cell's side padding, so the top and bottom dividers can have different insets (e.g. a full-width top line

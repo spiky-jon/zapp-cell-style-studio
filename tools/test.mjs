@@ -26,4 +26,9 @@ const check = (name, got, expect) => { const bad = Object.entries(expect).filter
   if (bad.length) { fail++; console.log('FAIL', name, bad.map(([k, v]) => `${k}: ${JSON.stringify(got[k])} (expected ${JSON.stringify(v)})`).join('; ')); } else console.log('ok  ', name); };
 for (const d of nav.navBars) { const r = Convert.navBar(d); check(`nav bar ${d.variant}`, { ...r.styles, height: r.height, images: r.images.map(i => i.field) }, d.expect); }
 { const r = Convert.tabBar(nav.tabBar); check('tab bar', { ...r.styles, tabs: r.tabs.length }, nav.tabBar.expect); }
+// space inside cell edges, corrected from the Figma layer (tools/inset-fixture.json)
+for (const k of JSON.parse(readFileSync(root + 'tools/inset-fixture.json')).cases) {
+  const d = JSON.parse(JSON.stringify(k.cell)), msg = Convert.fixInsets(d, k.layer), l = (d.labels || [])[0] || {};
+  check(`spacing: ${k.name}`, { padding: d.cell && d.cell.padding, labelMargin: l.margin, lineHeight: l.font && l.font.lineHeight, headerPadding: d.header && d.header.padding, changed: !!msg }, k.expect);
+}
 process.exit(fail ? 1 : 0);

@@ -433,6 +433,37 @@
     return { styles, tabs: list, notes, height: TAB.height.ios + num(d.border && d.border.width, 0) };
   }
 
-  const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, NAV_DEFAULT, TAB };
+  // The space between a cell's edges and its content is the cell's own padding. Claude sometimes drops it (or moves it into
+  // label margins or line height); L is the Figma layer's measured content inset, which then decides.
+  function fixInsets(d, L) {
+    if (!d || !L || !Array.isArray(L.inset) || d.plugin === 'cell_3') return '';
+    const [t, , b] = L.inset, out = [];
+    const labs = Array.isArray(d.labels) ? d.labels.filter(Boolean) : [], first = labs[0], last = labs[labs.length - 1];
+    // single-line labels keep the design's text box height as their line height (extra height is spacing, not text)
+    for (const [i, l] of labs.entries()) {
+      const tx = L.texts[i]; if (!tx || !l.font || tx.lines !== 1 || (l.lines && l.lines !== 1)) continue;
+      if (num(l.font.lineHeight) > tx.h + 2) { out.push(`line height ${tx.h} (was ${l.font.lineHeight})`); l.font.lineHeight = tx.h; }
+    }
+    const mt = l => num((l?.margin || [])[0]), mb = l => num((l?.margin || [])[2]);
+    if (d.plugin === 'cell_info') {
+      const h = d.header || (d.header = {}), p = Array.isArray(h.padding) ? h.padding.slice() : [null, null, null, null];
+      if (Math.abs(num(p[0]) - t) > 1.5 || Math.abs(num(p[2]) - b) > 1.5) { out.push(`padding top and bottom ${t} and ${b} (was ${num(p[0])} and ${num(p[2])})`); p[0] = t; p[2] = b; h.padding = p; }
+    } else {
+      const cell = d.cell || (d.cell = {}), p = box(cell.padding);
+      // what the description puts above the first content and below the last (padding, plus label margins in a text-only cell)
+      const textOnly = !d.image, im = box(d.image?.margin);
+      const top = p[0] + (textOnly ? mt(first) : im[0]), bottom = p[2] + (textOnly ? mb(last) : d.plugin === 'cell_1' ? mb(last) : im[2]);
+      // text-only cells follow the layer exactly; with an image, only missing space is added (the image's own margins vary by type)
+      const off = textOnly ? Math.abs(top - t) > 1.5 || Math.abs(bottom - b) > 1.5 : top < t - 1.5 || bottom < b - 1.5;
+      if (off) {
+        out.push(`padding top and bottom ${t} and ${b}, as in the Figma layer (was ${top} and ${bottom})`);
+        p[0] = t; p[2] = b; cell.padding = p;
+        if (textOnly) { if (first?.margin) first.margin[0] = 0; if (last?.margin) last.margin[2] = 0; }
+      }
+    }
+    return out.length ? out.join('; ') : '';
+  }
+
+  const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -14,6 +14,7 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
     {
       "name": "Poster Tile",                 // short, Title Case, unique per style
       "screen": "Home",                       // where it appears
+      "figmaLayer": "Poster Card",            // from Figma: the component (or layer) name the cell is built from, as in the layer details
       "purpose": "Portrait poster for rails and grids, with an optional tag.",
       "bbox": { "x": 0.05, "y": 0.30, "w": 0.28, "h": 0.20 }, // one clear example in THIS image, fractions of the image (0-1)
       "plugin": "cell_3",                     // cell_1 | cell_2 | cell_3 | cell_info  (see rules)
