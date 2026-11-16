@@ -131,13 +131,13 @@
   }
   const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   async function addFontFiles(files) {
-    const added = [];
+    const added = [], dupes = [];
     for (const f of files) {
       if (!/\.(ttf|otf|woff2?)$/i.test(f.name)) { toast(`${f.name} isn't a font file (.ttf or .otf).`); continue; }
       try {
         const buf = await f.arrayBuffer(), info = parseFont(buf), ext = f.name.split('.').pop().toLowerCase();
         const u = (S.fonts.uploads[info.family] ||= { faces: [] });
-        if (u.faces.some(x => x.ps === info.ps)) continue;
+        if (u.faces.some(x => x.ps === info.ps)) { dupes.push(info.ps); continue; }
         const face = { ...info, ext, file: f.name, data: new Uint8Array(buf) };
         u.faces.push(face); u.faces.sort((a, b) => a.weight - b.weight || a.italic - b.italic);
         // an @font-face rule with the file inline, in both documents (the engine's snapshots copy stylesheets, not FontFace objects)
@@ -152,6 +152,7 @@
       } catch (e) { toast(`${f.name}: ${e.message}.`); }
     }
     renderFontFiles(); renderFontPanel();
+    if (dupes.length && !added.length) toast(`${dupes.length === 1 ? dupes[0] + ' is' : 'Those fonts are'} already added. Remove ${dupes.length === 1 ? 'it' : 'them'} first to add again.`);
     if (added.length) {
       toast(`Added ${added.length} font${added.length > 1 ? 's' : ''}`);
       // cells already using an uploaded family pick up its real file names
@@ -193,7 +194,14 @@
     for (const c of hit) { stampFonts(c.desc); await ensureFonts(c.desc); await buildCell(c); }
     if (hit.length) renderAll();
   }
-  $('fontInput').addEventListener('change', async e => { await addFontFiles([...e.target.files]); e.target.value = ''; });
+  $('fontInput').addEventListener('change', async e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) await addFontFiles(fs); });
+  // any "Add font files" control opens the picker (a real button, so it works wherever the input is hidden)
+  document.addEventListener('click', e => { if (e.target.closest('[data-addfonts]')) { e.preventDefault(); $('fontInput').click(); } });
+  // font files can also be dropped on the fonts area, or on the screenshots area
+  const fontZone = $('fontZone'), isFont = f => /\.(ttf|otf|woff2?)$/i.test(f.name);
+  ['dragenter', 'dragover'].forEach(ev => fontZone.addEventListener(ev, e => { e.preventDefault(); fontZone.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => fontZone.addEventListener(ev, e => { e.preventDefault(); fontZone.classList.remove('over'); }));
+  fontZone.addEventListener('drop', e => { const fs = [...e.dataTransfer.files].filter(isFont); if (fs.length) addFontFiles(fs); else toast('Drop .ttf or .otf files here.'); });
 
   /* ---------- icons: role -> PNG @3x from the chosen library ---------- */
   const iconCache = new Map();
@@ -323,7 +331,9 @@
   const drop = $('drop');
   ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', async e => { for (const f of e.dataTransfer.files) if (f.type.startsWith('image/')) await addScreen({ name: f.name, blob: f }); });
+  drop.addEventListener('drop', async e => { const fs = [...e.dataTransfer.files], fonts = fs.filter(f => /\.(ttf|otf|woff2?)$/i.test(f.name));
+    if (fonts.length) addFontFiles(fonts);
+    for (const f of fs) if (f.type.startsWith('image/')) await addScreen({ name: f.name, blob: f }); });
   $('device').addEventListener('change', () => { $('screenW').value = $('device').value === 'tablet' ? 1133 : 393; });
 
   /* ---------- Figma ---------- */
@@ -826,7 +836,7 @@ return { icons: out, specs, cells };`;
     box.hidden = !use.size; if (!use.size) return;
     const uploads = Object.keys(S.fonts.uploads);
     const NOTE = { missing: 'Not on Google Fonts: pick another or add the file', uploaded: 'Your font file', system: 'System font', google: 'Google Fonts' };
-    box.innerHTML = `<div class="row" style="justify-content:space-between"><span class="lab">Fonts</span><label class="hint link" for="fontInput">Add font files</label></div>` +
+    box.innerHTML = `<div class="row" style="justify-content:space-between"><span class="lab">Fonts</span><button class="hint link" type="button" data-addfonts>Add font files</button></div>` +
       [...use].sort((a, b) => b[1] - a[1]).map(([fam, n]) => {
         const pick = S.fonts.picks.find(p => p.family === fam) || {}, st = fontStatus[fam] || 'google';
         const opts = [...new Set([fam, ...(pick.alternatives || []), ...uploads])];

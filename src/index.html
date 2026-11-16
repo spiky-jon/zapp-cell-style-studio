@@ -163,8 +163,12 @@ details > summary { cursor: pointer; font-weight: 500; color: var(--ink-2) }
 .fontp .other { gap: 6px } .fontp .other .inp { flex: 1; min-width: 0 }
 .hint.bad { color: var(--warn, #8A5A00) }
 .link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px }
+button.link { background: none; border: 0; padding: 0; font-family: inherit; color: inherit }
+button.hint.link { color: var(--ink-3) }
 .fflist { display: grid; gap: 6px }
 .fflist { display: grid; gap: 10px }
+.vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; opacity: 0 }
+#fontZone.over { outline: 2px dashed var(--focus); outline-offset: 4px; border-radius: 8px }
 .ffam { display: grid; gap: 4px }
 .fflist .ff { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--chip) }
 .ff .ffs { font-size: 26px; line-height: 1; text-align: center }
@@ -271,10 +275,10 @@ i.sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; box
             <div class="row"><button class="btn small" id="figmaAdd" type="button">Add frames from Figma</button><span class="hint" id="figmaMsg"></span></div>
             <p class="hint">Link to a page or a section of screen frames. Uses your Figma connection on Claude; the file must be one your Figma account can open.</p>
           </div>
-          <div class="field">
+          <div class="field" id="fontZone">
             <span>Fonts <span class="hint">(optional)</span></span>
-            <div class="row"><label class="btn small" for="fontInput">Add font files</label><span class="hint">.ttf or .otf</span></div>
-            <input type="file" id="fontInput" accept=".ttf,.otf,font/ttf,font/otf" multiple hidden>
+            <div class="row"><button class="btn small" type="button" data-addfonts>Add font files</button><span class="hint">.ttf or .otf, or drop them here</span></div>
+            <input type="file" id="fontInput" class="vh" accept=".ttf,.otf" multiple tabindex="-1" aria-hidden="true">
             <div class="fflist" id="fontFiles"></div>
             <p class="hint">The design's own fonts. Cells use them wherever the type matches, and the download includes the files. Without them, the studio picks the closest Google Fonts.</p>
           </div>
