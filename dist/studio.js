@@ -40,22 +40,25 @@
     const out = new Map();
     (function walk(o) {
       if (!o || typeof o !== 'object') return;
-      if (typeof o.family === 'string' && ('weight' in o || 'size' in o)) { if (!out.has(o.family)) out.set(o.family, new Set()); out.get(o.family).add(Math.round((+o.weight || 400) / 100) * 100); }
+      const pf = typeof o.postscript === 'string' && faceByPs(o.postscript); if (pf) { if (!out.has(pf.family)) out.set(pf.family, new Set()); out.get(pf.family).add(pf.weight); }
+      else if (typeof o.family === 'string' && ('weight' in o || 'size' in o)) { if (!out.has(o.family)) out.set(o.family, new Set()); out.get(o.family).add(Math.round((+o.weight || 400) / 100) * 100); }
       for (const v of Object.values(o)) walk(v);
     })(desc);
     return out;
   };
   // every font object in a description (a label's font, a button's font…)
   const fontObjs = desc => { const out = []; (function walk(o) { if (!o || typeof o !== 'object') return;
-    if (typeof o.family === 'string' && ('weight' in o || 'size' in o)) out.push(o); for (const v of Object.values(o)) walk(v); })(desc); return out; };
+    if ((typeof o.family === 'string' || typeof o.postscript === 'string') && ('weight' in o || 'size' in o || 'postscript' in o)) out.push(o); for (const v of Object.values(o)) walk(v); })(desc); return out; };
   const allFaces = () => Object.values(S.fonts.uploads).flatMap(u => u.faces);
   const faceByPs = ps => (ps ? allFaces().find(f => f.ps.toLowerCase() === String(ps).toLowerCase()) : null) || null;
-  // Uploaded fonts are named by their PostScript name, as Zapp lists them. Each font in an uploaded family is pinned to one
-  // face: its "postscript" decides (family and weight follow it); without one, the nearest weight in the family.
+  // Uploaded fonts are named by their PostScript name only, as Zapp names them ({ "postscript": "Channel4ChadwickMedium",
+  // "size": 16… }): family and weight come from the file. A font given by family and weight in an uploaded family is
+  // pinned to the nearest face. A PostScript name that isn't uploaded is dropped (the family, or Inter, is used).
   function stampFonts(desc) {
     for (const o of fontObjs(desc)) {
       const face = faceByPs(o.postscript) || (S.fonts.uploads[o.family] ? faceFor(o.family, +o.weight || 400) : null);
-      if (face) { o.family = face.family; o.weight = face.weight; o.postscript = face.ps; } else if (o.postscript) delete o.postscript;
+      if (face) { const rest = { ...o }; delete rest.family; delete rest.weight; delete rest.postscript; for (const k of Object.keys(o)) delete o[k]; Object.assign(o, { postscript: face.ps, ...rest }); }
+      else if (o.postscript) { delete o.postscript; if (!o.family) o.family = 'Inter'; }
     }
     return desc;
   }
@@ -183,12 +186,14 @@
   // removes uploaded faces; cells that used them move to the nearest face left in the family (or its Google match)
   async function removeFaces(list) {
     const gone = new Set(list.map(x => x.toLowerCase())), hit = S.cells.filter(c => [...facesUsed(c.desc)].some(ps => gone.has(ps.toLowerCase())));
+    const removed = new Map(allFaces().filter(f => gone.has(f.ps.toLowerCase())).map(f => [f.ps.toLowerCase(), f]));
     for (const [fam, u] of Object.entries(S.fonts.uploads)) {
       for (const f of u.faces.filter(f => gone.has(f.ps.toLowerCase()))) for (const doc of [document, engine?.document].filter(Boolean)) doc.querySelectorAll(`style[data-font="${CSS.escape(f.ps)}"]`).forEach(x => x.remove());
       u.faces = u.faces.filter(f => !gone.has(f.ps.toLowerCase()));
       if (!u.faces.length) { delete S.fonts.uploads[fam]; delete fontStatus[fam]; }
     }
-    for (const c of hit) for (const o of fontObjs(c.desc)) if (o.postscript && gone.has(o.postscript.toLowerCase())) delete o.postscript;
+    // fonts named by a removed face keep its family and weight, so they move to the nearest face left (or the Google match)
+    for (const c of hit) for (const o of fontObjs(c.desc)) if (o.postscript && gone.has(o.postscript.toLowerCase())) { const f = removed.get(o.postscript.toLowerCase()); delete o.postscript; if (f) { o.family = f.family; o.weight = f.weight; } }
     renderFontFiles(); renderFontPanel();
     toast(`Removed ${list.length === 1 ? list[0] : `${list.length} fonts`}${hit.length ? `; rebuilding ${hit.length} cell${hit.length > 1 ? 's' : ''}` : ''}`);
     for (const c of hit) { stampFonts(c.desc); await ensureFonts(c.desc); await buildCell(c); }
@@ -630,7 +635,7 @@ return { icons: out, specs, cells };`;
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
       'Return the whole response described under "Whole response" in the FORMAT: cells, seen, screen (this screen top to bottom as components, using exact cell names, with the text each item shows in "texts"), spacing (the screen padding, the gap between components and its background), navigation (the status bar, navigation bar and bottom tab bar, as plugins) and icons.',
       S.iconsSet || S.iconsTouched ? `The icon library is already chosen (${S.icons.library}); repeat it in "icons".` : '',
-      allFaces().length ? `UPLOADED FONTS (the design's own font files, by PostScript name): ${allFaces().map(f => `${f.ps} = ${f.family} ${f.sub}${f.italic && !/italic/i.test(f.sub) ? ' italic' : ''}, weight ${f.weight}`).join('; ')}. Wherever the design's type matches one (Figma layer details name the family and style), set the font's "postscript" to that PostScript name exactly, with its family and weight, and list the family in "fonts" with "source": "uploaded".` : '',
+      allFaces().length ? `UPLOADED FONTS (the design's own font files, by PostScript name): ${allFaces().map(f => `${f.ps} = ${f.family} ${f.sub}${f.italic && !/italic/i.test(f.sub) ? ' italic' : ''}, weight ${f.weight}`).join('; ')}. Wherever the design's type matches one (Figma layer details name the family and style), give that font as its PostScript name only, e.g. { "postscript": "${allFaces()[0]?.ps}", "size": 16, "lineHeight": 24, "letterSpacing": 0 } (no family or weight), and list the family in "fonts" with "source": "uploaded".` : '',
       S.fonts.picks.length ? `Fonts already chosen for earlier screens (use the same family for the same type here, and repeat them in "fonts"): ${S.fonts.picks.map(p => `${p.family} for ${p.seen || 'text'}`).join('; ')}` : '',
       (scr.figmaIcons || []).length ? `ICONS FROM THE FIGMA FILE${scr.sheet ? ' (the second image shows them, numbered in this order)' : ''}: ${scr.figmaIcons.map((r, i) => `${i + 1}. ${r} "${S.figmaIcons[r]?.name}" ${S.figmaIcons[r]?.w}x${S.figmaIcons[r]?.h}${S.figmaIcons[r]?.mono ? '' : ' (multi-colour)'}`).join('; ')}. These are the design's own icons: wherever a cell uses one (badges, action icons, header buttons, button icons), set the icon to its exact ref (e.g. "${scr.figmaIcons[0]}") instead of a role name. Use a role only for an icon that isn't in this list. If a Figma icon already includes its background shape (a filled square or circle behind the glyph), set the badge background to null so it isn't drawn twice.` : '',
       'Work in this order: write the inventory first (every visible element, top to bottom), then fonts, then the cells that build every inventory element, then seen, screen and icons.',
@@ -861,7 +866,7 @@ return { icons: out, specs, cells };`;
     const touched = [];
     for (const c of S.cells) {
       let hit = false;
-      (function walk(o) { if (!o || typeof o !== 'object') return; if (o.family === from && ('weight' in o || 'size' in o)) { o.family = to; hit = true; } for (const v of Object.values(o)) walk(v); })(c.desc);
+      (function walk(o) { if (!o || typeof o !== 'object') return; const pf = typeof o.postscript === 'string' && faceByPs(o.postscript); if (pf && pf.family === from) { o.family = to; o.weight = pf.weight; delete o.postscript; hit = true; } else if (o.family === from && ('weight' in o || 'size' in o)) { o.family = to; hit = true; } for (const v of Object.values(o)) walk(v); })(c.desc);
       if (hit) touched.push(c);
     }
     const p = S.fonts.picks.find(x => x.family === from);
@@ -1415,7 +1420,7 @@ return { icons: out, specs, cells };`;
   function fontNames(list) {
     const out = new Map();
     for (const c of list) for (const o of fontObjs(c.desc)) {
-      const w = Math.round((+o.weight || 400) / 100) * 100, face = faceByPs(o.postscript) || faceFor(o.family, w), ps = face ? face.ps : C.psName({ family: o.family, weight: w });
+      const pf = faceByPs(o.postscript), w = pf ? pf.weight : Math.round((+o.weight || 400) / 100) * 100, face = pf || faceFor(o.family, w), ps = face ? face.ps : C.psName({ family: o.family, weight: w });
       if (!out.has(ps)) out.set(ps, { ps, family: face ? face.family : o.family, weight: face ? face.weight : w, face, status: face ? 'uploaded' : fontStatus[o.family] || 'google' });
     }
     return [...out.values()].sort((a, b) => a.family.localeCompare(b.family) || a.weight - b.weight);

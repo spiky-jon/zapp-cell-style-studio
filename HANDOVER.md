@@ -79,8 +79,9 @@ also undoing space moved into label margins or line height. Logged per cell. Che
 
 Uploaded fonts: faces are named by their PostScript name, as Zapp lists them. The weight comes from the style name
 (Regular 400, Medium 500, Bold 700…) because some files carry a wrong weight number (the Ch4 files all say 500);
-the fonts list says so per family. Each font in a description carries `postscript` for an uploaded face (stamped
-on analysis and every build: the PostScript name decides, family and weight follow). The Designs tab lists every
+the fonts list says so per family. An uploaded face is named in descriptions by its PostScript name only
+(`{ "postscript": "Channel4ChadwickMedium", "size": 16, … }`, no family or weight, matching a Zapp export); family
+and weight come from the file. Stamped on analysis and every build. The Designs tab lists every
 face with its PostScript name, style, preview and the cells using it, with remove per face or family (cells move
 to the nearest face left).
 

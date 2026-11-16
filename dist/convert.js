@@ -37,7 +37,9 @@
   const setFontResolver = fn => { fontResolver = typeof fn === 'function' ? fn : null; };
   // an uploaded face is named by its PostScript name ("postscript"), checked against the uploads by the resolver
   const psName = f => (fontResolver && f && (f.family || f.postscript) && fontResolver(f.family, (f && f.weight) || 400, f.postscript))
+    || (f && f.postscript && !f.family ? String(f.postscript) : null)
     || `${famPrefix(f && f.family)}-${WEIGHTS[Math.round(((f && f.weight) || 400) / 100) * 100] || 'Regular'}`;
+  const famOf = f => (f && (f.family || f.postscript)) || null;
   const F = f => ({ font: psName(f), size: num(f && f.size, 14), lineHeight: num(f && f.lineHeight, Math.round(num(f && f.size, 14) * 1.3)), letterSpacing: num(f && f.letterSpacing, 0) });
   // Image ratios: the plugin's presets, or a custom "WxH". A size measured off a design (166x93) is snapped to the
   // nearest common ratio when it's within 2% (16:9), so cells keep clean ratios; anything else is reduced (43x60).
@@ -76,7 +78,7 @@
       text_alignment: ['left', 'center', 'right'].includes(l.align) ? l.align : 'left', text_transform: l.uppercase ? 'uppercase' : 'default',
       margin_top: mar[0], margin_right: mar[1], margin_bottom: mar[2], margin_left: mar[3],
       padding_top: pad[0], padding_right: pad[1], padding_bottom: pad[2], padding_left: pad[3], corner_radius: num(l.radius, 0), date_transform_enable: false };
-    if (l.font && l.font.family) notes.fonts.add(l.font.family);
+    if (famOf(l.font)) notes.fonts.add(famOf(l.font));
     return { id: l.role || `label${i + 1}`, type: 'label', priority: 10 - i, text: F(l.font), props,
       bind: { '*font_color*': color(l.color, '#FFFFFF'), '*background_color*': color(l.background, CLEAR) } };
   }
@@ -105,7 +107,7 @@
       // the design's label (e.g. "My List"): set once on the action plugin, so record it for the README and the preview
       if (typeof b.text === 'string' && b.text.trim() && b.label !== false) notes.buttonLabels.push({ action, text: b.text.trim() });
       if (b.icon && PLUGIN[action]) notes.buttonIcons.push({ action, role: (typeof b.icon === 'string' && b.icon !== 'true') ? b.icon : PLUGIN[action].role });
-      if (b.font && b.font.family) notes.fonts.add(b.font.family);
+      if (famOf(b.font)) notes.fonts.add(famOf(b.font));
       void n;
     });
     const m = box(btns.margin);
@@ -164,8 +166,8 @@
         title_text_switch: true, title_text_data_key: (t.dataKey === 'title' || !t.dataKey) ? 'title' : 'other', title_text_custom_data_key: (t.dataKey && t.dataKey !== 'title') ? t.dataKey : '',
         title_text_number_of_lines: Math.max(1, num(t.lines, 1)), title_text_alignment: t.align || 'left', title_text_transform: t.uppercase ? 'uppercase' : 'default',
         title_text_margin_top: '', title_text_margin_right: '', title_text_margin_bottom: '', title_text_margin_left: '' });
-      text.title_text = F(t.font); if (t.font) notes.fonts.add(t.font.family);
-      if (btnText) { text.button_text = F(btn.font || t.font); if (btn.font) notes.fonts.add(btn.font.family); }
+      text.title_text = F(t.font); if (famOf(t.font)) notes.fonts.add(famOf(t.font));
+      if (btnText) { text.button_text = F(btn.font || t.font); if (famOf(btn.font)) notes.fonts.add(famOf(btn.font)); }
       if (btnIcon) assets.push({ kind: 'header', role: btnIcon, size: num(btn.iconSize, 24), iconSize: num(btn.iconSize, 24), color: color(btn.color, '#FFFFFF'),
         file: `${slug(name)}-header-icon@3x.png`, field: 'button_icon_asset (header button icon)' });
       Object.assign(bind, { title_text_font_color: color(t.color, '#FFFFFF'), button_text_font_color: color(btn && btn.color, '#FFFFFF'),
@@ -242,7 +244,7 @@
     if (d.runtime && img) {
       const rp = box(d.runtime.padding, [1, 4, 1, 4]), rm = box(d.runtime.margin, [0, 10, 10, 0]);
       Object.assign(set, { runtime_switch: true, runtime_margin_right: rm[1], runtime_margin_bottom: rm[2], runtime_padding_top: rp[0], runtime_padding_right: rp[1], runtime_padding_bottom: rp[2], runtime_padding_left: rp[3] });
-      text.runtime = F(d.runtime.font); if (d.runtime.font) notes.fonts.add(d.runtime.font.family);
+      text.runtime = F(d.runtime.font); if (famOf(d.runtime.font)) notes.fonts.add(famOf(d.runtime.font));
       Object.assign(bind, { runtime_background_color: color(d.runtime.background, 'rgba(0,0,0,0.85)'), runtime_font_color: color(d.runtime.color, '#FFFFFF'), runtime_corner_radius: num(d.runtime.radius, 2) });
     }
 

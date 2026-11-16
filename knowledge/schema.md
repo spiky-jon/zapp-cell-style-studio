@@ -52,7 +52,8 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
           "dataKey": "extensions.tag",        // title | summary | any feed path (extensions.genre, extensions.runtime)
           "sample": "RECENTLY ADDED",         // the text in the design (used for the preview)
           "font": { "family": "DM Sans", "weight": 500, "size": 9, "lineHeight": 12, "letterSpacing": 0.6 },
-                                              //   with an uploaded font, add its PostScript name: "postscript": "Channel4ChadwickBold"
+                                              //   an uploaded font is named by its PostScript name only, as in Zapp:
+                                              //   { "postscript": "Channel4ChadwickBold", "size": 16, "lineHeight": 24, "letterSpacing": 0 }
           "color": "#172B3B",
           "background": "#E6F06E",            // null for none
           "padding": [1, 4, 1, 4], "radius": 2,
