@@ -39,12 +39,21 @@
   const psName = f => (fontResolver && f && (f.family || f.postscript) && fontResolver(f.family, (f && f.weight) || 400, f.postscript))
     || `${famPrefix(f && f.family)}-${WEIGHTS[Math.round(((f && f.weight) || 400) / 100) * 100] || 'Regular'}`;
   const F = f => ({ font: psName(f), size: num(f && f.size, 14), lineHeight: num(f && f.lineHeight, Math.round(num(f && f.size, 14) * 1.3)), letterSpacing: num(f && f.letterSpacing, 0) });
+  // Image ratios: the plugin's presets, or a custom "WxH". A size measured off a design (166x93) is snapped to the
+  // nearest common ratio when it's within 2% (16:9), so cells keep clean ratios; anything else is reduced (43x60).
+  const RATIO_PRESETS = ['16x9', '4x3', '1x1', '3x4', '2x3', '9x16', '3x2'];
+  const RATIO_COMMON = ['21x9', '2x1', '5x4', '4x5', '1x2', '5x3'];
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
   const ratioOf = r => {
     const s = String(r || '16x9').replace(/[: /]/g, 'x').toLowerCase();
-    const presets = ['16x9', '4x3', '1x1', '3x4', '2x3', '9x16', '3x2'];
-    if (presets.includes(s)) return { ratio: s, custom: '' };
+    if (RATIO_PRESETS.includes(s)) return { ratio: s, custom: '' };
     const m = s.match(/^([\d.]+)x([\d.]+)$/);
-    return m ? { ratio: 'other', custom: `${m[1]}x${m[2]}` } : { ratio: '16x9', custom: '' };
+    if (!m || !(+m[1] > 0) || !(+m[2] > 0)) return { ratio: '16x9', custom: '' };
+    const w = +m[1], h = +m[2], v = w / h;
+    const near = [...RATIO_PRESETS, ...RATIO_COMMON].map(k => { const [a, b] = k.split('x').map(Number); return { k, off: Math.abs(a / b - v) / (a / b) }; }).sort((x, y) => x.off - y.off)[0];
+    if (near.off <= 0.02) return RATIO_PRESETS.includes(near.k) ? { ratio: near.k, custom: '', from: near.k === s ? null : `${w}x${h}` } : { ratio: 'other', custom: near.k, from: near.k === s ? null : `${w}x${h}` };
+    const W = Math.round(w), H = Math.round(h), g = gcd(W, H) || 1;
+    return { ratio: 'other', custom: `${W / g}x${H / g}` };
   };
   const wh = r => { const m = String(r.custom || r.ratio).match(/([\d.]+)x([\d.]+)/); return m ? [+m[1], +m[2]] : [16, 9]; };
   const BOX = (pre, b, kind = 'margin') => { const [t, r, bo, l] = box(b); return { [`${pre}_${kind}_top`]: t, [`${pre}_${kind}_right`]: r, [`${pre}_${kind}_bottom`]: bo, [`${pre}_${kind}_left`]: l }; };
@@ -170,6 +179,8 @@
     const img = d.image || null;
     if (plugin === 'cell_2' && !img) base = 'cell_2_text';
     const r = ratioOf(img && img.ratio);
+    if (img && r.from) { const k = (r.custom || r.ratio).replace('x', ':'), [a, b] = (r.custom || r.ratio).split('x').map(Number), [w, h] = r.from.split('x').map(Number);
+      notes.warnings.push(`Image ratio set to ${k}: the design measures ${w}×${h}, ${Math.abs(w * b - h * a) < 0.01 ? 'which is' : 'which rounds to'} ${k}.`); }
     const cp = box(cell.padding);
 
     // shared cell box
@@ -465,6 +476,6 @@
     return out.length ? out.join('; ') : '';
   }
 
-  const api = { toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
+  const api = { ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

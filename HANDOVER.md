@@ -14,7 +14,7 @@ first; this note covers status and what's next.
 
 ## What the studio does now
 
-- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 22).
+- Screenshots or a Figma link in; Claude describes every cell style following `knowledge/rules.md` (version 23).
 - From Figma: a read-only `use_figma` script returns each screen's layer details (padding, gaps, fonts, colours,
   text) and exports the icons used (instances followed to their components, as SVG).
 - Cells built with the cell preview engine; gallery, inspector, icon panel (Figma icons or a matched library),
@@ -83,6 +83,10 @@ the fonts list says so per family. Each font in a description carries `postscrip
 on analysis and every build: the PostScript name decides, family and weight follow). The Designs tab lists every
 face with its PostScript name, style, preview and the cells using it, with remove per face or family (cells move
 to the nearest face left).
+
+Image ratios: `Convert.ratioOf` snaps a measured size to the nearest common ratio within 2% (the plugin presets
+16x9, 4x3, 1x1, 3x4, 2x3, 9x16, 3x2, or custom 21x9, 2x1, 5x4, 4x5, 1x2, 5x3), else reduces it; a build note says
+when it snapped (Ch4: 166x93 -> 16:9).
 
 ## Open questions
 

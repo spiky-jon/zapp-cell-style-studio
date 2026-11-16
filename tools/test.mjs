@@ -31,4 +31,8 @@ for (const k of JSON.parse(readFileSync(root + 'tools/inset-fixture.json')).case
   const d = JSON.parse(JSON.stringify(k.cell)), msg = Convert.fixInsets(d, k.layer), l = (d.labels || [])[0] || {};
   check(`spacing: ${k.name}`, { padding: d.cell && d.cell.padding, labelMargin: l.margin, lineHeight: l.font && l.font.lineHeight, headerPadding: d.header && d.header.padding, changed: !!msg }, k.expect);
 }
+// image ratios: measured sizes snap to common ratios
+for (const [inp, want] of [['166x93', '16x9'], ['353x353', '1x1'], ['166x249', '2x3'], ['390x167', '21x9'], ['16x9', '16x9'], ['43x60', '43x60'], ['300x240', '5x4']]) {
+  const r = Convert.ratioOf(inp); check(`ratio ${inp}`, { ratio: r.custom || r.ratio }, { ratio: want });
+}
 process.exit(fail ? 1 : 0);

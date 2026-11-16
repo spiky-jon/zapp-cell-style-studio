@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 22 · phone and tablet · cell plugins 16.0.0-alpha
+Version 23 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -103,8 +103,10 @@ Choosing:
 - When an item has **no image**, the image area stays (in the placeholder colour) and badges still show on it;
   the cell's shape doesn't change. (Confirmed on device.)
 - One **main image** per cell, from a feed media key: `image_base` (landscape key art), `thumb_1` (title logo),
-  `thumb_2` (poster), `thumb_3` (still). Aspect ratio from presets (16x9, 4x3, 1x1, 3x4, 2x3, 9x16) or a custom
-  `WxH`. Corner radius, a border (width, colour) and a placeholder colour are available.
+  `thumb_2` (poster), `thumb_3` (still). Aspect ratio from presets (16x9, 4x3, 1x1, 3x4, 2x3, 9x16, 3x2) or a custom
+  `WxH`. Give the ratio the image is drawn at, not its measured size: a 166x93 image is 16x9 rounded to whole points.
+  Use a preset whenever the size is within a couple of percent of one; otherwise the simplest custom ratio (21x9,
+  5x4). The studio snaps measured sizes to the nearest common ratio. Corner radius, a border (width, colour) and a placeholder colour are available.
 - One **secondary image** (title logo, channel logo, rank artwork): fixed width and height, fitted inside that
   box, positioned above or below a label or over the image (in a corner or the centre, with margins). It has
   **no border** setting.

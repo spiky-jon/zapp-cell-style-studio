@@ -33,7 +33,7 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       },
       "image": {                              // null when the cell has no picture (cell_2 and cell_info only)
         "key": "thumb_2",                     // feed media key: image_base (landscape key art), thumb_1 (logo), thumb_2 (poster), thumb_3 (still)
-        "ratio": "2x3",                       // 16x9 | 4x3 | 1x1 | 3x4 | 2x3 | 9x16 | or any "WxH" (e.g. "43x60")
+        "ratio": "2x3",                       // 16x9 | 4x3 | 1x1 | 3x4 | 2x3 | 9x16 | 3x2, or a clean "WxH" (21x9, 5x4); never the measured size
         "width": 135,                         // cell_2 only: the image's width
         "radius": 2,
         "border": null,                       // or { "width": 1, "color": "rgba(255,255,255,0.10)" }
