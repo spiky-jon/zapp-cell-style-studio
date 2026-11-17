@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 25 · phone and tablet · cell plugins 16.0.0-alpha
+Version 26 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -270,6 +270,9 @@ Choosing:
   buttons are inset (an inner content frame with side padding), put that inset on the labels, the logo and the buttons,
   and leave the cell padding at 0. On a Figma import each cell is measured against its component (size, picture, where
   each label starts and ends); known differences are fixed and the rest are listed under "Compared with Figma".
+- **On a Figma import the layers decide what is text.** Lettering with no text layer in the design is artwork (an image
+  layer, usually a title logo) and becomes the secondary image; an icon the design includes (icon=figma:…) is used
+  instead of a library icon. The studio checks both after the reading and corrects them.
 - **Focused states** (hover on web and TV, touch on mobile): buttons, the cell background and border, and each label
   have a focused colour. When the design has state variants (a Figma component set with Default and Hover, Touch,
   Pressed or Focused; the layer details list them as `states:`), give those colours in `focused` (buttons and the

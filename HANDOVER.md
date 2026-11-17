@@ -126,3 +126,12 @@ when it snapped (Ch4: 166x93 -> 16:9).
 - First known cause: Cell 3 pads the whole cell, picture included. When the design's picture runs edge to edge, side
   padding moves to the labels, logo and buttons (Ch4 Home hero: padding 12 -> labels and logo margin 12).
 - Cases live in tools/layout-fixture.json; add one whenever something slips through.
+
+## Nov 17: labels and icons checked against the Figma layers (rules v26)
+- The import script was fine (re-run on the Movie screen: title logo image layer and figma:5:20 Play icon both in the
+  layer details). The reading ignored them, so `C.reconcile(d, spec, icons)` now runs after it on Figma screens:
+  a label whose sample isn't any text layer becomes the secondary image when an image layer sits in the cell's box
+  (its single-image wrapper frame is the logo box; fit from where the image sits), else it's reported; button, badge,
+  action and header icons left as library roles take a matching Figma icon by name.
+- Results join `d.check` (fixed / issues), so they show under "Compared with Figma" even on cells that aren't Figma
+  components. Case: tools/reconcile-fixture.json (Ch4 Movie hero).

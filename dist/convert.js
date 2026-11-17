@@ -500,6 +500,66 @@
     return out.join('; ');
   }
 
+  // The Figma layer details are the truth for what is text and which icons the design uses. After the reading:
+  //  - a label whose text isn't a text layer anywhere in the design is lettering drawn into artwork (a title logo): when the
+  //    cell has an image layer for it, it becomes the secondary image; otherwise it is reported
+  //  - a button, badge or action icon left as a library role ("play") takes the design's own icon when one matches.
+  // spec: the layer details text; icons: [{ ref, name }] for this screen. Returns { fixed: [], issues: [] }.
+  function parseSpec(spec) {
+    const out = [], stack = [];
+    for (const raw of String(spec || '').split('\n')) {
+      const m = /^(\s*)([a-z_-]+) "((?:[^"\\]|\\.)*)" (-?[\d.]+),(-?[\d.]+) ([\d.]+)x([\d.]+)(.*)$/.exec(raw); if (!m) continue;
+      const depth = m[1].length / 2, n = { type: m[2], name: m[3], x: +m[4], y: +m[5], w: +m[6], h: +m[7], rest: m[8], depth, kids: [] };
+      if (n.type === 'text') { const t = /^ "((?:[^"\\]|\\.)*)"/.exec(n.rest); n.text = t ? t[1] : ''; }
+      n.image = /fill=image/.test(n.rest);
+      while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
+      n.parent = stack[stack.length - 1] || null; if (n.parent) n.parent.kids.push(n);
+      stack.push(n); out.push(n);
+    }
+    return out;
+  }
+  const normT = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const ICON_WORDS = { play: /play/, trailer: /play|trailer|movie/, add: /add|plus/, plus: /add|plus/, favourites: /add|plus|heart|bookmark/, share: /share/,
+    download: /download/, downloads: /download/, rate: /thumb|like|rate|star/, like: /thumb|like/, info: /info/, search: /search/, back: /back/, close: /close|cross/ };
+  function reconcile(d, spec, icons) {
+    const fixed = [], issues = [], nodes = parseSpec(spec);
+    if (!d || !nodes.length) return { fixed, issues };
+    const F = nodes[0], texts = nodes.filter(n => n.type === 'text'), all = new Set(texts.map(t => normT(t.text)).filter(Boolean));
+    const bb = d.bbox && d.bbox.w ? { x: d.bbox.x * F.w, y: d.bbox.y * F.h, w: d.bbox.w * F.w, h: d.bbox.h * F.h } : null;
+    const inside = n => !bb || (n.x + n.w / 2 >= bb.x - 4 && n.x + n.w / 2 <= bb.x + bb.w + 4 && n.y + n.h / 2 >= bb.y - 4 && n.y + n.h / 2 <= bb.y + bb.h + 4);
+    // 1. lettering that is artwork
+    const labs = d.labels || [];
+    for (let i = 0; i < labs.length; i++) {
+      const l = labs[i], k = normT(l && l.sample); if (!k || k.length < 3) continue;
+      if ([...all].some(t => t.includes(k) || (t.length >= 6 && k.includes(t)))) continue;
+      const pics = nodes.filter(n => n.image && inside(n) && !(bb && n.w >= bb.w * 0.9 && n.h >= bb.h * 0.5)).sort((a, b) => b.w * b.h - a.w * a.h);
+      const pic = pics[0];
+      if (!pic || d.secondaryImage) { issues.push(`"${String(l.sample).slice(0, 30)}" isn't a text layer in the design${d.secondaryImage ? '' : ' and no image layer was found for it'}: it may be artwork.`); continue; }
+      // the image's wrapper frame, when it only holds this image, is the logo's box (the image is fitted inside it)
+      const wrap = pic.parent && pic.parent.type !== 'instance' && pic.parent.kids.length === 1 && pic.parent.w <= (bb ? bb.w : F.w) * 0.9 ? pic.parent : pic;
+      const bottom = Math.abs(pic.y + pic.h - wrap.y - wrap.h) < 1, centre = Math.abs(pic.x + pic.w / 2 - wrap.x - wrap.w / 2) < 1 && pic.w < wrap.w - 1;
+      const next = texts.filter(t => inside(t) && t.y >= wrap.y + wrap.h - 1).sort((a, b) => a.y - b.y)[0];
+      const pl = box(d.cell && d.cell.padding)[3];
+      labs.splice(i, 1);
+      d.secondaryImage = { key: 'thumb_1', width: Math.round(wrap.w), height: Math.round(wrap.h), align: centre ? 'center' : 'left', fit: centre ? 'center' : bottom ? 'bottom_left' : 'top_left',
+        beforeLabel: i + 1, margin: [0, 0, next ? Math.max(0, Math.round(next.y - wrap.y - wrap.h)) : 0, bb ? Math.max(0, Math.round(wrap.x - bb.x - pl)) : 0] };
+      fixed.push(`"${String(l.sample).slice(0, 30)}" is artwork in the design (an image layer, not text), so it is the title logo image (${Math.round(wrap.w)}×${Math.round(wrap.h)}), reading thumb_1.`);
+      i--;
+    }
+    // 2. the design's own icons
+    const mine = (icons || []).filter(x => x && x.ref && x.name);
+    const pick = (role, ...hints) => { if (!mine.length) return null; const words = [role, ...hints].filter(Boolean).map(s => String(s).toLowerCase());
+      for (const w of words) { const re = ICON_WORDS[w] || ICON_WORDS[w.split(/\W/)[0]]; if (!re) continue; const hit = mine.find(x => re.test(x.name.toLowerCase())); if (hit) return hit; }
+      return null; };
+    const swap = (o, key, where, ...hints) => { const v = o && o[key]; if (!v || (typeof v === 'string' && v.startsWith('figma:'))) return;
+      const hit = pick(typeof v === 'string' ? v : null, ...hints); if (!hit) return; o[key] = hit.ref; fixed.push(`${where} uses the design's own "${hit.name}" icon.`); };
+    for (const b of (d.buttons && d.buttons.items) || []) swap(b, 'icon', `The "${b.text || b.action || ''}" button`, b.text, b.action);
+    if (d.badge) swap(d.badge, 'icon', 'The badge');
+    if (d.action) swap(d.action, 'icon', 'The action icon', d.action.action);
+    if (d.header && d.header.button) swap(d.header.button, 'icon', 'The header button');
+    return { fixed, issues };
+  }
+
   // Checks a cell against its Figma component, from numbers only (nothing is drawn): the component's size, where its main
   // image sits and where each label starts and ends, measured in Figma, against the same boxes worked out from the cell's
   // settings. Known causes are fixed here; anything else is reported in plain language. The component's own edges are the
@@ -578,6 +638,6 @@
       mobile_horizontal_indicator_margin_top: m[0], mobile_horizontal_indicator_margin_right: m[1], mobile_horizontal_indicator_margin_bottom: m[2], mobile_horizontal_indicator_margin_left: m[3] };
   }
 
-  const api = { checkLayout, indicatorStyles, ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
+  const api = { reconcile, parseSpec, checkLayout, indicatorStyles, ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -660,7 +660,7 @@ return { icons: out, specs, cells, states };`;
       '', '# RULES', K.rules, '', '# FORMAT', K.schema, '', '# WORKED EXAMPLES (from a reviewed build; match this level of detail)', JSON.stringify(K.examples),
       '', '# THIS SCREEN',
       `The attached image is the "${scr.name}" screen. It is ${scr.w} px wide and ${scr.h} px tall. The screen is ${scr.screenW} points wide (${scr.device}), so 1 point = ${(scr.w / scr.screenW).toFixed(3)} px. Give every size in points.`,
-      scr.figmaSpec ? `FIGMA LAYER DETAILS for this screen, from the design file (positions in points from the screen's top left, auto-layout padding as top,right,bottom,left, gaps, fills, strokes, and each text's content, font, size/line height, letter spacing and colour). These are exact: use them for sizes, padding, spacing, colours, fonts and sample text instead of measuring the image. Padding inside a component that wraps a row is the cell's padding; a list with gap=0 has no gap between rows. icon=figma:… marks an icon from the list below.\n${scr.figmaSpec}`
+      scr.figmaSpec ? `FIGMA LAYER DETAILS for this screen, from the design file (positions in points from the screen's top left, auto-layout padding as top,right,bottom,left, gaps, fills, strokes, and each text's content, font, size/line height, letter spacing and colour). These are exact: use them for sizes, padding, spacing, colours, fonts and sample text instead of measuring the image. Padding inside a component that wraps a row is the cell's padding; a list with gap=0 has no gap between rows. icon=figma:… marks an icon from the list below. Lettering you can see in the picture that has no text layer here is drawn into an image layer (fill=image, often a title logo): make it the secondary image, never a label.\n${scr.figmaSpec}`
         : scr.meta ? `Figma layer data for this frame: ${scr.meta.slice(0, 2000)}` : '',
       navKnown().length ? `Navigation already described on earlier screens (reuse the same variant name and values when a bar matches): ${navKnown().join(' | ')}` : '',
       known.length ? `Cell styles already described from other screens (do NOT describe these again; list their names in "seen" if they appear here): ${known.map(c => `${c.desc.name} (${c.desc.plugin}): ${c.desc.purpose || ''}`).join(' | ')}` : '',
@@ -689,7 +689,10 @@ return { icons: out, specs, cells, states };`;
           if (S.cells.some(c => c.desc.name.toLowerCase() === d.name.toLowerCase())) continue;
           const fixed = fixInsets(d, scr); if (fixed) log(`  ${d.name}: ${fixed}`);
           const st = applyFigmaStates(d, scr); if (st) log(`  ${d.name}: ${st}`);
+          const rc = scr.figmaSpec ? C.reconcile(d, scr.figmaSpec, (scr.figmaIcons || []).map(r => ({ ref: r, name: S.figmaIcons[r]?.name }))) : null;
+          if (rc?.fixed.length) log(`  ${d.name}: ${rc.fixed.join(' ')}`);
           d.check = C.checkLayout(d, figmaLayerFor(d, scr));
+          if (rc) { d.check.fixed.unshift(...rc.fixed); d.check.issues.unshift(...rc.issues); if (!d.check.checked) d.check.why = 'Not a Figma component, so its size wasn\'t measured. Its text and icons were checked against the Figma layers.'; }
           if (d.check.fixed.length) log(`  ${d.name}: ${d.check.fixed.join(' ')}`);
           if (d.check.issues.length) log(`  ${d.name}: doesn't match the design: ${d.check.issues.join(' ')}`);
           stampFonts(d);
@@ -821,9 +824,9 @@ return { icons: out, specs, cells, states };`;
   // the size check against the Figma component: matched, fixed on import, or still different
   function checkHtml(d) {
     const k = d.check; if (!k) return '';
-    if (!k.checked) return `<p class="hint">${esc(k.why || 'Not checked against Figma.')}</p>`;
+    if (!k.checked && !k.fixed.length && !k.issues.length) return `<p class="hint">${esc(k.why || 'Not checked against Figma.')}</p>`;
     const li = (t, x) => `<li class="${t}"><i aria-hidden="true">${{ works: '✓', changed: '!', alternative: '→' }[t]}</i><span>${esc(x)}</span></li>`;
-    return `<ul class="dec">${k.issues.length ? k.issues.map(x => li('changed', x)).join('') : li('works', 'Size, picture and label positions match the Figma component.')}${k.fixed.map(x => li('alternative', 'Fixed on import: ' + x)).join('')}</ul>`;
+    return `<ul class="dec">${k.issues.length ? k.issues.map(x => li('changed', x)).join('') : (k.checked ? li('works', 'Size, picture and label positions match the Figma component.') : '')}${k.fixed.map(x => li('alternative', 'Fixed on import: ' + x)).join('')}</ul>${k.checked ? '' : `<p class="hint">${esc(k.why || '')}</p>`}`;
   }
   function decisionsHtml(d) {
     const icon = { works: '✓', changed: '!', alternative: '→' };

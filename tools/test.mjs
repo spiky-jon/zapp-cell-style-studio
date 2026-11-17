@@ -41,6 +41,11 @@ for (const k of JSON.parse(readFileSync(root + 'tools/layout-fixture.json')).cas
   const d = JSON.parse(JSON.stringify(k.cell)), r = Convert.checkLayout(d, k.layer);
   check(`check: ${k.name}`, { padding: d.cell.padding, labelMargins: d.labels.map(l => l.margin), logoMargin: d.secondaryImage?.margin, issues: r.issues.length, fixed: r.fixed.length }, k.expect);
 }
+// labels and icons checked against the Figma layers (tools/reconcile-fixture.json)
+{ const k = JSON.parse(readFileSync(root + 'tools/reconcile-fixture.json')), d = JSON.parse(JSON.stringify(k.cell)), r = Convert.reconcile(d, k.spec, k.icons);
+  check('figma layers: title logo and Play icon', { labels: d.labels.length, secondaryImage: d.secondaryImage, buttonIcon: d.buttons.items[0].icon, issues: r.issues.length }, k.expect);
+  const d2 = JSON.parse(JSON.stringify(k.cell)); d2.labels.splice(0, 1); const r2 = Convert.reconcile(d2, k.spec, k.icons);
+  check('figma layers: real text left alone', { labels: d2.labels.length, secondaryImage: d2.secondaryImage, fixed: r2.fixed.length }, { labels: 2, secondaryImage: undefined, fixed: 1 }); }
 // page dots (Ch4 hero carousel)
 { const r = Convert.indicatorStyles({ width: 9, height: 9, gap: 11, color: '#787878', activeColor: '#8DFF77', align: 'center', position: 'below', margin: [27, 0, 0, 0] });
   check('page dots', r, { mobile_horizontal_indicator_toggle: true, mobile_horizontal_indicator_width: 9, mobile_horizontal_indicator_corner_radius: 4.5, mobile_horizontal_indicator_horizontal_gutter: 11,

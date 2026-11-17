@@ -1,0 +1,101 @@
+{
+  "about": "The Ch4 Movie screen's layer details (as the import reads them) and the hero as Claude described it: the title logo read as text and the Play button left on a library icon.",
+  "spec": "frame \"Movie Screen\" 0,0 392x1098.8 auto=vertical pad=0,0,0,0 gap=24 fill=#1e1e1e\n  frame \"Screen Content\" 0,0 392x991.3 auto=vertical pad=0,0,48,0 gap=24\n    frame \"Hero\" 0,0 392x703 auto=vertical pad=0,0,0,0 gap=12\n      frame \"Content\" 0,0 392x643 auto=vertical pad=0,0,0,0 gap=0\n        frame \"Show Hero\" 0,0 392x523 auto=vertical pad=0,12,12,12 gap=8 fill=#3e3e3e\n          frame \"Image\" 0,0 392x523 fill=image\n          frame \"Overlay\" 0,0 392x523 fill=gradient(#1e1e1e1a 0, #1e1e1e 1)\n          frame \"Image Bounds 16x9\" 12,404 190x107 auto=vertical pad=0,0,0,0 gap=8\n            rectangle \"iNudegFbTBAGBB529k7wGVivqE4 1\" 12,484 190x27 fill=image\n        frame \"Content\" 0,523 392x120 auto=vertical pad=0,12,0,12 gap=12\n          frame \"Text Labels\" 12,523 368x60 auto=vertical pad=0,0,0,0 gap=4\n            text \"Summary\" 12,523 368x36 \"It’s all caramel from tracle tart to millionaire shortbread\" Channel 4 Chadwick Regular 16/18 #ffffff\n            frame \"Meta\" 12,563 368x20 auto=horizontal pad=0,0,0,0 gap=6\n              frame \"Frame 12\" 12,563 44x20 auto=horizontal pad=0,0,0,0 gap=4\n                instance \"Comment\" 12,563 20x20 icon=figma:16:703 colour=#bbbdbe\n                instance \"Hd\" 36,563 20x20 icon=figma:16:704 colour=#bbbdbe\n              text \"Drama | 159 mins\" 62,564 318x18 \"Drama | 159 mins\" Channel 4 Chadwick Medium 14/18 ls=-0.4 #bbbdbe\n          instance \"Button\" 12,595 368x48 auto=horizontal pad=14,0,14,0 gap=12 fill=#8dff77\n            instance \"Play arrow\" 163.5,609 20x20 icon=figma:5:20 colour=#000000\n            frame \"Button Labels\" 195.5,609 33x18 auto=horizontal pad=0,0,0,0 gap=6\n              text \"Summary\" 195.5,609 33x18 \"Play\" Channel 4 Chadwick Medium 16/18 #000000\n      frame \"Small Buttons\" 0,655 392x48 auto=horizontal pad=0,12,0,12 gap=4\n        instance \"Small Button\" 12,655 120x48 auto=vertical pad=0,0,0,0 gap=4\n          instance \"Add\" 58,655 28x28 icon=figma:25:1798 colour=#ffffff\n          text \"My List\" 49.5,687 45x16 \"My List\" Channel 4 Chadwick Medium 13/16 #ffffff align=center",
+  "icons": [
+    {
+      "ref": "figma:16:703",
+      "name": "Comment"
+    },
+    {
+      "ref": "figma:16:704",
+      "name": "Hd"
+    },
+    {
+      "ref": "figma:5:20",
+      "name": "Play arrow"
+    },
+    {
+      "ref": "figma:25:1798",
+      "name": "Add"
+    },
+    {
+      "ref": "figma:25:1800",
+      "name": "Ios share"
+    }
+  ],
+  "cell": {
+    "name": "Movie Detail Hero",
+    "plugin": "cell_3",
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 0.585
+    },
+    "cell": {
+      "padding": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "labels": [
+      {
+        "sample": "TED LASSO",
+        "margin": [
+          0,
+          12,
+          8,
+          12
+        ]
+      },
+      {
+        "sample": "It's all caramel from tracle tart to millionaire shortbread",
+        "margin": [
+          0,
+          12,
+          4,
+          12
+        ]
+      },
+      {
+        "sample": "Drama | 159 mins",
+        "margin": [
+          0,
+          12,
+          12,
+          12
+        ]
+      }
+    ],
+    "buttons": {
+      "items": [
+        {
+          "text": "Play",
+          "action": "navigation",
+          "icon": "play"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "labels": 2,
+    "secondaryImage": {
+      "key": "thumb_1",
+      "width": 190,
+      "height": 107,
+      "align": "left",
+      "fit": "bottom_left",
+      "beforeLabel": 1,
+      "margin": [
+        0,
+        0,
+        12,
+        12
+      ]
+    },
+    "buttonIcon": "figma:5:20",
+    "issues": 0
+  }
+}
