@@ -500,6 +500,71 @@
     return out.join('; ');
   }
 
+  // Checks a cell against its Figma component, from numbers only (nothing is drawn): the component's size, where its main
+  // image sits and where each label starts and ends, measured in Figma, against the same boxes worked out from the cell's
+  // settings. Known causes are fixed here; anything else is reported in plain language. The component's own edges are the
+  // cell's edges: spacing outside it belongs to the list or the screen. Returns { checked, fixed: [], issues: [] }.
+  function checkLayout(d, L) {
+    if (!d) return { checked: false, fixed: [], issues: [] };
+    if (!L || !(L.w > 0)) return { checked: false, why: 'This cell came from a picture, not a Figma component, so it was not measured.', fixed: [], issues: [] };
+    const fixed = [], issues = [], P = d.plugin, W = L.w, cell = d.cell || (d.cell = {});
+    if (P === 'cell_info') return { checked: true, fixed, issues };
+    const labs = (d.labels || []).filter(Boolean), im = d.image ? box(d.image.margin) : null;
+    const lm = l => (l.margin = box(l.margin));
+    const r = n => Math.round(n * 10) / 10, off = (a, b, t = 1) => Math.abs(a - b) >= t;
+    // match each label to a Figma text by its sample, then by order
+    const ft = (L.texts || []).slice().sort((a, b) => a.y - b.y || a.x - b.x), used = new Set();
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 16);
+    const pairs = labs.map(l => { const k = norm(l.sample); let t = k ? ft.find(x => !used.has(x) && norm(x.s) && (norm(x.s).startsWith(k) || k.startsWith(norm(x.s)))) : null;
+      return { l, t: t ? (used.add(t), t) : null }; });
+    pairs.forEach(p => { if (!p.t) { const t = ft.find(x => !used.has(x)); if (t) { used.add(t); p.t = t; } } });
+    const flowLeft = P !== 'cell_2' || !d.image; // labels start from the cell's left edge (not beside an image)
+    const img = L.image, fills = img && img.x <= 0.5 && img.w >= W - 1;
+    // 1. a full-width image in the design, but the cell padding pushes the built one in: the design's inset belongs to the
+    //    text, the logo and the buttons, not the cell (Cell 3 pads the whole cell, picture included)
+    let p = box(cell.padding);
+    if (d.image && P !== 'cell_2' && fills && (p[1] > 0 || p[3] > 0)) {
+      const [, pr, , pl] = p;
+      for (const l of labs) { const m = lm(l); m[3] += pl; m[1] += pr; }
+      if (d.secondaryImage) { const m = box(d.secondaryImage.margin); m[3] += pl; m[1] += pr; d.secondaryImage.margin = m; }
+      if (d.buttons && d.buttons.position !== 'over_image') { const m = box(d.buttons.margin); m[3] += pl; m[1] += pr; d.buttons.margin = m; }
+      p[1] = 0; p[3] = 0; cell.padding = p;
+      fixed.push(`The picture runs edge to edge in the design, so the ${pl === pr ? pl + 'pt' : pl + 'pt and ' + pr + 'pt'} side space moved from the cell to the text${d.secondaryImage ? ', the logo' : ''}${d.buttons ? ' and the buttons' : ''}.`);
+    }
+    // 2. the image box
+    if (d.image && img && P !== 'cell_2') {
+      const bx = p[3] + im[3], bw = W - p[1] - p[3] - im[1] - im[3];
+      if (off(bx, img.x) || off(bw, img.w)) {
+        const nl = Math.max(0, img.x - p[3]), nr = Math.max(0, W - img.x - img.w - p[1]);
+        if (off(p[3] + nl, img.x) || off(W - p[1] - p[3] - nl - nr, img.w)) issues.push(`The picture is ${r(bw)}pt wide in the cell and ${r(img.w)}pt in the design.`);
+        else { im[3] = nl; im[1] = nr; d.image.margin = im; fixed.push(`Picture side space set to ${nl}pt and ${nr}pt, as in the design.`); }
+      }
+      const [rw, rh] = wh(ratioOf(d.image.ratio)), ih = (W - p[1] - p[3] - im[1] - im[3]) * rh / rw;
+      if (off(ih, img.h, 2)) issues.push(`The picture is ${r(ih)}pt tall in the cell and ${r(img.h)}pt in the design: the image shape (${rw}:${rh}) doesn't match.`);
+    }
+    // 3. where each label starts and ends
+    if (flowLeft) for (const { l, t } of pairs) {
+      if (!t || (l.align && l.align !== 'left')) continue;
+      const m = lm(l), x = p[3] + m[3], name = `"${String(l.sample || l.role || 'label').slice(0, 30)}"`;
+      if (off(x, t.x)) { m[3] = Math.max(0, r(t.x - p[3])); fixed.push(`${name} starts ${t.x}pt from the left, as in the design (was ${r(x)}pt).`); }
+      if (t.fill) { const ri = W - t.x - t.w, have = p[1] + m[1];
+        if (off(have, ri)) { m[1] = Math.max(0, r(ri - p[1])); fixed.push(`${name} stops ${r(ri)}pt from the right, as in the design (was ${r(have)}pt).`); } }
+    }
+    if (d.secondaryImage && L.logo && P !== 'cell_2' && (!d.secondaryImage.align || d.secondaryImage.align === 'left')) {
+      const m = box(d.secondaryImage.margin), x = p[3] + m[3];
+      if (off(x, L.logo.x)) { m[3] = Math.max(0, r(L.logo.x - p[3])); d.secondaryImage.margin = m; fixed.push(`The logo starts ${L.logo.x}pt from the left, as in the design (was ${r(x)}pt).`); }
+    }
+    // 4. overall height, where the cell stacks simply (picture, then labels)
+    if (P === 'cell_1' && d.image && img && !d.secondaryImage && !d.buttons && !d.progress) {
+      const [rw, rh] = wh(ratioOf(d.image.ratio)), ih = (W - p[1] - p[3] - im[1] - im[3]) * rh / rw;
+      let h = p[0] + im[0] + ih + im[2] + p[2];
+      for (const { l, t } of pairs) { const m = box(l.margin), lp = box(l.padding), lines = Math.max(1, Math.min(num(l.lines, 99) || 99, t ? t.lines : 1));
+        h += m[0] + m[2] + lp[0] + lp[2] + num(l.font && l.font.lineHeight, 16) * lines; }
+      if (off(h, L.h, 2)) issues.push(`The cell is ${r(h)}pt tall and ${r(L.h)}pt in the design.`);
+    }
+    return { checked: true, fixed, issues };
+  }
+
   // page indicators (dots) under or above a rail: the Horizontal List plugin's own fields
   function indicatorStyles(d) {
     if (!d || typeof d !== 'object') return null;
@@ -513,6 +578,6 @@
       mobile_horizontal_indicator_margin_top: m[0], mobile_horizontal_indicator_margin_right: m[1], mobile_horizontal_indicator_margin_bottom: m[2], mobile_horizontal_indicator_margin_left: m[3] };
   }
 
-  const api = { indicatorStyles, ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
+  const api = { checkLayout, indicatorStyles, ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

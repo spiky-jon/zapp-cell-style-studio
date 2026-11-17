@@ -115,3 +115,14 @@ when it snapped (Ch4: 166x93 -> 16:9).
 - **Page dots**: screen item `indicators` -> `C.indicatorStyles` -> mobile_horizontal_indicator_* on the
   Horizontal List; drawn under (or above) the rail in the preview and listed in the side panel. Ch4 Home: 9x9,
   gap 11, 27 below, centred, #8dff77 / #787878.
+
+## Nov 17: cells checked against their Figma component (rules v25)
+- `contentBox` (import script) now also returns the main picture (`image`), a smaller second picture (`logo`) and each
+  text's box (`x`, `y`, `w`, `lines` from its pixel line height, `fill`, sample `s`), relative to the component.
+- `C.checkLayout(d, L)` (convert.js) works out the same boxes from the cell's settings, with no drawing: picture box,
+  where each left-aligned label starts and ends, the logo's start, and (Cell 1, picture then labels) the total height.
+  It fixes known causes and reports the rest; result on `d.check` = { checked, fixed[], issues[] }, shown under
+  "Compared with Figma" in the inspector and report, and as a "Check" pill on the cell card.
+- First known cause: Cell 3 pads the whole cell, picture included. When the design's picture runs edge to edge, side
+  padding moves to the labels, logo and buttons (Ch4 Home hero: padding 12 -> labels and logo margin 12).
+- Cases live in tools/layout-fixture.json; add one whenever something slips through.

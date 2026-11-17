@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 24 · phone and tablet · cell plugins 16.0.0-alpha
+Version 25 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -264,6 +264,12 @@ Choosing:
   (theme default 12; set it to 0 for rows that touch, see "List rows" above).
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
+- **The component's edges are the cell's edges.** Spacing on the frames around a cell (a list's or rail's padding, the
+  screen's side margins, the gap between cells) belongs to the component or the screen, never the cell. Inside the cell,
+  Cell 3's padding insets everything, picture included: when the picture runs edge to edge and only the text, logo and
+  buttons are inset (an inner content frame with side padding), put that inset on the labels, the logo and the buttons,
+  and leave the cell padding at 0. On a Figma import each cell is measured against its component (size, picture, where
+  each label starts and ends); known differences are fixed and the rest are listed under "Compared with Figma".
 - **Focused states** (hover on web and TV, touch on mobile): buttons, the cell background and border, and each label
   have a focused colour. When the design has state variants (a Figma component set with Default and Hover, Touch,
   Pressed or Focused; the layer details list them as `states:`), give those colours in `focused` (buttons and the

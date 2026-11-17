@@ -484,7 +484,8 @@ const contentBox = n => { const b = n.absoluteBoundingBox; if (!b) return null; 
     const leaf = k.type === 'TEXT' || (k.type === 'INSTANCE' && isIcon(k)) || (Array.isArray(k.fills) && k.fills.some(f => f.visible !== false && f.type === 'IMAGE'))
       || (filled && /image|img|thumb|poster|artwork|picture|photo|still|cover/i.test(k.name)) || (filled && k.type === 'RECTANGLE') || ['VECTOR', 'BOOLEAN_OPERATION', 'ELLIPSE', 'POLYGON', 'STAR'].indexOf(k.type) >= 0;
     const spans = kb.width >= b.width * 0.95 && kb.height >= b.height * 0.95;
-    if (leaf && !spans) { x0 = Math.min(x0, kb.x); y0 = Math.min(y0, kb.y); x1 = Math.max(x1, kb.x + kb.width); y1 = Math.max(y1, kb.y + kb.height); if (k.type === 'TEXT') texts.push({ h: r1(kb.height), lines: k.characters.split('\\n').length }); return; }
+    if (leaf && !spans) { x0 = Math.min(x0, kb.x); y0 = Math.min(y0, kb.y); x1 = Math.max(x1, kb.x + kb.width); y1 = Math.max(y1, kb.y + kb.height); if (k.type === 'TEXT') { const lh = k.lineHeight && k.lineHeight.unit === 'PIXELS' ? k.lineHeight.value : 0;
+      texts.push({ h: r1(kb.height), lines: lh ? Math.max(1, Math.round(kb.height / lh)) : k.characters.split('\\n').length, x: r1(kb.x - b.x), y: r1(kb.y - b.y), w: r1(kb.width), fill: k.textAutoResize !== 'WIDTH_AND_HEIGHT', s: k.characters.slice(0, 40) }); } return; }
     if ('children' in k) for (const c of k.children) visit(c); };
   if ('children' in n) for (const c of n.children) visit(c);
   if (x0 === Infinity) return null;
@@ -497,7 +498,11 @@ const contentBox = n => { const b = n.absoluteBoundingBox; if (!b) return null; 
     if (t && !dividers.top && Math.abs(kb.y - b.y) < 2) dividers.top = { width: t, color: hex(sp) };
     if (bo && !dividers.bottom && Math.abs(kb.y + kb.height - b.y - b.height) < 2) dividers.bottom = { width: bo, color: hex(sp) }; };
   edge(n); if ('findAll' in n) for (const k of n.findAll(x => x.visible && (x.type === 'FRAME' || x.type === 'INSTANCE' || x.type === 'RECTANGLE'))) edge(k);
-  return { inset: [y0 - b.y, b.x + b.width - x1, b.y + b.height - y1, x0 - b.x].map(v => Math.max(0, Math.round(v))), w: r1(b.width), h: r1(b.height), texts, dividers }; };
+  // the main picture (the biggest image or artwork layer) and a smaller one beside it (a logo or second image), for the size check
+  const rel = k => { const kb = k.absoluteBoundingBox; return { x: r1(kb.x - b.x), y: r1(kb.y - b.y), w: r1(kb.width), h: r1(kb.height) }; };
+  const pics = ('findAll' in n ? n.findAll(k => k.visible && k.absoluteBoundingBox && !(k.type === 'INSTANCE' && isIcon(k)) && Array.isArray(k.fills) && k.fills.some(f => f.visible !== false && (f.type === 'IMAGE' || (/image|img|thumb|poster|artwork|picture|photo|still|cover/i.test(k.name) && (f.opacity == null || f.opacity > 0))))) : []).map(rel).sort((p, q) => q.w * q.h - p.w * p.h);
+  const image = pics[0] || null, logo = image ? pics.find(p => p.w * p.h < image.w * image.h * 0.5) || null : null;
+  return { inset: [y0 - b.y, b.x + b.width - x1, b.y + b.height - y1, x0 - b.x].map(v => Math.max(0, Math.round(v))), w: r1(b.width), h: r1(b.height), texts, dividers, image, logo }; };
 // state variants (Default, Hover, Touch, Pressed, Focused, Selected, Active…) of a component set: how each one looks
 const STATE = /^(default|normal|rest|idle|enabled|hover|hovered|focus|focused|touch|touched|press|pressed|active|selected|checked|highlighted|disabled|on|off)$/i;
 const looks = v => { const o = { fill: paint(v.fills), stroke: paint(v.strokes), texts: [], icons: [] };
@@ -684,6 +689,9 @@ return { icons: out, specs, cells, states };`;
           if (S.cells.some(c => c.desc.name.toLowerCase() === d.name.toLowerCase())) continue;
           const fixed = fixInsets(d, scr); if (fixed) log(`  ${d.name}: ${fixed}`);
           const st = applyFigmaStates(d, scr); if (st) log(`  ${d.name}: ${st}`);
+          d.check = C.checkLayout(d, figmaLayerFor(d, scr));
+          if (d.check.fixed.length) log(`  ${d.name}: ${d.check.fixed.join(' ')}`);
+          if (d.check.issues.length) log(`  ${d.name}: doesn't match the design: ${d.check.issues.join(' ')}`);
           stampFonts(d);
           const c = { id: uid(), desc: d, screenId: scr.id, screens: [scr.name], crop: cropOf(scr, d.bbox) };
           S.cells.push(c);
@@ -806,9 +814,16 @@ return { icons: out, specs, cells, states };`;
     $('list').querySelectorAll('.item').forEach(b => b.onclick = () => { S.sel = b.dataset.id; renderAll(); });
     $('grid').innerHTML = S.cells.map(c => `<button class="card" data-id="${c.id}" aria-current="${c.id === S.sel}">
       <div class="thumbs"><div style="background:var(--chip)">${c.crop ? `<img src="${c.crop}" alt="">` : '<span class="hint">No original</span>'}</div><div style="background:${esc(cellBg(c))}">${c.snap ? `<img src="${c.snap}" alt="">` : ''}</div></div>
-      <div class="t"><b>${esc(c.desc.name)}</b><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span></div></button>`).join('');
+      <div class="t"><b>${esc(c.desc.name)}</b><span class="pill ${esc(c.desc.status)}">${esc(STATUS[c.desc.status] || '')}</span>${c.desc.check?.issues?.length ? '<span class="pill adapted" title="Doesn\'t match the Figma component: see Compared with Figma">Check</span>' : ''}</div></button>`).join('');
     $('grid').querySelectorAll('.card').forEach(b => b.onclick = () => { S.sel = b.dataset.id; renderAll(); $('stage').scrollIntoView({ block: 'nearest' }); });
     renderStage(); renderInspector(); renderFontPanel(); renderFontFiles();
+  }
+  // the size check against the Figma component: matched, fixed on import, or still different
+  function checkHtml(d) {
+    const k = d.check; if (!k) return '';
+    if (!k.checked) return `<p class="hint">${esc(k.why || 'Not checked against Figma.')}</p>`;
+    const li = (t, x) => `<li class="${t}"><i aria-hidden="true">${{ works: '✓', changed: '!', alternative: '→' }[t]}</i><span>${esc(x)}</span></li>`;
+    return `<ul class="dec">${k.issues.length ? k.issues.map(x => li('changed', x)).join('') : li('works', 'Size, picture and label positions match the Figma component.')}${k.fixed.map(x => li('alternative', 'Fixed on import: ' + x)).join('')}</ul>`;
   }
   function decisionsHtml(d) {
     const icon = { works: '✓', changed: '!', alternative: '→' };
@@ -842,6 +857,7 @@ return { icons: out, specs, cells, states };`;
         </div>
         ${(c.warnings || []).map(w => `<div class="warn">${esc(w)}</div>`).join('')}
       </div>
+      ${d.check ? `<div class="sec"><span class="lab">Compared with Figma</span>${checkHtml(d)}</div>` : ''}
       <div class="sec"><span class="lab">What works and what changed</span>${decisionsHtml(d)}</div>
       <div class="sec"><span class="lab">Data keys</span><p class="hint">Which feed field each label and image reads.</p>
         <div class="kv">${labels.map((l, i) => `<label for="dk${i}">${esc(l.role || 'Label ' + (i + 1))}</label><input class="inp mono" id="dk${i}" data-i="${i}" value="${esc(l.dataKey || '')}" list="dkText">`).join('')}
@@ -1596,7 +1612,7 @@ return { icons: out, specs, cells, states };`;
         <span class="hint">${esc(TYPE[c.desc.plugin] || '')} · ${esc(c.output || '')}</span>${c.desc.purpose ? `<p class="purpose">${esc(c.desc.purpose)}</p>` : ''}
         <div class="pair"><div class="pane"><span class="lab">Original design</span><div class="frame">${c.crop ? `<img src="${c.crop}" alt="">` : '<span class="none">No original</span>'}</div></div>
         <div class="pane"><span class="lab">Built cell</span><div class="frame" style="background:${esc(cellBg(c))}">${c.snap ? `<img src="${c.snap}" alt="">` : ''}</div></div></div>
-        ${decisionsHtml(c.desc)}</section>`).join('')}`;
+        ${decisionsHtml(c.desc)}${c.desc.check?.checked ? checkHtml(c.desc) : ''}</section>`).join('')}`;
   }
   const imgSize = url => new Promise(ok => { const i = new Image(); i.onload = () => ok([i.naturalWidth, i.naturalHeight]); i.onerror = () => ok([1, 1]); i.src = url; });
   async function reportPdf() {

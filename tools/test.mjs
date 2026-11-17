@@ -36,6 +36,11 @@ for (const k of JSON.parse(readFileSync(root + 'tools/inset-fixture.json')).case
 for (const [inp, want] of [['166x93', '16x9'], ['353x353', '1x1'], ['166x249', '2x3'], ['390x167', '21x9'], ['16x9', '16x9'], ['43x60', '43x60'], ['300x240', '5x4']]) {
   const r = Convert.ratioOf(inp); check(`ratio ${inp}`, { ratio: r.custom || r.ratio }, { ratio: want });
 }
+// the size check against the Figma component (tools/layout-fixture.json)
+for (const k of JSON.parse(readFileSync(root + 'tools/layout-fixture.json')).cases) {
+  const d = JSON.parse(JSON.stringify(k.cell)), r = Convert.checkLayout(d, k.layer);
+  check(`check: ${k.name}`, { padding: d.cell.padding, labelMargins: d.labels.map(l => l.margin), logoMargin: d.secondaryImage?.margin, issues: r.issues.length, fixed: r.fixed.length }, k.expect);
+}
 // page dots (Ch4 hero carousel)
 { const r = Convert.indicatorStyles({ width: 9, height: 9, gap: 11, color: '#787878', activeColor: '#8DFF77', align: 'center', position: 'below', margin: [27, 0, 0, 0] });
   check('page dots', r, { mobile_horizontal_indicator_toggle: true, mobile_horizontal_indicator_width: 9, mobile_horizontal_indicator_corner_radius: 4.5, mobile_horizontal_indicator_horizontal_gutter: 11,

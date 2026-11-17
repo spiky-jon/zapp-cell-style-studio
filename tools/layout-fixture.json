@@ -1,0 +1,31 @@
+{
+  "about": "Cells as Claude described them, with the Figma component measured in the same way the import does (sizes relative to the component). The check must fix known causes and report the rest.",
+  "cases": [
+    {
+      "name": "Ch4 Home hero: list padding put on the cell",
+      "cell": { "name": "Hero Card", "plugin": "cell_3", "cell": { "padding": [0, 12, 0, 12] },
+        "image": { "key": "image_base", "ratio": "1x1", "margin": [0, 0, 0, 0] },
+        "secondaryImage": { "key": "thumb_1", "width": 190, "height": 107, "align": "left", "margin": [0, 0, 15, 0] },
+        "labels": [ { "sample": "A cracking quarter-final", "font": { "size": 13, "lineHeight": 18 }, "margin": [0, 0, 6, 0], "lines": 1 },
+                    { "sample": "It's all caramel from tracle tart to millionaire shortbread", "font": { "size": 16, "lineHeight": 18 }, "margin": [0, 0, 0, 0], "lines": 2 } ] },
+      "layer": { "w": 353, "h": 353, "image": { "x": 0, "y": 0, "w": 353, "h": 353 }, "logo": { "x": 12, "y": 251, "w": 190, "h": 27 },
+        "texts": [ { "x": 12, "y": 293, "w": 329, "h": 18, "lines": 1, "fill": true, "s": "A cracking quarter-final" },
+                   { "x": 12, "y": 317, "w": 329, "h": 36, "lines": 2, "fill": true, "s": "It’s all caramel from tracle tart to mil" } ] },
+      "expect": { "padding": [0, 0, 0, 0], "labelMargins": [[0, 12, 6, 12], [0, 12, 0, 12]], "logoMargin": [0, 12, 15, 12], "issues": 0 }
+    },
+    {
+      "name": "Poster tile already right",
+      "cell": { "name": "Poster", "plugin": "cell_1", "cell": { "padding": [0, 0, 0, 0] }, "image": { "ratio": "2x3", "margin": [0, 0, 8, 0] },
+        "labels": [ { "sample": "Bake Off", "font": { "lineHeight": 20 }, "margin": [0, 0, 0, 0], "lines": 1 } ] },
+      "layer": { "w": 120, "h": 208, "image": { "x": 0, "y": 0, "w": 120, "h": 180 }, "texts": [ { "x": 0, "y": 188, "w": 120, "h": 20, "lines": 1, "fill": true, "s": "Bake Off" } ] },
+      "expect": { "padding": [0, 0, 0, 0], "labelMargins": [[0, 0, 0, 0]], "issues": 0, "fixed": 0 }
+    },
+    {
+      "name": "Poster tile with the wrong image shape is reported",
+      "cell": { "name": "Poster", "plugin": "cell_1", "cell": { "padding": [0, 0, 0, 0] }, "image": { "ratio": "16x9", "margin": [0, 0, 8, 0] },
+        "labels": [ { "sample": "Bake Off", "font": { "lineHeight": 20 }, "margin": [0, 0, 0, 0], "lines": 1 } ] },
+      "layer": { "w": 120, "h": 208, "image": { "x": 0, "y": 0, "w": 120, "h": 180 }, "texts": [ { "x": 0, "y": 188, "w": 120, "h": 20, "lines": 1, "fill": true, "s": "Bake Off" } ] },
+      "expect": { "issues": 2 }
+    }
+  ]
+}
