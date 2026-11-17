@@ -79,8 +79,9 @@
       margin_top: mar[0], margin_right: mar[1], margin_bottom: mar[2], margin_left: mar[3],
       padding_top: pad[0], padding_right: pad[1], padding_bottom: pad[2], padding_left: pad[3], corner_radius: num(l.radius, 0), date_transform_enable: false };
     if (famOf(l.font)) notes.fonts.add(famOf(l.font));
-    return { id: l.role || `label${i + 1}`, type: 'label', priority: 10 - i, text: F(l.font), props,
-      bind: { '*font_color*': color(l.color, '#FFFFFF'), '*background_color*': color(l.background, CLEAR) } };
+    const bind = { '*font_color*': color(l.color, '#FFFFFF'), '*background_color*': color(l.background, CLEAR) };
+    if (l.focusedColor) bind['*font_color*focused*'] = color(l.focusedColor, bind['*font_color*']);
+    return { id: l.role || `label${i + 1}`, type: 'label', priority: 10 - i, text: F(l.font), props, bind };
   }
 
   function buttonsSpec(btns, notes) {
@@ -101,8 +102,11 @@
       });
       if (mode === 'fixed') set[`${p}_width`] = num(b.width);
       const bg = color(b.background, CLEAR), fg = color(b.color, '#FFFFFF'), bc = b.border ? color(b.border.color, bg) : bg;
-      Object.assign(bind, { [`${p}_background_color`]: bg, [`${p}_focused_background_color`]: bg, [`${p}_font_color`]: fg, [`${p}_focused_font_color`]: fg,
-        [`${p}_border_color`]: bc, [`${p}_focused_border_color`]: bc, [`${p}_corner_radius`]: num(b.radius, 0) });
+      // the focused state (hover on web and TV, touch on mobile): the design's own when it has one, otherwise the same as default
+      const fo = b.focused && typeof b.focused === 'object' ? b.focused : {}, fbg = color(fo.background, bg), ffg = color(fo.color, fg);
+      const fbc = b.border ? color(fo.border && fo.border.color, bc) : fbg;
+      Object.assign(bind, { [`${p}_background_color`]: bg, [`${p}_focused_background_color`]: fbg, [`${p}_font_color`]: fg, [`${p}_focused_font_color`]: ffg,
+        [`${p}_border_color`]: bc, [`${p}_focused_border_color`]: fbc, [`${p}_corner_radius`]: num(b.radius, 0) });
       text[p] = F(b.font || { family: 'Inter', weight: 500, size: 15, lineHeight: 20 });
       // the design's label (e.g. "My List"): set once on the action plugin, so record it for the README and the preview
       if (typeof b.text === 'string' && b.text.trim() && b.label !== false) notes.buttonLabels.push({ action, text: b.text.trim() });
@@ -189,6 +193,11 @@
     Object.assign(set, { cell_padding_top: cp[0], cell_padding_right: cp[1], cell_padding_bottom: cp[2], cell_padding_left: cp[3], ...BOX('cell', [0, 0, 0, 0]),
       cell_border_size: cell.border ? num(cell.border.width, 1) : 0, cell_border_position: 'inside' });
     Object.assign(bind, { cell_corner_radius: num(cell.radius, 0), 'cell_*background_color': color(cell.background, CLEAR), 'cell_*border_color': cell.border ? color(cell.border.color, CLEAR) : CLEAR });
+    // the cell's focused state (hover on web and TV, touch on mobile); field names differ by cell type, one pattern covers them
+    if (cell.focused && typeof cell.focused === 'object') {
+      if (cell.focused.background) bind['cell*focused*background*'] = color(cell.focused.background, CLEAR);
+      if (cell.focused.border && cell.border) bind['cell_focused*border_color'] = color(cell.focused.border.color || cell.focused.border, CLEAR);
+    }
     Object.assign(set, plugin === 'cell_3' ? C3_OFF : C12_OFF);
     if (plugin === 'cell_2') set.text_label_4_switch = false;
 
@@ -451,33 +460,59 @@
   // label margins or line height); L is the Figma layer's measured content inset, which then decides.
   function fixInsets(d, L) {
     if (!d || !L || !Array.isArray(L.inset) || d.plugin === 'cell_3') return '';
-    const [t, , b] = L.inset, out = [];
+    const out = [];
     const labs = Array.isArray(d.labels) ? d.labels.filter(Boolean) : [], first = labs[0], last = labs[labs.length - 1];
     // single-line labels keep the design's text box height as their line height (extra height is spacing, not text)
     for (const [i, l] of labs.entries()) {
-      const tx = L.texts[i]; if (!tx || !l.font || tx.lines !== 1 || (l.lines && l.lines !== 1)) continue;
+      const tx = (L.texts || [])[i]; if (!tx || !l.font || tx.lines !== 1 || (l.lines && l.lines !== 1)) continue;
       if (num(l.font.lineHeight) > tx.h + 2) { out.push(`line height ${tx.h} (was ${l.font.lineHeight})`); l.font.lineHeight = tx.h; }
     }
     const mt = l => num((l?.margin || [])[0]), mb = l => num((l?.margin || [])[2]);
     if (d.plugin === 'cell_info') {
-      const h = d.header || (d.header = {}), p = Array.isArray(h.padding) ? h.padding.slice() : [null, null, null, null];
+      const [t, , b] = L.inset, h = d.header || (d.header = {}), p = Array.isArray(h.padding) ? h.padding.slice() : [null, null, null, null];
       if (Math.abs(num(p[0]) - t) > 1.5 || Math.abs(num(p[2]) - b) > 1.5) { out.push(`padding top and bottom ${t} and ${b} (was ${num(p[0])} and ${num(p[2])})`); p[0] = t; p[2] = b; h.padding = p; }
-    } else {
-      const cell = d.cell || (d.cell = {}), p = box(cell.padding);
-      // what the description puts above the first content and below the last (padding, plus label margins in a text-only cell)
-      const textOnly = !d.image, im = box(d.image?.margin);
-      const top = p[0] + (textOnly ? mt(first) : im[0]), bottom = p[2] + (textOnly ? mb(last) : d.plugin === 'cell_1' ? mb(last) : im[2]);
-      // text-only cells follow the layer exactly; with an image, only missing space is added (the image's own margins vary by type)
-      const off = textOnly ? Math.abs(top - t) > 1.5 || Math.abs(bottom - b) > 1.5 : top < t - 1.5 || bottom < b - 1.5;
-      if (off) {
-        out.push(`padding top and bottom ${t} and ${b}, as in the Figma layer (was ${top} and ${bottom})`);
-        p[0] = t; p[2] = b; cell.padding = p;
-        if (textOnly) { if (first?.margin) first.margin[0] = 0; if (last?.margin) last.margin[2] = 0; }
-      }
+      return out.join('; ');
     }
-    return out.length ? out.join('; ') : '';
+    const cell = d.cell || (d.cell = {}), p = box(cell.padding), textOnly = !d.image, im = box(d.image?.margin);
+    // A line along the top or bottom of the cell (Cell 2) sits outside its padding: top line, then the content with the cell
+    // padding around it, then the bottom line. So the space between content and a line is the padding plus the line's own
+    // margin on that side: the space goes in the padding, the line's top and bottom margins stay 0 (never both: that doubles it).
+    // The measured inset includes a line drawn inside the layer, so its thickness comes off.
+    const lines = L.dividers || {};
+    const sides = [['top', 0, 'dividerTop'], ['bottom', 2, 'dividerBottom']];
+    for (const [side, i, key] of sides) {
+      const fl = lines[side];
+      if (fl && !cell[key] && d.plugin === 'cell_2') { cell[key] = { thickness: fl.width, color: fl.color, margin: [0, 0, 0, 0] }; out.push(`a ${fl.width}pt line along the ${side}, as in the Figma layer`); }
+      const dv = cell[key], dm = dv ? box(dv.margin) : null;
+      const space = Math.max(0, L.inset[i] - (fl ? num(fl.width) : dv ? num(dv.thickness, 1) : 0));
+      const lineGap = dv ? (side === 'top' ? dm[2] + dm[0] : dm[0] + dm[2]) : 0;
+      const labelGap = textOnly ? (side === 'top' ? mt(first) : mb(last)) : side === 'top' ? im[0] : d.plugin === 'cell_1' ? mb(last) : im[2];
+      const have = p[i] + lineGap + labelGap;
+      // text-only cells follow the layer exactly; with an image, only missing or doubled space is fixed (image margins vary by type)
+      const off = textOnly || dv ? Math.abs(have - space) >= 1 : have < space - 1.5;
+      if (!off) continue;
+      out.push(`${side} padding ${space}${dv ? ` and the ${side} line's margins 0` : ''}, as in the Figma layer (was ${p[i]}${lineGap ? ` plus ${lineGap} on the line` : ''}${labelGap && textOnly ? ` plus ${labelGap} on the label` : ''})`);
+      p[i] = space;
+      if (dv) { dm[0] = 0; dm[2] = 0; dv.margin = dm; }
+      if (textOnly) { if (side === 'top' && first?.margin) first.margin[0] = 0; if (side === 'bottom' && last?.margin) last.margin[2] = 0; }
+    }
+    cell.padding = p;
+    return out.join('; ');
   }
 
-  const api = { ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
+  // page indicators (dots) under or above a rail: the Horizontal List plugin's own fields
+  function indicatorStyles(d) {
+    if (!d || typeof d !== 'object') return null;
+    const w = num(d.width, num(d.size, 8)), h = num(d.height, num(d.size, w)), m = box(d.margin, [15, 0, 15, 0]);
+    return { mobile_horizontal_indicator_toggle: true, mobile_horizontal_indicator_position: d.position === 'top' ? 'top' : 'below',
+      mobile_horizontal_indicator_width: w, mobile_horizontal_indicator_height: h,
+      mobile_horizontal_indicator_color_default: solid(d.color) || 'rgba(255, 255, 255, 0.25)', mobile_horizontal_indicator_color_active: solid(d.activeColor) || 'rgba(255, 255, 255, 1)',
+      mobile_horizontal_indicator_border_color_default: solid(d.border && d.border.color) || 'transparent', mobile_horizontal_indicator_border_color_active: solid(d.border && (d.border.activeColor || d.border.color)) || 'transparent',
+      mobile_horizontal_indicator_border_thickness: num(d.border && d.border.width, 0), mobile_horizontal_indicator_corner_radius: num(d.radius, Math.min(w, h) / 2),
+      mobile_horizontal_indicator_alignment: ['left', 'right'].includes(d.align) ? d.align : 'center', mobile_horizontal_indicator_horizontal_gutter: num(d.gap, 5),
+      mobile_horizontal_indicator_margin_top: m[0], mobile_horizontal_indicator_margin_right: m[1], mobile_horizontal_indicator_margin_bottom: m[2], mobile_horizontal_indicator_margin_left: m[3] };
+  }
+
+  const api = { indicatorStyles, ratioOf, toSpec, psName, setFontResolver, famPrefix, color, box, slug, pascal, PLUGIN, navBar, tabBar, fixInsets, NAV_DEFAULT, TAB };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Convert = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,23 +1,429 @@
 {
   "note": "Cells whose space inside their edges was dropped or moved, with the inset measured on their Figma layer (Ch4). tools/test.mjs checks that the studio puts it back into the cell padding.",
   "cases": [
-    { "name": "Category Row, space moved under the label", "layer": { "inset": [10, 0, 9, 0], "texts": [{ "h": 24.5, "lines": 1 }] },
-      "cell": { "name": "Category Row", "plugin": "cell_2", "cell": { "padding": [0, 0, 0, 0], "dividerTop": { "thickness": 1, "color": "rgba(255,255,255,0.15)" } },
-        "labels": [{ "role": "title", "font": { "size": 16, "lineHeight": 24 }, "margin": [0, 0, 19, 0] }] },
-      "expect": { "padding": [10, 0, 9, 0], "labelMargin": [0, 0, 0, 0], "lineHeight": 24 } },
-    { "name": "Category Row, space put into line height", "layer": { "inset": [10, 0, 9, 0], "texts": [{ "h": 24, "lines": 1 }] },
-      "cell": { "name": "Category Row", "plugin": "cell_2", "cell": { "padding": [0, 0, 0, 0] }, "labels": [{ "role": "title", "font": { "size": 16, "lineHeight": 43 }, "margin": [0, 0, 0, 0] }] },
-      "expect": { "padding": [10, 0, 9, 0], "lineHeight": 24 } },
-    { "name": "Category Row, already right", "layer": { "inset": [10, 0, 9, 0], "texts": [{ "h": 24, "lines": 1 }] },
-      "cell": { "name": "Category Row", "plugin": "cell_2", "cell": { "padding": [9, 0, 9, 0] }, "labels": [{ "role": "title", "font": { "size": 16, "lineHeight": 24 } }] },
-      "expect": { "padding": [9, 0, 9, 0], "changed": false } },
-    { "name": "Page title header, no padding", "layer": { "inset": [20, 12, 20, 12], "texts": [{ "h": 40, "lines": 1 }] },
-      "cell": { "name": "Page Title", "plugin": "cell_info", "header": { "title": { "font": { "size": 36, "lineHeight": 40 } } } },
-      "expect": { "headerPadding": [20, null, 20, null] } },
-    { "name": "Episode row with image, space under the image missing", "layer": { "inset": [0, 0, 11, 0], "texts": [{ "h": 18, "lines": 1 }] },
-      "cell": { "name": "Show", "plugin": "cell_2", "cell": { "padding": [0, 0, 0, 0] }, "image": { "width": 166, "margin": [0, 12, 0, 0] }, "labels": [{ "font": { "size": 16, "lineHeight": 18 } }] },
-      "expect": { "padding": [0, 0, 11, 0] } },
-    { "name": "Text over image is left alone", "layer": { "inset": [251, 12, 0, 12], "texts": [] },
-      "cell": { "name": "Hero", "plugin": "cell_3", "cell": { "padding": [0, 0, 0, 0] } }, "expect": { "changed": false } }
+    {
+      "name": "Category Row, space moved under the label (the 1pt top line takes a point)",
+      "layer": {
+        "inset": [
+          10,
+          0,
+          9,
+          0
+        ],
+        "texts": [
+          {
+            "h": 24.5,
+            "lines": 1
+          }
+        ]
+      },
+      "cell": {
+        "name": "Category Row",
+        "plugin": "cell_2",
+        "cell": {
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "dividerTop": {
+            "thickness": 1,
+            "color": "rgba(255,255,255,0.15)"
+          }
+        },
+        "labels": [
+          {
+            "role": "title",
+            "font": {
+              "size": 16,
+              "lineHeight": 24
+            },
+            "margin": [
+              0,
+              0,
+              19,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "padding": [
+          9,
+          0,
+          9,
+          0
+        ],
+        "labelMargin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "lineHeight": 24
+      }
+    },
+    {
+      "name": "Category Row, space put into line height",
+      "layer": {
+        "inset": [
+          10,
+          0,
+          9,
+          0
+        ],
+        "texts": [
+          {
+            "h": 24,
+            "lines": 1
+          }
+        ]
+      },
+      "cell": {
+        "name": "Category Row",
+        "plugin": "cell_2",
+        "cell": {
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "labels": [
+          {
+            "role": "title",
+            "font": {
+              "size": 16,
+              "lineHeight": 43
+            },
+            "margin": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "padding": [
+          10,
+          0,
+          9,
+          0
+        ],
+        "lineHeight": 24
+      }
+    },
+    {
+      "name": "Category Row, already right",
+      "layer": {
+        "inset": [
+          9,
+          0,
+          9,
+          0
+        ],
+        "texts": [
+          {
+            "h": 24,
+            "lines": 1
+          }
+        ]
+      },
+      "cell": {
+        "name": "Category Row",
+        "plugin": "cell_2",
+        "cell": {
+          "padding": [
+            9,
+            0,
+            9,
+            0
+          ]
+        },
+        "labels": [
+          {
+            "role": "title",
+            "font": {
+              "size": 16,
+              "lineHeight": 24
+            }
+          }
+        ]
+      },
+      "expect": {
+        "padding": [
+          9,
+          0,
+          9,
+          0
+        ],
+        "changed": false
+      }
+    },
+    {
+      "name": "Page title header, no padding",
+      "layer": {
+        "inset": [
+          20,
+          12,
+          20,
+          12
+        ],
+        "texts": [
+          {
+            "h": 40,
+            "lines": 1
+          }
+        ]
+      },
+      "cell": {
+        "name": "Page Title",
+        "plugin": "cell_info",
+        "header": {
+          "title": {
+            "font": {
+              "size": 36,
+              "lineHeight": 40
+            }
+          }
+        }
+      },
+      "expect": {
+        "headerPadding": [
+          20,
+          null,
+          20,
+          null
+        ]
+      }
+    },
+    {
+      "name": "Episode row with image, space under the image missing",
+      "layer": {
+        "inset": [
+          0,
+          0,
+          11,
+          0
+        ],
+        "texts": [
+          {
+            "h": 18,
+            "lines": 1
+          }
+        ]
+      },
+      "cell": {
+        "name": "Show",
+        "plugin": "cell_2",
+        "cell": {
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "image": {
+          "width": 166,
+          "margin": [
+            0,
+            12,
+            0,
+            0
+          ]
+        },
+        "labels": [
+          {
+            "font": {
+              "size": 16,
+              "lineHeight": 18
+            }
+          }
+        ]
+      },
+      "expect": {
+        "padding": [
+          0,
+          0,
+          11,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Text over image is left alone",
+      "layer": {
+        "inset": [
+          251,
+          12,
+          0,
+          12
+        ],
+        "texts": []
+      },
+      "cell": {
+        "name": "Hero",
+        "plugin": "cell_3",
+        "cell": {
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "expect": {
+        "changed": false
+      }
+    },
+    {
+      "name": "Show Row, space doubled under a bottom line",
+      "layer": {
+        "inset": [
+          0,
+          0,
+          11,
+          0
+        ],
+        "texts": [
+          {
+            "h": 18,
+            "lines": 1
+          },
+          {
+            "h": 18,
+            "lines": 1
+          }
+        ],
+        "dividers": {
+          "bottom": {
+            "width": 1,
+            "color": "rgba(255,255,255,0.15)"
+          }
+        }
+      },
+      "cell": {
+        "name": "Show Row",
+        "plugin": "cell_2",
+        "cell": {
+          "padding": [
+            0,
+            0,
+            11,
+            0
+          ],
+          "dividerBottom": {
+            "thickness": 1,
+            "color": "rgba(255,255,255,0.15)",
+            "margin": [
+              10,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "image": {
+          "width": 166,
+          "margin": [
+            0,
+            12,
+            0,
+            0
+          ]
+        },
+        "labels": [
+          {
+            "font": {
+              "size": 16,
+              "lineHeight": 18
+            }
+          },
+          {
+            "font": {
+              "size": 14,
+              "lineHeight": 18
+            }
+          }
+        ]
+      },
+      "expect": {
+        "padding": [
+          0,
+          0,
+          10,
+          0
+        ],
+        "dividerMargin": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Category Row, top line from the Figma layer",
+      "layer": {
+        "inset": [
+          10,
+          0,
+          9,
+          0
+        ],
+        "texts": [
+          {
+            "h": 24,
+            "lines": 1
+          }
+        ],
+        "dividers": {
+          "top": {
+            "width": 1,
+            "color": "rgba(255,255,255,0.15)"
+          }
+        }
+      },
+      "cell": {
+        "name": "Category Row",
+        "plugin": "cell_2",
+        "cell": {
+          "padding": [
+            10,
+            0,
+            9,
+            0
+          ]
+        },
+        "labels": [
+          {
+            "font": {
+              "size": 16,
+              "lineHeight": 24
+            }
+          }
+        ]
+      },
+      "expect": {
+        "padding": [
+          9,
+          0,
+          9,
+          0
+        ],
+        "dividerTopMargin": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
   ]
 }

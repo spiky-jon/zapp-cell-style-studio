@@ -27,8 +27,10 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
       "appBackground": "#172B3B",             // the screen colour behind the cell
       "cell": {
         "background": "rgba(0,0,0,0)", "radius": 0, "padding": [0, 0, 0, 0],
+        "focused": null,                      // { "background": "#2A2A2A", "border": { "color": "#FFFFFF" } }: the hover/touch state, when the design has one
         "border": null,                       // or { "width": 1, "color": "rgba(255,255,255,0.14)" }
-        "dividerTop": null,                   // cell_2 only: { "thickness": 1, "color": "#4B6F80", "margin": [20, 0, 0, 0] } (its own margins, inside the cell padding)
+        "dividerTop": null,                   // cell_2 only: { "thickness": 1, "color": "#4B6F80", "margin": [0, 20, 0, 20] } (outside the cell padding:
+                                              //   space between content and a line goes in the padding; the line's top/bottom margins stay 0)
         "dividerBottom": null
       },
       "image": {                              // null when the cell has no picture (cell_2 and cell_info only)
@@ -60,13 +62,15 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
           "align": "center",                  // left | center | right
           "lines": 1,
           "uppercase": true,
-          "margin": [0, 6, 5, 6]
+          "margin": [0, 6, 5, 6],
+          "focusedColor": null                // the label's colour in the hover/touch state, when the design has one
         }
       ],
       "buttons": null,                        // { "stacking": "horizontal|vertical", "align": "left|center", "gap": 8, "margin": [0,0,0,0], "afterLabel": 3 | "position": "over_image",
                                               //   "items": [ { "action": "navigation|favourites|share|downloads|trailer", "label": true, "text": "My List", "uppercase": false,
                                               //               "icon": true | "<icon role>", "iconPosition": "left|right|top",
                                               //               "width": "fill" | "dynamic" | 260, "background": "#FFFFFF", "color": "#102C3D", "border": null, "radius": 2,
+                                              //               "focused": { "background": "#55CD3E", "color": "#000000" }  (hover/touch state, when the design has one),
                                               //               "padding": [11,16,11,16], "font": {...}, "iconSize": 22, "iconFlavour": "light|dark" } ] }
       "progress": null,                       // { "position": "on_image | above_label_1 | below_label_1 | above_label_2 | below_label_2 | bottom_of_cell",
                                               //   "height": 4, "color": "#A0FCBB", "track": "#2E4B5C", "radius": 2, "margin": [6, 92, 0, 0] }
@@ -113,6 +117,9 @@ All sizes are in points at the device's width (phone 393, tablet 1133 unless tol
     { "cell": "Section Header", "component": "single" },
     { "cell": "Page Title", "component": "single", "texts": [{ "title": "Search" }] },
     { "cell": "Poster Tile", "component": "rail", "count": 4 },          // rail: horizontal list; count = items visible
+    { "cell": "Hero Card", "component": "rail", "count": 1,                // a swipeable carousel with page dots under it
+      "indicators": { "width": 9, "height": 9, "radius": 4.5, "gap": 11, "color": "#787878", "activeColor": "#8DFF77",
+                      "align": "center", "position": "below", "margin": [27, 0, 0, 0] } },
     { "cell": "Category Row", "component": "list", "count": 3,           // list: vertical list
       "texts": [{ "title": "All Shows" }, { "title": "Audio Described" }, { "title": "Comedy" }] },  // what each item shows here
     { "cell": "Poster Tile", "component": "grid", "columns": 3, "count": 6 }

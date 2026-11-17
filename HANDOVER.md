@@ -102,3 +102,16 @@ when it snapped (Ch4: 166x93 -> 16:9).
 - Navigation bar and tab bar in the PDF report (not there yet).
 - Run Jon's real test designs end to end (screenshots and the Ch4 Figma file) and review results.
 - Later scope: components, plugins, web, TV.
+
+## Nov 17: hover states, line spacing, page dots (rules v24)
+- **Figma states**: the import script reads each instance's component set; a variant property with two or more
+  state-like options (Default/Hover/Touch/Pressed/Focused...) is listed as `states:` in the layer details and
+  returned as `states`. `applyFigmaStates` (studio.js) maps them to button `focused`, cell `focused` and label
+  `focusedColor`; convert.js writes them to the focused fields (buttons, cell background/border, labels).
+  Ch4: Button Default #8dff77, Touch #55cd3e.
+- **Lines and padding**: Cell 2 draws top line, padded content, bottom line. `fixInsets` now takes the lines from
+  the Figma layer (`dividers` in contentBox), puts the space in the padding and zeroes the line's top/bottom
+  margins. Show Row: 104 = 93 + 10 + 1 gives padding bottom 10, line margin 0.
+- **Page dots**: screen item `indicators` -> `C.indicatorStyles` -> mobile_horizontal_indicator_* on the
+  Horizontal List; drawn under (or above) the rail in the preview and listed in the side panel. Ch4 Home: 9x9,
+  gap 11, 27 below, centred, #8dff77 / #787878.

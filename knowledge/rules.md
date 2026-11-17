@@ -1,6 +1,6 @@
 # Zapp mobile cell styles: rules
 
-Version 23 · phone and tablet · cell plugins 16.0.0-alpha
+Version 24 · phone and tablet · cell plugins 16.0.0-alpha
 
 These rules decide how a design becomes Zapp cell styles. They were learned by rebuilding a full streaming app
 (ITVX) cell by cell and reviewing the results on device. Follow them exactly: when a design asks for something
@@ -205,7 +205,11 @@ Choosing:
 - Cell padding, background, corner radius and border (inside) are on the cell. Cell 2 also has top and bottom
   **dividers** (thickness, colour). Each divider has **its own margins** (top, right, bottom, left), added inside
   the cell's side padding, so the top and bottom dividers can have different insets (e.g. a full-width top line
-  and a shorter bottom line). (Confirmed on device.) Both start from the cell's side padding. Components have **20pt side padding by
+  and a shorter bottom line). (Confirmed on device.) Dividers sit **outside the cell padding**: top divider, then the
+  content with the cell padding around it, then the bottom divider (from the plugin code). So the space between the
+  content and a bottom line is the cell's bottom padding plus the line's top margin: put the space in the padding and
+  leave the divider's top and bottom margins at 0, never both (that doubles the space). A line drawn inside a Figma
+  layer counts towards its height: a 104pt row with a 1pt bottom line and 10pt under the content is padding 10, line 1. Both start from the cell's side padding. Components have **20pt side padding by
   default** (a theme value), changed per component when a design needs something else. For a divider flush
   with the screen edges, set that component's side padding to 0 and give the cell no side padding, and inset the content
   with the labels' (and image's and buttons') own margins. Don't use negative margins for this.
@@ -260,6 +264,15 @@ Choosing:
   (theme default 12; set it to 0 for rows that touch, see "List rows" above).
 - Things around cells belong to the **component**, not the cell: carousel peek, page dots, rail gaps and item
   widths, grid columns, side insets. Note them, don't build them.
+- **Focused states** (hover on web and TV, touch on mobile): buttons, the cell background and border, and each label
+  have a focused colour. When the design has state variants (a Figma component set with Default and Hover, Touch,
+  Pressed or Focused; the layer details list them as `states:`), give those colours in `focused` (buttons and the
+  cell) and `focusedColor` (labels). Without one, focused matches the default. Selected and disabled states aren't
+  set from the design.
+- **Page indicators (dots)** under a swipeable rail or carousel are a Horizontal List setting: dot width and height,
+  default and active colours, optional border, corner radius (half the size for round dots), the gap between dots,
+  alignment (left, centre, right), above or below the rail, and margins. Describe them in `indicators` on that
+  screen item, never as a cell.
 - **The navigation bar and the bottom tab bar are plugins, not cells.** Describe them in `navigation` (never as
   cells) so the studio can set up the two plugins. Each screen carries its own navigation bar settings, so
   screens can use different bars (a top-level bar with a logo, a second-level bar with back and a title, a

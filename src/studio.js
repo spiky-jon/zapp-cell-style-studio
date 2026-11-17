@@ -466,7 +466,7 @@
   // Preferred: one read-only script in the file finds every icon instance in the screens, follows it to its component,
   // and exports that component as SVG (vector, any size). Layer data alone can't see inside component instances.
   const ICON_SCRIPT = ids => `const frameIds = ${JSON.stringify(ids)};
-const icons = new Map(), specs = {}, cells = {};
+const icons = new Map(), specs = {}, cells = {}, states = {};
 const r1 = v => Math.round(v * 10) / 10;
 const hex = p => { const c = p.color, h = v => Math.round(v * 255).toString(16).padStart(2, '0'); return '#' + h(c.r) + h(c.g) + h(c.b) + (p.opacity != null && p.opacity < 1 ? h(p.opacity) : ''); };
 const paint = ps => { if (!Array.isArray(ps)) return ''; const p = ps.find(x => x.visible !== false); if (!p) return ''; return p.type === 'SOLID' ? hex(p) : p.type === 'IMAGE' ? 'image' : p.type.indexOf('GRADIENT') === 0 ? 'gradient(' + p.gradientStops.map(g => hex({ color: g.color, opacity: g.color.a }) + ' ' + r1(g.position)).join(', ') + ')' : p.type.toLowerCase(); };
@@ -488,7 +488,30 @@ const contentBox = n => { const b = n.absoluteBoundingBox; if (!b) return null; 
     if ('children' in k) for (const c of k.children) visit(c); };
   if ('children' in n) for (const c of n.children) visit(c);
   if (x0 === Infinity) return null;
-  return { inset: [y0 - b.y, b.x + b.width - x1, b.y + b.height - y1, x0 - b.x].map(v => Math.max(0, Math.round(v))), w: r1(b.width), h: r1(b.height), texts }; };
+  // a line along the top or bottom edge: a one-sided stroke on the layer (or a full-width frame in it)
+  const dividers = {}, edge = k => { if (!('strokes' in k) || !Array.isArray(k.strokes)) return; const sp = k.strokes.find(p => p.visible !== false && p.type === 'SOLID'); if (!sp) return;
+    const kb = k.absoluteBoundingBox; if (!kb || kb.width < b.width * 0.9) return;
+    const t = typeof k.strokeTopWeight === 'number' ? k.strokeTopWeight : 0, bo = typeof k.strokeBottomWeight === 'number' ? k.strokeBottomWeight : 0;
+    const l = typeof k.strokeLeftWeight === 'number' ? k.strokeLeftWeight : 0, rr = typeof k.strokeRightWeight === 'number' ? k.strokeRightWeight : 0;
+    if (l || rr) return;
+    if (t && !dividers.top && Math.abs(kb.y - b.y) < 2) dividers.top = { width: t, color: hex(sp) };
+    if (bo && !dividers.bottom && Math.abs(kb.y + kb.height - b.y - b.height) < 2) dividers.bottom = { width: bo, color: hex(sp) }; };
+  edge(n); if ('findAll' in n) for (const k of n.findAll(x => x.visible && (x.type === 'FRAME' || x.type === 'INSTANCE' || x.type === 'RECTANGLE'))) edge(k);
+  return { inset: [y0 - b.y, b.x + b.width - x1, b.y + b.height - y1, x0 - b.x].map(v => Math.max(0, Math.round(v))), w: r1(b.width), h: r1(b.height), texts, dividers }; };
+// state variants (Default, Hover, Touch, Pressed, Focused, Selected, Active…) of a component set: how each one looks
+const STATE = /^(default|normal|rest|idle|enabled|hover|hovered|focus|focused|touch|touched|press|pressed|active|selected|checked|highlighted|disabled|on|off)$/i;
+const looks = v => { const o = { fill: paint(v.fills), stroke: paint(v.strokes), texts: [], icons: [] };
+  if ('findAll' in v) { for (const t of v.findAll(x => x.type === 'TEXT' && x.visible)) o.texts.push(paint(t.fills));
+    for (const g of v.findAll(x => x.visible && ['VECTOR', 'BOOLEAN_OPERATION'].indexOf(x.type) >= 0)) { const c = paint(g.fills); if (c && o.icons.indexOf(c) < 0) o.icons.push(c); } }
+  return o; };
+const statesOf = main => { const set = main && main.parent; if (!set || set.type !== 'COMPONENT_SET') return null;
+  const defs = set.componentPropertyDefinitions || {}, cur = main.variantProperties || {};
+  for (const prop of Object.keys(defs)) { const d = defs[prop]; if (d.type !== 'VARIANT' || (d.variantOptions || []).filter(o => STATE.test(o)).length < 2) continue;
+    const variants = {};
+    for (const v of set.children) { const vp = v.variantProperties || {}; if (vp[prop] === cur[prop]) continue;
+      if (Object.keys(cur).every(k => k === prop || vp[k] === cur[k])) variants[vp[prop]] = looks(v); }
+    if (Object.keys(variants).length) return { set: set.name, prop, current: cur[prop], base: looks(main), variants }; }
+  return null; };
 const glyphColour = n => { const v = n.findAll(x => x.visible && ['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'ELLIPSE', 'POLYGON'].indexOf(x.type) >= 0 && Array.isArray(x.fills) && x.fills.some(f => f.visible !== false && f.type === 'SOLID'));
   if (!v.length) return ''; const f = v[v.length - 1].fills.find(f => f.visible !== false && f.type === 'SOLID'); return f ? hex(f) : ''; };
 const textOf = n => { const fn = n.fontName, lh = n.lineHeight, ls = n.letterSpacing;
@@ -527,6 +550,9 @@ for (const fid of frameIds) {
       const main = await n.getMainComponentAsync();
       if (main && isIcon(n) && !glyphOf(n)) { const c = glyphColour(n); line += ' icon=figma:' + main.id + (c ? ' colour=' + c : ''); lines.push(line); size += line.length; return; }
       if (main && isIcon(n)) line += ' (wraps the icon below)';
+      const st = main && !isIcon(n) ? statesOf(main) : null;
+      if (st) { line += ' states: ' + st.prop + '=' + st.current + ' (this one); ' + Object.entries(st.variants).map(([k, v]) => k + ' fill=' + (v.fill || 'none') + (v.texts.length ? ' text=' + v.texts.join('/') : '') + (v.stroke ? ' stroke=' + v.stroke : '')).join('; ');
+        const list = states[fid] || (states[fid] = []); if (!list.some(x => x.set === st.set && x.current === st.current)) list.push(st); }
       if (main && !isIcon(n) && n.findAllWithCriteria({ types: ['TEXT'] }).some(t => t.visible)) {
         const cb = contentBox(n);
         if (cb) { line += ' inset=' + cb.inset.join(',') + ' (content to edges, top,right,bottom,left: the cell padding)';
@@ -552,7 +578,7 @@ for (const ic of icons.values()) {
   try { svg = await ic.node.exportAsync({ format: 'SVG_STRING' }); } catch (e) { svg = null; }
   if (svg && svg.length < 60000) out.push({ id: ic.id, name: ic.name, w: ic.w, h: ic.h, frames: ic.frames, svg });
 }
-return { icons: out, specs, cells };`;
+return { icons: out, specs, cells, states };`;
   const svgColours = svg => [...new Set([...svg.replace(/<defs>[\s\S]*?<\/defs>/g, '').matchAll(/(?:fill|stroke)(?:=|:\s*)"?(#[0-9a-f]{3,8}|rgba?\([^)]*\)|[a-z]+)/gi)].map(m => m[1].toLowerCase()).filter(c => c !== 'none' && c !== 'transparent' && !c.startsWith('url')))];
   async function figmaIconsViaPlugin(fileKey, sid, added) {
     if (!mcp || !added.length) return false;
@@ -561,7 +587,7 @@ return { icons: out, specs, cells };`;
     try { data = JSON.parse(txt); } catch (e) { const a = txt.indexOf('{'), z = txt.lastIndexOf('}'); data = a >= 0 ? JSON.parse(txt.slice(a, z + 1)) : null; }
     const list = Array.isArray(data) ? data : data?.icons;
     if (!Array.isArray(list)) return false;
-    for (const { scr, f } of added) { if (data?.specs?.[f.id]) scr.figmaSpec = data.specs[f.id]; if (data?.cells?.[f.id]) scr.figmaCells = data.cells[f.id]; }
+    for (const { scr, f } of added) { if (data?.specs?.[f.id]) scr.figmaSpec = data.specs[f.id]; if (data?.cells?.[f.id]) scr.figmaCells = data.cells[f.id]; if (data?.states?.[f.id]) scr.figmaStates = data.states[f.id]; }
     for (const ic of list) {
       if (!ic || !ic.svg) continue;
       const ref = `figma:${ic.id}`;
@@ -657,6 +683,7 @@ return { icons: out, specs, cells };`;
           if (!d || !d.name) continue;
           if (S.cells.some(c => c.desc.name.toLowerCase() === d.name.toLowerCase())) continue;
           const fixed = fixInsets(d, scr); if (fixed) log(`  ${d.name}: ${fixed}`);
+          const st = applyFigmaStates(d, scr); if (st) log(`  ${d.name}: ${st}`);
           stampFonts(d);
           const c = { id: uid(), desc: d, screenId: scr.id, screens: [scr.name], crop: cropOf(scr, d.bbox) };
           S.cells.push(c);
@@ -703,6 +730,34 @@ return { icons: out, specs, cells };`;
     const k = Object.keys(rec).find(k => names.includes(k.toLowerCase())); return k ? rec[k] : null;
   }
   const fixInsets = (d, scr) => C.fixInsets(d, figmaLayerFor(d, scr));
+  // State variants in the Figma file (a Button set with Default and Touch, a card with Default and Hover) become the cell's
+  // focused colours: hover on web and TV, touch on mobile. Claude is asked for them; anything it leaves out is filled in here.
+  const FOCUS = /hover|focus|touch|press|highlight/i;
+  const hex6 = c => { const m = /^#?([0-9a-f]{6})/i.exec(String(c || '').trim()); if (m) return m[1].toLowerCase();
+    const r = String(c || '').match(/[\d.]+/g); return r && r.length >= 3 ? r.slice(0, 3).map(v => Math.round(+v).toString(16).padStart(2, '0')).join('') : ''; };
+  function applyFigmaStates(d, scr) {
+    const sets = scr.figmaStates || []; if (!sets.length) return '';
+    const focusOf = st => Object.entries(st.variants).find(([k]) => FOCUS.test(k));
+    const out = [];
+    // buttons: matched to a set by their default background
+    for (const b of d.buttons?.items || []) {
+      if (b.focused) continue;
+      const st = sets.find(x => x.base.fill && hex6(x.base.fill) === hex6(b.background) && focusOf(x)); if (!st) continue;
+      const [name, v] = focusOf(st), f = {};
+      if (v.fill && hex6(v.fill) !== hex6(st.base.fill)) f.background = v.fill;
+      if (v.texts[0] && hex6(v.texts[0]) !== hex6(st.base.texts[0])) f.color = v.texts[0];
+      if (Object.keys(f).length) { b.focused = f; out.push(`button "${b.text || b.action || ''}" ${name.toLowerCase()} state from the Figma ${st.set} component`); }
+    }
+    // the cell itself: its Figma component has state variants
+    const own = sets.find(x => [d.figmaLayer, d.name].filter(Boolean).some(n => String(n).toLowerCase() === x.set.toLowerCase()));
+    const fv = own && focusOf(own);
+    if (fv) {
+      const [name, v] = fv, cell = d.cell || (d.cell = {});
+      if (!cell.focused && v.fill && hex6(v.fill) !== hex6(own.base.fill)) { cell.focused = { background: v.fill }; out.push(`${name.toLowerCase()} background from the Figma ${own.set} component`); }
+      (d.labels || []).forEach((l, i) => { const t = v.texts[i]; if (l && !l.focusedColor && t && hex6(t) !== hex6(own.base.texts[i])) { l.focusedColor = t; out.push(`label ${i + 1} ${name.toLowerCase()} colour`); } });
+    }
+    return out.join('; ');
+  }
 
   // Headers usually line up with the first item of the rail, list or grid under them. When a header's title starts a
   // few points off that edge (a measuring slip), move it onto the edge; bigger differences are left as designed.
@@ -905,7 +960,17 @@ return { icons: out, specs, cells };`;
     const all = Array.from({ length: n }, (_, i) => at(i));
     // rails make every item as tall as the deepest one, filled with the cell's background (as on device)
     const fill = c.desc?.cell?.background || 'transparent', boxed = (x, w, h, H) => `<div style="flex:none;width:${w ?? x.w}px;height:${H}px;background:${esc(fill)}">${im(x, w, h)}</div>`;
-    if (comp === 'rail') { const H = Math.max(...all.map(x => x.h)); return { h: H, html: `<div class="blk" style="gap:${gap}px;padding-left:${pad}px;align-items:flex-start">${all.map(x => boxed(x, null, null, H)).join('')}</div>` }; }
+    if (comp === 'rail') {
+      const H = Math.max(...all.map(x => x.h)), rail = `<div class="blk" style="gap:${gap}px;padding-left:${pad}px;align-items:flex-start">${all.map(x => boxed(x, null, null, H)).join('')}</div>`;
+      const ind = item.indicators && C.indicatorStyles(item.indicators);
+      if (!ind) return { h: H, html: rail };
+      // page dots, as the Horizontal List draws them: one per item, the first one active
+      const dotsN = Math.max(2, Math.min(10, +item.dots || +item.count || 5));
+      const dot = on => `<i style="display:block;flex:none;width:${ind.mobile_horizontal_indicator_width}px;height:${ind.mobile_horizontal_indicator_height}px;border-radius:${ind.mobile_horizontal_indicator_corner_radius}px;background:${on ? ind.mobile_horizontal_indicator_color_active : ind.mobile_horizontal_indicator_color_default};${ind.mobile_horizontal_indicator_border_thickness ? `box-shadow:inset 0 0 0 ${ind.mobile_horizontal_indicator_border_thickness}px ${on ? ind.mobile_horizontal_indicator_border_color_active : ind.mobile_horizontal_indicator_border_color_default};` : ''}"></i>`;
+      const dots = `<div style="display:flex;gap:${ind.mobile_horizontal_indicator_horizontal_gutter}px;justify-content:${{ left: 'flex-start', right: 'flex-end' }[ind.mobile_horizontal_indicator_alignment] || 'center'};margin:${ind.mobile_horizontal_indicator_margin_top}px ${ind.mobile_horizontal_indicator_margin_right + pad}px ${ind.mobile_horizontal_indicator_margin_bottom}px ${ind.mobile_horizontal_indicator_margin_left + pad}px">${Array.from({ length: dotsN }, (_, i) => dot(i === 0)).join('')}</div>`;
+      const dh = ind.mobile_horizontal_indicator_margin_top + ind.mobile_horizontal_indicator_height + ind.mobile_horizontal_indicator_margin_bottom;
+      return { h: H + dh, html: `<div style="display:flex;flex-direction:column">${ind.mobile_horizontal_indicator_position === 'top' ? dots + rail : rail + dots}</div>` };
+    }
     if (comp === 'list') { const rg = num(lay.rowGap ?? 0);
       return { h: all.reduce((a, x) => a + x.h, 0) + (n - 1) * rg, html: `<div class="blk" style="flex-direction:column;gap:${rg}px;padding:0 ${pad}px">${all.map(x => im(x)).join('')}</div>` }; }
     // grids: each row as tall as its deepest item
@@ -1005,6 +1070,7 @@ return { icons: out, specs, cells };`;
       else Object.assign(st, { horizontal_list_scaled_switch: false, horizontal_list_cell_width: L.itemWidth });
     }
     if (comp === 'grid') st.component_columns = +it.columns || d.columns || 2;
+    if (comp === 'rail' && it.indicators) Object.assign(st, C.indicatorStyles(it.indicators));
     if (p.gapH != null && p.gapH !== T.gutterH.value) st.component_gutter_horizontal = p.gapH;
     if (p.gapV != null && p.gapV !== T.gutterV.value) st.component_gutter_vertical = p.gapV;
     // a header left on the theme's margin would open a gap above its list, so it is always set
@@ -1092,6 +1158,7 @@ return { icons: out, specs, cells };`;
     if (p.comp !== 'single' && !p.header) row('Items shown', n);
     if (p.comp === 'rail') row('Cell width', L.cellsPerView ? `Scaled: ${L.cellsPerView} per view, next cell offset ${L.peek}` : `Fixed: ${L.itemWidth}`);
     if (p.comp === 'grid') row('Columns', st.component_columns);
+    if (st.mobile_horizontal_indicator_toggle) row('Page dots', `${st.mobile_horizontal_indicator_width}×${st.mobile_horizontal_indicator_height}, gap ${st.mobile_horizontal_indicator_horizontal_gutter}, ${st.mobile_horizontal_indicator_alignment}, ${st.mobile_horizontal_indicator_margin_top} ${st.mobile_horizontal_indicator_position === 'top' ? 'above' : 'below'}`, true);
     if (!p.header) row('Side padding', p.pad ?? T.padding.value, 'component_padding_left' in st);
     if (p.gapH != null) row('Gap between cells', p.gapH, 'component_gutter_horizontal' in st);
     if (p.gapV != null) row('Gap between rows', p.gapV, 'component_gutter_vertical' in st);
